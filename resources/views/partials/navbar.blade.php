@@ -3,10 +3,10 @@
     $topbarRouteName = (string) optional(request()->route())->getName();
 
     $topbarModuleTitle = match (true) {
-        request()->routeIs('ai.*') => 'EGO AI Copilot',
         request()->routeIs('orders.*', 'order-returns.*', 'orders.returns.*') => 'Đơn hàng',
-        request()->routeIs('customers.*', 'customer-profiles.*', 'sales.work-reports.*') => 'Khách hàng',
+        request()->routeIs('customers.*', 'customer-profiles.*') => 'Khách hàng',
         request()->routeIs('products.*', 'product-categories.*', 'serial-warranty.*') => 'Sản phẩm',
+        request()->routeIs('projects-unified.*', 'ky-thuat.maintenance.*') => 'Dự án',
         request()->routeIs('sites.*', 'ky-thuat.*', 'technical.*') => 'Công trình & Kỹ thuật',
         request()->routeIs('finance.*', 'payment_requests.*', 'payment-requests.*', 'payment_methods.*') => 'Tài chính',
         request()->routeIs('hr.*') => 'Nhân sự',
@@ -73,7 +73,7 @@
         <div class="crm-topbar__left">
             <button
                 type="button"
-                class="crm-topbar__icon-button crm-topbar__desktop-sidebar-toggle"
+                class="crm-topbar__icon-button crm-topbar__sidebar-toggle"
                 id="crmSidebarToggle"
                 aria-label="Thu gọn hoặc mở rộng thanh bên"
                 title="Thu gọn hoặc mở rộng menu"
@@ -81,16 +81,6 @@
                 <i class="bi bi-layout-sidebar-inset" aria-hidden="true"></i>
             </button>
 
-            {{-- EGO_WORKSPACE_APP_LAUNCHER_START --}}
-            <a
-                href="{{ route('workspace.index') }}"
-                class="crm-topbar__icon-button crm-topbar__desktop-app-launcher"
-                aria-label="Mở Trung tâm ứng dụng"
-                title="Trung tâm ứng dụng"
-            >
-                <i class="bi bi-grid-3x3-gap-fill" aria-hidden="true"></i>
-            </a>
-            {{-- EGO_WORKSPACE_APP_LAUNCHER_END --}}
             <button
                 type="button"
                 class="crm-topbar__icon-button crm-topbar__mobile-menu"
@@ -121,10 +111,6 @@
                 <strong class="crm-topbar__module-title">{{ $topbarModuleTitle }}</strong>
             </div>
 
-            <span class="crm-topbar__status-chip" title="Chủ động phối hợp, tăng tốc hiệu suất">
-                <span class="crm-topbar__status-dot" aria-hidden="true"></span>
-                Chủ động phối hợp, tăng tốc hiệu suất
-            </span>
         </div>
 
 
@@ -149,57 +135,42 @@
             </span>
         </a>
 
-        <div class="crm-topbar__center" aria-label="Hỏi Đáp AI">
+        <nav class="crm-topbar__center" aria-label="Điều hướng nhanh">
+            {{-- EGO_AI_ASSISTANT_SEARCH_INCLUDE --}}
+            @include('partials.ai-assistant-search')
+
+            <a
+                href="{{ route('solar.calculator') }}"
+                class="crm-topbar__quick-link {{ request()->routeIs('solar.*') ? 'is-active' : '' }}"
+            >
+                <i class="bi bi-sun" aria-hidden="true"></i>
+                <span>Công cụ Solar</span>
+            </a>
+
+            <a
+                href="{{ $topbarQuoteUrl }}"
+                class="crm-topbar__quick-link {{ request()->routeIs('sales-quotations.*') ? 'is-active' : '' }}"
+            >
+                <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+                <span>Báo giá</span>
+            </a>
+
             @auth
-                {{-- EGO_AI_TOPBAR_PERMISSION_START --}}
-@can('ai.use')
-<a
-                    href="{{ route('ai.index') }}"
-                    class="ego-smart-search-topbar ego-topbar-ai-button {{ request()->routeIs('ai.*') ? 'is-active' : '' }}"
-                    id="egoAiTopbarButton"
-                    title="Mở EGO AI Copilot (Ctrl + K)"
+                <a
+                    href="{{ route('hr.attendance.my') }}"
+                    class="crm-topbar__quick-link {{ request()->routeIs('hr.attendance.*') ? 'is-active' : '' }}"
                 >
-                    <span class="ego-smart-search-topbar__icon" aria-hidden="true">
-                        <i class="bi bi-stars"></i>
-                    </span>
-                    <span class="ego-smart-search-topbar__text">Hỏi Đáp AI</span>
-                    <span class="ego-smart-search-topbar__key">⌘K</span>
+                    <i class="bi bi-calendar-check" aria-hidden="true"></i>
+                    <span>Chấm công</span>
                 </a>
-@endcan
-{{-- EGO_AI_TOPBAR_PERMISSION_END --}}
             @endauth
-        </div>
+        </nav>
 
         <div class="crm-topbar__right">
-            <div class="crm-topbar__right-tools" aria-label="Công cụ nhanh">
-                <a
-                    href="{{ route('solar.calculator') }}"
-                    class="crm-topbar__quick-link {{ request()->routeIs('solar.*') ? 'is-active' : '' }}"
-                >
-                    <i class="bi bi-sun" aria-hidden="true"></i>
-                    <span>Công cụ Solar</span>
-                </a>
-
-                <a
-                    href="{{ $topbarQuoteUrl }}"
-                    class="crm-topbar__quick-link {{ request()->routeIs('sales-quotations.*') ? 'is-active' : '' }}"
-                >
-                    <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
-                    <span>Báo giá</span>
-                </a>
-
-                @auth
-                    <a
-                        href="{{ route('hr.attendance.my') }}"
-                        class="crm-topbar__quick-link {{ request()->routeIs('hr.attendance.*') ? 'is-active' : '' }}"
-                    >
-                        <i class="bi bi-calendar-check" aria-hidden="true"></i>
-                        <span>Chấm công</span>
-                    </a>
-                @endauth
-            </div>
-
             @auth
+                {{-- EGO_AI_ASSISTANT_PANEL_INCLUDE --}}
+                @include('partials.ai-assistant-panel')
+
                 <div class="crm-topbar__panel-wrap crm-topbar__chat-wrap" data-crm-panel-wrap="chat">
                     <button
                         type="button"
@@ -269,7 +240,7 @@
                         <i class="bi bi-three-dots" aria-hidden="true"></i>
                     </button>
 
-                    <section class="crm-topbar__panel crm-topbar__panel--compact crm-topbar__panel--utilities" id="crmMorePanel" data-crm-panel="more" aria-hidden="true">
+                    <section class="crm-topbar__panel crm-topbar__panel--compact" id="crmMorePanel" data-crm-panel="more" aria-hidden="true">
                         <header class="crm-topbar__panel-header crm-topbar__panel-header--compact">
                             <div>
                                 <span class="crm-topbar__panel-kicker">Truy cập nhanh</span>
@@ -317,6 +288,31 @@
         <span class="crm-topbar__utility-copy">
             <strong>Tin nhắn</strong>
             <small>Trao đổi nội bộ và công việc</small>
+        </span>
+    </button>
+
+    {{-- EGO_AI_ASSISTANT_UTILITY_ITEM --}}
+    <button type="button" data-crm-open-panel="ai">
+        <span class="crm-topbar__utility-icon">
+            <i class="bi bi-stars" aria-hidden="true"></i>
+        </span>
+        <span class="crm-topbar__utility-copy">
+            <strong>Tìm kiếm thông minh</strong>
+            <small>Tìm và tổng hợp dữ liệu CRM</small>
+        </span>
+    </button>
+
+    <button
+        type="button"
+        class="crm-topbar__utility-item--wide"
+        data-ego-open-panel="notifications"
+    >
+        <span class="crm-topbar__utility-icon">
+            <i class="bi bi-bell" aria-hidden="true"></i>
+        </span>
+        <span class="crm-topbar__utility-copy">
+            <strong>Thông báo</strong>
+            <small>Xem cập nhật và các nội dung cần xử lý</small>
         </span>
     </button>
 </nav>
@@ -369,7 +365,7 @@
                         </div>
 
                         <div class="crm-topbar__panel-list" id="notifyList">
-                            <div class="crm-topbar__skeleton-list" aria-label="Đang tải thông báo">
+                            <div class="crm-topbar__skeleton-list" role="status" aria-label="Đang tải thông báo">
                                 <span></span><span></span><span></span>
                             </div>
                         </div>
@@ -423,12 +419,6 @@
                         </header>
 
                         <nav class="crm-topbar__account-menu" aria-label="Menu tài khoản">
-                            {{-- EGO_WORKSPACE_ACCOUNT_LINK_START --}}
-                            <a href="{{ route('workspace.index') }}">
-                                <i class="bi bi-grid-3x3-gap-fill" aria-hidden="true"></i>
-                                <span>Trung tâm ứng dụng</span>
-                            </a>
-                            {{-- EGO_WORKSPACE_ACCOUNT_LINK_END --}}
                             <a href="{{ route('users.profile') }}">
                                 <i class="bi bi-person" aria-hidden="true"></i>
                                 <span>Thông tin cá nhân</span>

@@ -8,15 +8,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('content_calendar_weekly_metrics', function (Blueprint $table) {
-            $table->text('feedback')->nullable()->after('note');
-        });
+        if (Schema::hasTable('content_calendar_weekly_metrics')) {
+            Schema::table('content_calendar_weekly_metrics', function (Blueprint $table) {
+                if (! Schema::hasColumn('content_calendar_weekly_metrics', 'feedback')) {
+                    $table->text('feedback')->nullable()->after('note');
+                }
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('content_calendar_weekly_metrics', function (Blueprint $table) {
-            $table->dropColumn('feedback');
-        });
+        if (Schema::hasTable('content_calendar_weekly_metrics')) {
+            Schema::table('content_calendar_weekly_metrics', function (Blueprint $table) {
+                $table->dropColumn('feedback');
+            });
+        }
     }
 };

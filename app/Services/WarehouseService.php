@@ -11,7 +11,6 @@ use App\Models\CRM\Orders\Order;
 use App\Models\Inventory\Stock\ProductStock;
 use App\Models\Inventory\Stock\StockMovement;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Service xử lý nghiệp vụ kho hàng (Warehouse).
@@ -90,24 +89,18 @@ class WarehouseService implements WarehouseServiceInterface
      */
     public function getActiveWarehouses()
     {
-        $query = Warehouse::query()->select('id', 'name', 'location');
-
-        if (Schema::hasColumn('crm_warehouses', 'is_sales_selectable')) {
-            $query->where(function ($builder) {
-                $builder->where('is_sales_selectable', 1)->orWhereNull('is_sales_selectable');
+        return Warehouse::query()
+            ->select('id', 'name', 'location')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($warehouse) {
+                return [
+                    'id' => $warehouse->id,
+                    'name' => $warehouse->name,
+                    'location' => $warehouse->location,
+                    'display' => $warehouse->name.($warehouse->location ? ' - '.$warehouse->location : ''),
+                ];
             });
-        } else {
-            $query->where('name', 'not like', '[KÝ GỬI]%');
-        }
-
-        return $query->orderBy('name')->get()->map(function ($warehouse) {
-            return [
-                'id' => $warehouse->id,
-                'name' => $warehouse->name,
-                'location' => $warehouse->location,
-                'display' => $warehouse->name.($warehouse->location ? ' - '.$warehouse->location : ''),
-            ];
-        });
     }
 
     /**

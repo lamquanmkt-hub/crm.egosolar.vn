@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Marketing;
 
 use App\Http\Controllers\Controller;
+use App\Support\ProbeFailureLog;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller tiến độ kế hoạch marketing: sinh task tự động từ kế hoạch và theo dõi trạng thái.
@@ -22,8 +23,10 @@ class MarketingProgressController extends Controller
     private function safeTable(string $table): bool
     {
         try {
-            return Schema::hasTable($table);
+            return SchemaCache::hasTable($table);
         } catch (\Throwable $e) {
+            ProbeFailureLog::warn('MarketingProgressController::safeTable', $e);
+
             return false;
         }
     }

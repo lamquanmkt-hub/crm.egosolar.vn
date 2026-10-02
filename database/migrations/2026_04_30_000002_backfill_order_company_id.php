@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('crm_orders') || !Schema::hasTable('crm_warehouses')) {
+        if (! Schema::hasTable('crm_orders') || ! Schema::hasTable('crm_warehouses')) {
             return;
         }
 
@@ -20,7 +20,7 @@ return new class extends Migration
                 foreach ($orders as $order) {
                     $companyId = null;
 
-                    if (!empty($order->warehouse_id)) {
+                    if (! empty($order->warehouse_id)) {
                         $companyId = DB::table('crm_warehouses')
                             ->where('id', $order->warehouse_id)
                             ->value('company_id');
@@ -32,14 +32,14 @@ return new class extends Migration
                             ->whereNotNull('warehouse_id')
                             ->value('warehouse_id');
 
-                        if (!empty($itemWarehouseId)) {
+                        if (! empty($itemWarehouseId)) {
                             $companyId = DB::table('crm_warehouses')
                                 ->where('id', $itemWarehouseId)
                                 ->value('company_id');
                         }
                     }
 
-                    if (!empty($companyId)) {
+                    if (! empty($companyId)) {
                         DB::table('crm_orders')
                             ->where('id', $order->id)
                             ->update(['company_id' => $companyId]);

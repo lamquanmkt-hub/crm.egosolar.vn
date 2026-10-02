@@ -8,13 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('departments', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('code')->nullable();
-            $table->text('description')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('departments')) {
+            Schema::create('departments', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->string('code')->nullable();
+                $table->text('description')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void

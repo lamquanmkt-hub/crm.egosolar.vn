@@ -4,10 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('site_assemblies')) {
+        if (! Schema::hasTable('site_assemblies')) {
             Schema::create('site_assemblies', function (Blueprint $table) {
                 $table->id();
                 $table->string('code', 50)->unique();
@@ -31,7 +32,7 @@ return new class extends Migration {
             });
         }
 
-        if (!Schema::hasTable('site_assembly_materials')) {
+        if (! Schema::hasTable('site_assembly_materials')) {
             Schema::create('site_assembly_materials', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('assembly_id');

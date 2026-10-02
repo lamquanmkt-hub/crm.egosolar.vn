@@ -128,7 +128,7 @@ textarea.egomp-control{min-height:130px;resize:vertical;line-height:1.7}
         </div>
 
         @if($errors->any())
-            <div class="alert alert-danger">{{ $errors->first() }}</div>
+            <x-ui.alert variant="danger">{{ $errors->first() }}</x-ui.alert>
         @endif
 
         <form method="POST" action="{{ route('marketing.plan.update',$plan->id) }}" enctype="multipart/form-data">
@@ -182,7 +182,7 @@ textarea.egomp-control{min-height:130px;resize:vertical;line-height:1.7}
     <div style="font-size:34px;">📎</div>
     <h4>Upload file kế hoạch</h4>
     <p>Hỗ trợ nhiều file. Có thể xem trực tiếp trong CRM mà không cần tải về.</p>
-    <input type="file" name="attachments[]" multiple class="form-control">
+    <x-ui.input type="file" name="attachments[]" multiple />
 </div>
                 </div>
             </div>

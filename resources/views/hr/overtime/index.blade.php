@@ -1,174 +1,175 @@
 @extends('layouts.app')
 
 @section('content')
-@php
-    $fmtHour = fn($n) => rtrim(rtrim(number_format((float) $n, 2, '.', ''), '0'), '.');
-@endphp
-
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+{{-- Lưới dùng `tw:row` / `tw:col12-*` / `tw:g-*`: đó là @utility tự khai trong resources/css/app.css,
+     tái lập đúng mô hình lưới của Bootstrap (lề âm trên hàng + đệm trên con), KHÔNG phải grid+gap.
+     Breakpoint dùng min-[75rem] để khớp mốc xl của Bootstrap (1200px) thay vì xl: của Tailwind. --}}
+<div class="tw:w-full tw:px-3 tw:mx-auto tw:py-6">
+    <div class="tw:flex tw:justify-between tw:items-center tw:flex-wrap tw:gap-2 tw:mb-6">
         <div>
-            <h3 class="mb-1 fw-bold">Đăng ký tăng ca</h3>
-            <div class="text-muted">Theo dõi đơn tăng ca và duyệt để ghi chú vào bảng chấm công</div>
+            <h3 class="tw:mb-1 tw:font-bold">Đăng ký tăng ca</h3>
+            <div class="tw:text-[rgba(33,37,41,0.75)]">Theo dõi đơn tăng ca và duyệt để ghi chú vào bảng chấm công</div>
         </div>
 
-        <a href="{{ route('hr.overtime.create') }}" class="btn btn-primary rounded-pill px-4">
-            <i class="bi bi-plus-circle me-1"></i> Tạo đơn tăng ca
-        </a>
+        <x-ui.button href="{{ route('hr.overtime.create') }}" variant="primary" class="tw:rounded-[50rem]! tw:px-6">
+            <i class="bi bi-plus-circle tw:mr-1"></i> Tạo đơn tăng ca
+        </x-ui.button>
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm">{{ session('success') }}</div>
+        <x-ui.alert variant="success" class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)]">{{ session('success') }}</x-ui.alert>
     @endif
 
     @if(session('error'))
-        <div class="alert alert-danger border-0 shadow-sm">{{ session('error') }}</div>
+        <x-ui.alert variant="danger" class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)]">{{ session('error') }}</x-ui.alert>
     @endif
 
-    <div class="row g-3 mb-3">
-        <div class="col-6 col-xl">
-            <div class="card border-0 shadow-sm rounded-4"><div class="card-body">
-                <div class="text-muted small fw-bold">Tổng đơn</div>
-                <div class="fs-3 fw-bold">{{ number_format($summary['total'] ?? 0) }}</div>
-            </div></div>
+    <div class="tw:row tw:g-3 tw:mb-4">
+        <div class="tw:col12-6 tw:min-[75rem]:col12">
+            <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem]"><x-ui.card-body>
+                <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em] tw:font-bold">Tổng đơn</div>
+                <div class="tw:text-[calc(1.3rem+0.6vw)] tw:min-[75rem]:text-[1.75rem] tw:font-bold">{{ $summaryCards->totalText }}</div>
+            </x-ui.card-body></x-ui.card>
         </div>
 
-        <div class="col-6 col-xl">
-            <div class="card border-0 shadow-sm rounded-4"><div class="card-body">
-                <div class="text-muted small fw-bold">Chờ duyệt</div>
-                <div class="fs-3 fw-bold">{{ number_format($summary['pending'] ?? 0) }}</div>
-            </div></div>
+        <div class="tw:col12-6 tw:min-[75rem]:col12">
+            <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem]"><x-ui.card-body>
+                <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em] tw:font-bold">Chờ duyệt</div>
+                <div class="tw:text-[calc(1.3rem+0.6vw)] tw:min-[75rem]:text-[1.75rem] tw:font-bold">{{ $summaryCards->pendingText }}</div>
+            </x-ui.card-body></x-ui.card>
         </div>
 
-        <div class="col-6 col-xl">
-            <div class="card border-0 shadow-sm rounded-4"><div class="card-body">
-                <div class="text-muted small fw-bold">Đã duyệt</div>
-                <div class="fs-3 fw-bold">{{ number_format($summary['approved'] ?? 0) }}</div>
-            </div></div>
+        <div class="tw:col12-6 tw:min-[75rem]:col12">
+            <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem]"><x-ui.card-body>
+                <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em] tw:font-bold">Đã duyệt</div>
+                <div class="tw:text-[calc(1.3rem+0.6vw)] tw:min-[75rem]:text-[1.75rem] tw:font-bold">{{ $summaryCards->approvedText }}</div>
+            </x-ui.card-body></x-ui.card>
         </div>
 
-        <div class="col-6 col-xl">
-            <div class="card border-0 shadow-sm rounded-4"><div class="card-body">
-                <div class="text-muted small fw-bold">Từ chối</div>
-                <div class="fs-3 fw-bold">{{ number_format($summary['rejected'] ?? 0) }}</div>
-            </div></div>
+        <div class="tw:col12-6 tw:min-[75rem]:col12">
+            <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem]"><x-ui.card-body>
+                <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em] tw:font-bold">Từ chối</div>
+                <div class="tw:text-[calc(1.3rem+0.6vw)] tw:min-[75rem]:text-[1.75rem] tw:font-bold">{{ $summaryCards->rejectedText }}</div>
+            </x-ui.card-body></x-ui.card>
         </div>
 
-        <div class="col-12 col-xl">
-            <div class="card border-0 shadow-sm rounded-4"><div class="card-body">
-                <div class="text-muted small fw-bold">Giờ tăng ca duyệt</div>
-                <div class="fs-3 fw-bold">{{ $fmtHour($summary['hours'] ?? 0) }} giờ</div>
-            </div></div>
+        <div class="tw:col12-12 tw:min-[75rem]:col12">
+            <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem]"><x-ui.card-body>
+                <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em] tw:font-bold">Giờ tăng ca duyệt</div>
+                <div class="tw:text-[calc(1.3rem+0.6vw)] tw:min-[75rem]:text-[1.75rem] tw:font-bold">{{ $summaryCards->hoursText }} giờ</div>
+            </x-ui.card-body></x-ui.card>
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm rounded-4 mb-3">
-        <div class="card-body">
-            <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Tháng</label>
-                    <input type="month" name="month" value="{{ $month }}" class="form-control rounded-4">
+    <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem] tw:mb-4">
+        <x-ui.card-body>
+            <form method="GET" class="tw:row tw:g-3 tw:items-end">
+                <div class="tw:md:col12-3">
+                    <x-ui.label class="tw:font-semibold">Tháng</x-ui.label>
+                    <x-ui.input type="month" name="month" value="{{ $month }}" class="tw:rounded-[1rem]!" />
                 </div>
 
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Trạng thái</label>
-                    <select name="status" class="form-select rounded-4">
+                <div class="tw:md:col12-3">
+                    <x-ui.label class="tw:font-semibold">Trạng thái</x-ui.label>
+                    <x-ui.select name="status" class="tw:rounded-[1rem]!">
                         <option value="">-- Tất cả --</option>
                         <option value="pending" {{ $status === 'pending' ? 'selected' : '' }}>Chờ duyệt</option>
                         <option value="approved" {{ $status === 'approved' ? 'selected' : '' }}>Đã duyệt</option>
                         <option value="rejected" {{ $status === 'rejected' ? 'selected' : '' }}>Từ chối</option>
-                    </select>
+                    </x-ui.select>
                 </div>
 
                 @if($canManage)
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Nhân viên</label>
-                        <select name="user_id" class="form-select rounded-4">
+                    <div class="tw:md:col12-4">
+                        <x-ui.label class="tw:font-semibold">Nhân viên</x-ui.label>
+                        <x-ui.select name="user_id" class="tw:rounded-[1rem]!">
                             <option value="">-- Tất cả --</option>
                             @foreach($employees as $employee)
                                 <option value="{{ $employee->id }}" {{ (int)$userId === (int)$employee->id ? 'selected' : '' }}>
                                     {{ $employee->name }} @if(optional($employee->department)->name) - {{ optional($employee->department)->name }} @endif
                                 </option>
                             @endforeach
-                        </select>
+                        </x-ui.select>
                     </div>
                 @endif
 
-                <div class="col-md-2 d-flex gap-2">
-                    <button class="btn btn-dark rounded-4 px-4 w-100" type="submit">Lọc</button>
-                    <a href="{{ route('hr.overtime.index') }}" class="btn btn-light rounded-4 px-3">Xóa</a>
+                <div class="tw:md:col12-2 tw:flex tw:gap-2">
+                    <x-ui.button variant="dark" type="submit" class="tw:rounded-[1rem]! tw:px-6 tw:w-full">Lọc</x-ui.button>
+                    <x-ui.button href="{{ route('hr.overtime.index') }}" variant="light" class="tw:rounded-[1rem]! tw:px-4">Xóa</x-ui.button>
                 </div>
             </form>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 
-    <div class="card border-0 shadow-sm rounded-4">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+    <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem]">
+        <x-ui.table-wrap>
+            <x-ui.table hover class="tw:align-middle tw:mb-0">
+                <x-ui.table-head>
                     <tr>
-                        <th>Nhân viên</th>
-                        <th>Ngày</th>
-                        <th>Thời gian</th>
-                        <th>Số giờ</th>
-                        <th>Người duyệt</th>
-                        <th>Lý do</th>
-                        <th>Trạng thái</th>
-                        <th style="width:240px">Thao tác</th>
+                        <th scope="col">Nhân viên</th>
+                        <th scope="col">Ngày</th>
+                        <th scope="col">Thời gian</th>
+                        <th scope="col">Số giờ</th>
+                        <th scope="col">Người duyệt</th>
+                        <th scope="col">Lý do</th>
+                        <th scope="col">Trạng thái</th>
+                        <th scope="col" class="tw:w-[240px]">Thao tác</th>
                     </tr>
-                </thead>
+                </x-ui.table-head>
                 <tbody>
-                    @forelse($requests as $item)
-                        @php
-                            $currentUser = auth()->user();
-                            $canApproveThis = $canManage || (int)$item->approver_id === (int)$currentUser->id;
-                        @endphp
+                    @forelse($overtimeRows as $row)
                         <tr>
                             <td>
-                                <div class="fw-bold">{{ $item->user->name ?? '-' }}</div>
-                                <div class="text-muted small">{{ optional(optional($item->user)->department)->name ?? '-' }}</div>
+                                <div class="tw:font-bold">{{ $row->userName }}</div>
+                                <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">{{ $row->departmentName }}</div>
                             </td>
-                            <td class="fw-bold">{{ optional($item->overtime_date)->format('d/m/Y') }}</td>
-                            <td>{{ optional($item->start_at)->format('H:i') }} - {{ optional($item->end_at)->format('H:i') }}</td>
-                            <td class="fw-bold">{{ $fmtHour($item->hours) }} giờ</td>
-                            <td>{{ $item->approver->name ?? 'HR / Admin' }}</td>
-                            <td style="min-width:260px">{{ $item->reason ?: '-' }}</td>
+                            <td class="tw:font-bold">{{ $row->dateText }}</td>
+                            <td>{{ $row->timeText }}</td>
+                            <td class="tw:font-bold">{{ $row->hoursText }} giờ</td>
+                            <td>{{ $row->approverName }}</td>
+                            <td class="tw:min-w-[260px]">{{ $row->reasonText }}</td>
                             <td>
-                                <span class="badge bg-{{ $item->status_badge_class }}">{{ $item->status_label }}</span>
-                                @if($item->approval_note)
-                                    <div class="small text-muted mt-1">{{ $item->approval_note }}</div>
+                                <x-hr.overtime-badge :tone="$row->statusTone">{{ $row->statusLabel }}</x-hr.overtime-badge>
+                                @if($row->approvalNote)
+                                    <div class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)] tw:mt-1">{{ $row->approvalNote }}</div>
                                 @endif
                             </td>
                             <td>
-                                @if($item->status === 'pending' && $canApproveThis)
-                                    <form method="POST" action="{{ route('hr.overtime.approve', $item) }}" class="mb-2">
+                                @if($row->canApprove)
+                                    <form method="POST" action="{{ route('hr.overtime.approve', $row->id) }}" class="tw:mb-2">
                                         @csrf
-                                        <input type="text" name="approval_note" class="form-control form-control-sm rounded-3 mb-1" placeholder="Ghi chú duyệt nếu có">
-                                        <button class="btn btn-success btn-sm rounded-3 w-100" type="submit">Duyệt</button>
+                                        <label>
+                                            <span class="tw:sr-only">Ghi chú duyệt đơn tăng ca {{ $row->dateText }} của {{ $row->userName }}</span>
+                                            <x-ui.input size="sm" type="text" name="approval_note" class="tw:rounded-[0.5rem]! tw:mb-1" placeholder="Ghi chú duyệt nếu có" />
+                                        </label>
+                                        <x-ui.button variant="success" size="sm" type="submit" class="tw:rounded-[0.5rem]! tw:w-full">Duyệt</x-ui.button>
                                     </form>
 
-                                    <form method="POST" action="{{ route('hr.overtime.reject', $item) }}">
+                                    <form method="POST" action="{{ route('hr.overtime.reject', $row->id) }}">
                                         @csrf
-                                        <input type="text" name="approval_note" class="form-control form-control-sm rounded-3 mb-1" placeholder="Lý do từ chối">
-                                        <button class="btn btn-danger btn-sm rounded-3 w-100" type="submit">Từ chối</button>
+                                        <label>
+                                            <span class="tw:sr-only">Lý do từ chối đơn tăng ca {{ $row->dateText }} của {{ $row->userName }}</span>
+                                            <x-ui.input size="sm" type="text" name="approval_note" class="tw:rounded-[0.5rem]! tw:mb-1" placeholder="Lý do từ chối" />
+                                        </label>
+                                        <x-ui.button variant="danger" size="sm" type="submit" class="tw:rounded-[0.5rem]! tw:w-full">Từ chối</x-ui.button>
                                     </form>
                                 @else
-                                    <span class="text-muted small">Không có thao tác</span>
+                                    <span class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Không có thao tác</span>
                                 @endif
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-muted py-5">Chưa có đơn tăng ca nào.</td>
+                            <td colspan="8" class="tw:text-center tw:text-[rgba(33,37,41,0.75)] tw:py-12">Chưa có đơn tăng ca nào.</td>
                         </tr>
                     @endforelse
                 </tbody>
-            </table>
-        </div>
+            </x-ui.table>
+        </x-ui.table-wrap>
 
-        <div class="p-3 border-top">
+        <div class="tw:p-4 tw:[border-top:1px_solid_#dee2e6]">
             {{ $requests->links() }}
         </div>
-    </div>
+    </x-ui.card>
 </div>
 @endsection

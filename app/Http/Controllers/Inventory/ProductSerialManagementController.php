@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
-use App\Support\EgoCompanyLock;
+use App\Support\EgoCompanyContext;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -48,26 +48,32 @@ class ProductSerialManagementController extends Controller
             ->paginate(50)
             ->withQueryString();
 
-        $products = Schema::hasTable('crm_product_catalog')
+        $products = SchemaCache::hasTable('crm_product_catalog')
             ? DB::table('crm_product_catalog')
                 ->select('id', 'name', 'sku')
+                ->where(function ($query) {
+                    $query->where('company_id', EgoCompanyContext::defaultCompanyId())->orWhereNull('company_id');
+                })
                 ->orderBy('name')
                 ->limit(2500)
                 ->get()
             : collect();
 
-        $warehouses = Schema::hasTable('crm_warehouses')
+        $warehouses = SchemaCache::hasTable('crm_warehouses')
             ? DB::table('crm_warehouses')
                 ->select('id', 'name', 'company_id')
-                ->where('company_id', EgoCompanyLock::id())
+                ->where(function ($query) {
+                    $query->where('company_id', EgoCompanyContext::defaultCompanyId())
+                        ->orWhereIn('id', DB::table('company_warehouse')->select('warehouse_id')->where('company_id', EgoCompanyContext::defaultCompanyId()));
+                })
                 ->orderBy('name')
                 ->get()
             : collect();
 
-        $companies = Schema::hasTable('companies')
+        $companies = SchemaCache::hasTable('companies')
             ? DB::table('companies')
                 ->select('id', 'name', 'code')
-                ->where('id', EgoCompanyLock::id())
+                ->where('id', EgoCompanyContext::defaultCompanyId())
                 ->orderBy('id')
                 ->get()
             : collect();
@@ -152,7 +158,7 @@ class ProductSerialManagementController extends Controller
     private function ensureSerialTables(): void
     {
         foreach (['crm_serial_units', 'crm_serial_identifiers', 'crm_serial_unit_identifiers', 'crm_serial_unit_states'] as $table) {
-            abort_unless(Schema::hasTable($table), 500, 'Thiếu bảng dữ liệu serial: '.$table);
+            abort_unless(SchemaCache::hasTable($table), 500, 'Thiếu bảng dữ liệu serial: '.$table);
         }
     }
 
@@ -166,7 +172,7 @@ class ProductSerialManagementController extends Controller
             'status' => trim((string) $request->query('status', '')),
             'product_id' => (int) $request->query('product_id', 0),
             'warehouse_id' => (int) $request->query('warehouse_id', 0),
-            'company_id' => $request->query('company_id', '') === '' ? 0 : (int) $request->query('company_id', 0),
+            'company_id' => EgoCompanyContext::defaultCompanyId(),
             'warranty' => trim((string) $request->query('warranty', '')),
         ];
     }
@@ -193,25 +199,25 @@ class ProductSerialManagementController extends Controller
 
         $companyParts = [];
 
-        if (Schema::hasTable('companies')) {
-            if (Schema::hasColumn('crm_serial_unit_states', 'company_id')) {
+        if (SchemaCache::hasTable('companies')) {
+            if (SchemaCache::hasColumn('crm_serial_unit_states', 'company_id')) {
                 $query->leftJoin('companies as cst', 'cst.id', '=', 'st.company_id');
                 $companyParts[] = 'cst.name';
             }
 
-            if (Schema::hasColumn('crm_product_catalog', 'company_id')) {
+            if (SchemaCache::hasColumn('crm_product_catalog', 'company_id')) {
                 $query->leftJoin('companies as cp', 'cp.id', '=', 'p.company_id');
                 $companyParts[] = 'cp.name';
             }
 
-            if (Schema::hasColumn('crm_warehouses', 'company_id')) {
+            if (SchemaCache::hasColumn('crm_warehouses', 'company_id')) {
                 $query->leftJoin('companies as cw', 'cw.id', '=', 'w.company_id');
                 $companyParts[] = 'cw.name';
             }
         }
 
         $leadJoined = false;
-        if (Schema::hasTable('crm_leads') && Schema::hasColumn('crm_leads', 'customer_id')) {
+        if (SchemaCache::hasTable('crm_leads') && SchemaCache::hasColumn('crm_leads', 'customer_id')) {
             $query->leftJoin('crm_leads as l', 'l.id', '=', 'o.lead_id');
             $leadJoined = true;
         }
@@ -219,35 +225,35 @@ class ProductSerialManagementController extends Controller
         $customerNameParts = [];
         $customerPhoneParts = [];
 
-        if (Schema::hasTable('crm_customers')) {
+        if (SchemaCache::hasTable('crm_customers')) {
             $query->leftJoin('crm_customers as cwa', 'cwa.id', '=', 'wa.customer_id');
 
-            if (Schema::hasColumn('crm_customers', 'name')) {
+            if (SchemaCache::hasColumn('crm_customers', 'name')) {
                 $customerNameParts[] = 'cwa.name';
             }
 
-            if (Schema::hasColumn('crm_customers', 'phone')) {
+            if (SchemaCache::hasColumn('crm_customers', 'phone')) {
                 $customerPhoneParts[] = 'cwa.phone';
             }
 
             if ($leadJoined) {
                 $query->leftJoin('crm_customers as clead', 'clead.id', '=', 'l.customer_id');
 
-                if (Schema::hasColumn('crm_customers', 'name')) {
+                if (SchemaCache::hasColumn('crm_customers', 'name')) {
                     $customerNameParts[] = 'clead.name';
                 }
 
-                if (Schema::hasColumn('crm_customers', 'phone')) {
+                if (SchemaCache::hasColumn('crm_customers', 'phone')) {
                     $customerPhoneParts[] = 'clead.phone';
                 }
             }
         }
 
-        if (Schema::hasColumn('crm_orders', 'receiver_name')) {
+        if (SchemaCache::hasColumn('crm_orders', 'receiver_name')) {
             $customerNameParts[] = 'o.receiver_name';
         }
 
-        if (Schema::hasColumn('crm_orders', 'receiver_phone')) {
+        if (SchemaCache::hasColumn('crm_orders', 'receiver_phone')) {
             $customerPhoneParts[] = 'o.receiver_phone';
         }
 
@@ -283,8 +289,17 @@ class ProductSerialManagementController extends Controller
             ->selectRaw($customerNameParts ? 'COALESCE('.implode(',', $customerNameParts).') as customer_name' : 'NULL as customer_name')
             ->selectRaw($customerPhoneParts ? 'COALESCE('.implode(',', $customerPhoneParts).') as customer_phone' : 'NULL as customer_phone');
 
-        if (Schema::hasColumn('crm_serial_units', 'deleted_at')) {
+        if (SchemaCache::hasColumn('crm_serial_units', 'deleted_at')) {
             $query->whereNull('su.deleted_at');
+        }
+
+        if (SchemaCache::hasColumn('crm_serial_unit_states', 'company_id')) {
+            $query->where('st.company_id', EgoCompanyContext::defaultCompanyId());
+        } elseif (SchemaCache::hasColumn('crm_warehouses', 'company_id')) {
+            $query->where(function ($warehouseQuery) {
+                $warehouseQuery->where('w.company_id', EgoCompanyContext::defaultCompanyId())
+                    ->orWhereIn('w.id', DB::table('company_warehouse')->select('warehouse_id')->where('company_id', EgoCompanyContext::defaultCompanyId()));
+            });
         }
 
         return $query;
@@ -305,19 +320,19 @@ class ProductSerialManagementController extends Controller
                     ->orWhere('w.name', 'like', '%'.$q.'%')
                     ->orWhere('o.order_code', 'like', '%'.$q.'%');
 
-                if (Schema::hasTable('crm_customers')) {
-                    if (Schema::hasColumn('crm_customers', 'name')) {
+                if (SchemaCache::hasTable('crm_customers')) {
+                    if (SchemaCache::hasColumn('crm_customers', 'name')) {
                         $x->orWhere('cwa.name', 'like', '%'.$q.'%');
 
-                        if (Schema::hasTable('crm_leads') && Schema::hasColumn('crm_leads', 'customer_id')) {
+                        if (SchemaCache::hasTable('crm_leads') && SchemaCache::hasColumn('crm_leads', 'customer_id')) {
                             $x->orWhere('clead.name', 'like', '%'.$q.'%');
                         }
                     }
 
-                    if (Schema::hasColumn('crm_customers', 'phone')) {
+                    if (SchemaCache::hasColumn('crm_customers', 'phone')) {
                         $x->orWhere('cwa.phone', 'like', '%'.$q.'%');
 
-                        if (Schema::hasTable('crm_leads') && Schema::hasColumn('crm_leads', 'customer_id')) {
+                        if (SchemaCache::hasTable('crm_leads') && SchemaCache::hasColumn('crm_leads', 'customer_id')) {
                             $x->orWhere('clead.phone', 'like', '%'.$q.'%');
                         }
                     }
@@ -343,25 +358,25 @@ class ProductSerialManagementController extends Controller
             $query->where(function ($x) use ($companyId) {
                 $hasAnyCompanyColumn = false;
 
-                if (Schema::hasColumn('crm_serial_unit_states', 'company_id')) {
+                if (SchemaCache::hasColumn('crm_serial_unit_states', 'company_id')) {
                     $hasAnyCompanyColumn = true;
                     $x->orWhere('st.company_id', $companyId)
                         ->orWhereNull('st.company_id');
                 }
 
-                if (Schema::hasColumn('crm_product_catalog', 'company_id')) {
+                if (SchemaCache::hasColumn('crm_product_catalog', 'company_id')) {
                     $hasAnyCompanyColumn = true;
                     $x->orWhere('p.company_id', $companyId)
                         ->orWhereNull('p.company_id');
                 }
 
-                if (Schema::hasColumn('crm_warehouses', 'company_id')) {
+                if (SchemaCache::hasColumn('crm_warehouses', 'company_id')) {
                     $hasAnyCompanyColumn = true;
                     $x->orWhere('w.company_id', $companyId)
                         ->orWhereNull('w.company_id');
                 }
 
-                if (Schema::hasColumn('crm_orders', 'company_id')) {
+                if (SchemaCache::hasColumn('crm_orders', 'company_id')) {
                     $hasAnyCompanyColumn = true;
                     $x->orWhere('o.company_id', $companyId)
                         ->orWhereNull('o.company_id');
@@ -430,40 +445,51 @@ class ProductSerialManagementController extends Controller
      */
     private function stats(): array
     {
-        $totalQuery = DB::table('crm_serial_units');
+        $states = DB::table('crm_serial_unit_states')
+            ->where('company_id', EgoCompanyContext::defaultCompanyId());
 
-        if (Schema::hasColumn('crm_serial_units', 'deleted_at')) {
-            $totalQuery->whereNull('deleted_at');
+        $totalQuery = DB::table('crm_serial_units as su')
+            ->join('crm_serial_unit_states as st', 'st.serial_unit_id', '=', 'su.id')
+            ->where('st.company_id', EgoCompanyContext::defaultCompanyId());
+
+        if (SchemaCache::hasColumn('crm_serial_units', 'deleted_at')) {
+            $totalQuery->whereNull('su.deleted_at');
         }
 
-        $soldByState = DB::table('crm_serial_unit_states')
+        $soldByState = (clone $states)
             ->whereIn('state', $this->soldStates)
             ->count();
 
-        $soldByOrder = Schema::hasTable('crm_order_item_serial_units')
-            ? DB::table('crm_order_item_serial_units')->distinct('serial_unit_id')->count('serial_unit_id')
+        $soldByOrder = SchemaCache::hasTable('crm_order_item_serial_units')
+            ? DB::table('crm_order_item_serial_units as link')
+                ->join('crm_serial_unit_states as st', 'st.serial_unit_id', '=', 'link.serial_unit_id')
+                ->where('st.company_id', EgoCompanyContext::defaultCompanyId())
+                ->distinct('link.serial_unit_id')
+                ->count('link.serial_unit_id')
             : 0;
 
         return [
-            'total' => (int) $totalQuery->count(),
-            'in_stock' => (int) DB::table('crm_serial_unit_states')
+            'total' => (int) $totalQuery->distinct('su.id')->count('su.id'),
+            'in_stock' => (int) (clone $states)
                 ->where('state', 'in_stock')
                 ->whereNotNull('warehouse_id')
                 ->count(),
-            'stock_all' => (int) DB::table('crm_serial_unit_states')
+            'stock_all' => (int) (clone $states)
                 ->whereIn('state', $this->stockStates)
                 ->whereNotNull('warehouse_id')
                 ->count(),
             'sold' => max((int) $soldByState, (int) $soldByOrder),
-            'unknown' => (int) DB::table('crm_serial_unit_states')
-                ->where(function ($q) {
-                    $q->whereNull('state')->orWhere('state', 'unknown');
+            'unknown' => (int) (clone $states)
+                ->where(function ($query) {
+                    $query->whereNull('state')->orWhere('state', 'unknown');
                 })
                 ->count(),
-            'warranty_active' => Schema::hasTable('crm_serial_warranties')
-                ? (int) DB::table('crm_serial_warranties')
-                    ->whereNotNull('warranty_end_at')
-                    ->whereDate('warranty_end_at', '>=', now()->toDateString())
+            'warranty_active' => SchemaCache::hasTable('crm_serial_warranties')
+                ? (int) DB::table('crm_serial_warranties as warranty')
+                    ->join('crm_serial_unit_states as st', 'st.serial_unit_id', '=', 'warranty.serial_unit_id')
+                    ->where('st.company_id', EgoCompanyContext::defaultCompanyId())
+                    ->whereNotNull('warranty.warranty_end_at')
+                    ->whereDate('warranty.warranty_end_at', '>=', now()->toDateString())
                     ->count()
                 : 0,
         ];

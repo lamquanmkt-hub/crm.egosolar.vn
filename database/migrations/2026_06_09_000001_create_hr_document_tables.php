@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('hr_document_folders')) {
+        if (! Schema::hasTable('hr_document_folders')) {
             Schema::create('hr_document_folders', function (Blueprint $table) {
                 $table->id();
                 $table->string('category', 50)->index();
@@ -18,7 +18,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_document_files')) {
+        if (! Schema::hasTable('hr_document_files')) {
             Schema::create('hr_document_files', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('folder_id')->index();

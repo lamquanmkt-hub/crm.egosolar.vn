@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Finance;
 use App\Contracts\Services\PaymentMethodServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PaymentMethodRequest;
+use App\View\Presenters\Finance\PaymentMethodListPresenter;
 use Illuminate\Http\Request;
 
 /**
@@ -23,7 +24,10 @@ class PaymentMethodController extends Controller
     {
         $methods = $this->service->getList($request->all());
 
-        return view('payment_methods.index', compact('methods'));
+        return view('payment_methods.index', array_merge(
+            compact('methods'),
+            app(PaymentMethodListPresenter::class)->viewData($methods)
+        ));
     }
 
     public function create()

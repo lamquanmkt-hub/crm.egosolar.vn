@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('company_document_folders')) {
+        if (! Schema::hasTable('company_document_folders')) {
             Schema::create('company_document_folders', function (Blueprint $table) {
                 $table->id();
                 $table->string('department', 50)->index();
@@ -19,7 +19,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('company_document_files')) {
+        if (! Schema::hasTable('company_document_files')) {
             Schema::create('company_document_files', function (Blueprint $table) {
                 $table->id();
                 $table->string('department', 50)->index();

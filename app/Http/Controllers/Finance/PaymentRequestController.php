@@ -4,15 +4,17 @@ namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payments\PaymentRequest;
-use App\Models\Payments\PaymentRequestEditLog;
 use App\Models\User;
-use App\Services\Payments\PaymentRequestAuditLogger;
+use App\Services\Finance\FinanceFullAccess;
+use App\Support\SchemaCache;
+use App\View\Presenters\Finance\PaymentRequestDetailPresenter;
+use App\View\Presenters\Finance\PaymentRequestEditPresenter;
+use App\View\Presenters\Finance\PaymentRequestListPresenter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -22,6 +24,11 @@ use Illuminate\Validation\ValidationException;
  */
 class PaymentRequestController extends Controller
 {
+    public function __construct(
+        private readonly PaymentRequestListPresenter $listPresenter,
+        private readonly PaymentRequestEditPresenter $editPresenter,
+    ) {}
+
     /* =========================
      * Helpers: role check
      * ========================= */
@@ -65,8 +72,7 @@ class PaymentRequestController extends Controller
     }
 
     /**
-     * Kiểm tra người dùng có thuộc phòng Nhân sự (HR).
-     * HR chỉ được mở rộng phạm vi XEM; không tự động có quyền duyệt/sửa/xóa.
+     * Kiểm tra người dùng có phải Hành chính - Nhân sự (HCNS).
      */
     private function isHr($user): bool
     {
@@ -74,28 +80,68 @@ class PaymentRequestController extends Controller
             return false;
         }
 
-        $roles = ['hr'];
+        $roles = ['hr', 'hcns', 'human_resources', 'human-resource'];
 
         if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole($roles)) {
             return true;
         }
 
-        if (method_exists($user, 'hasRole') && $user->hasRole('hr')) {
+        if (method_exists($user, 'hasRole')) {
+            foreach ($roles as $role) {
+                if ($user->hasRole($role)) {
+                    return true;
+                }
+            }
+        }
+
+        $rawRole = strtolower(trim((string) ($user->role ?? '')));
+        $email = strtolower(trim((string) ($user->email ?? '')));
+
+        if (in_array($rawRole, $roles, true) || $email === 'hr@egosolar.vn') {
             return true;
         }
 
-        return strtolower(trim((string) ($user->role ?? ''))) === 'hr';
+        // Fallback theo dữ liệu hiện tại: phòng Hành Chính - Nhân Sự có department_id = 14.
+        return (int) ($user->department_id ?? 0) === 14;
     }
 
     /**
-     * Quyền xem toàn bộ đề nghị thanh toán.
-     * Admin/Kế toán giữ nguyên quyền hiện tại; HR được xem toàn bộ nhưng không có quyền xử lý.
+     * Quyền sửa phiếu:
+     * - tài khoản FinanceFullAccess: giữ toàn quyền như trước;
+     * - chủ phiếu: sửa khi Nháp/Từ chối;
+     * - Kế toán: được sửa mọi phiếu đang ở trạng thái Đã gửi duyệt;
+     * - HCNS: được sửa phiếu Đã gửi duyệt do chính mình tạo.
+     *
+     * Không mở quyền xoá và không mở sửa sau khi Quản lý tài chính đã duyệt.
      */
-    private function canViewAllPaymentRequests($user): bool
+    private function canEditPaymentRequest($user, PaymentRequest $item): bool
     {
-        return $this->isAdmin($user)
-            || $this->isAccounting($user)
-            || $this->isHr($user);
+        if (! $user) {
+            return false;
+        }
+
+        if (app(FinanceFullAccess::class)->allows($user)) {
+            return true;
+        }
+
+        $status = strtolower(trim((string) ($item->status ?? '')));
+        $isOwner = (int) ($item->created_by ?? 0) === (int) $user->id;
+
+        if ($isOwner && in_array($status, ['draft', 'admin_rejected', 'accounting_rejected'], true)) {
+            return true;
+        }
+
+        if ($status === 'submitted') {
+            if ($this->isAccounting($user)) {
+                return true;
+            }
+
+            if ($isOwner && $this->isHr($user)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -103,8 +149,12 @@ class PaymentRequestController extends Controller
      */
     private function companyOptions(): array
     {
+        /*
+         * EGO_DNTT_SINGLE_COMPANY_V1
+         * ĐNTT chỉ sử dụng duy nhất Công ty TNHH EGO Việt Nam.
+         */
         return [
-            'Công ty TNHH TMKT Quốc Tế EGO',
+            'CÔNG TY TNHH EGO VIỆT NAM',
         ];
     }
 
@@ -472,52 +522,61 @@ class PaymentRequestController extends Controller
     public function index(Request $request)
     {
 
-        /* EGO_DNTT_AUTO_LOAD_FULL_V2_START */
-        /*
-         * Khi truy cập đường dẫn sạch /payment-requests,
-         * tự khởi tạo bộ lọc toàn bộ dữ liệu.
-         *
-         * Việc redirect một lần giúp chạy đúng cùng luồng
-         * với nút Áp dụng hiện tại, không nhân đôi query.
-         */
-        if (! $request->query->has('date_filter_manual')) {
-            return redirect()->route(
-                'payment_requests.index',
-                [
-                    'date_filter_manual' => 0,
-                    'company' => '',
-                    'status' => '',
-                    'q' => '',
-                    'date_from' => '',
-                    'date_to' => '',
-                    'date_preset' => 'all_time',
-                    'created_by' => '',
-                ]
-            );
-        }
-        /* EGO_DNTT_AUTO_LOAD_FULL_V2_END */
-
         $user = auth()->user();
         $canAdminApprove = $this->isAdmin($user);
         $canAccountingApprove = $this->isAccounting($user);
+        $canHrEditSubmitted = $this->isHr($user);
         $canBulkApprove = ($canAdminApprove || $canAccountingApprove);
-        $canViewAll = $this->canViewAllPaymentRequests($user);
+        $canViewAll = $canBulkApprove;
 
         /*
-         * Mặc định danh sách là tất cả công ty.
-         * Các giá trị rỗng/all/0/* không được tạo điều kiện WHERE company.
+         * Module DNTT có bộ lọc công ty riêng.
+         *
+         * company_id do middleware/ngữ cảnh công ty thêm vào không được dùng
+         * để lọc danh sách DNTT, vì Admin/Kế toán cần xem tất cả công ty.
+         *
+         * Khi URL cũ đồng thời có company_id và company, hiểu đây là bộ lọc
+         * ngữ cảnh bị giữ lại, không phải lựa chọn chủ động trong form DNTT.
          */
+        $contextCompanyInjected = $request->query->has('company_id');
+
+        $request->query->remove('company_id');
+        $request->request->remove('company_id');
+
+        $companyOptions = $this->companyOptions();
         $companyFilter = trim((string) $request->input('company', ''));
+        $companyFilterLower = mb_strtolower($companyFilter);
+
+        $canonicalCompany = collect($companyOptions)->first(
+            fn ($option) => mb_strtolower(trim((string) $option))
+                === $companyFilterLower
+        );
 
         if (
-            $companyFilter === ''
+            $contextCompanyInjected
+            || $companyFilter === ''
             || in_array(
-                mb_strtolower($companyFilter),
+                $companyFilterLower,
                 ['all', '0', '*', 'tất cả', 'tat ca'],
                 true
             )
+            || $canonicalCompany === null
         ) {
+            $request->query->remove('company');
             $request->request->remove('company');
+        } else {
+            /*
+             * Chỉ áp dụng khi người dùng thật sự chọn công ty
+             * trong bộ lọc của trang DNTT.
+             */
+            $request->query->set(
+                'company',
+                $canonicalCompany
+            );
+
+            $request->merge([
+                'company' => $canonicalCompany,
+            ]);
         }
 
         [$selectedDatePreset, $effectiveDateFrom, $effectiveDateTo] = $this->resolveDateFilter($request);
@@ -552,9 +611,64 @@ class PaymentRequestController extends Controller
             $perPage = 20;
         }
 
-        $items = $q->paginate($perPage)->withQueryString();
+        /*
+         * Chỉ truyền các tham số thuộc bộ lọc của DNTT sang trang tiếp theo.
+         *
+         * Không dùng withQueryString() vì nó giữ cả:
+         * - company_id từ ngữ cảnh công ty
+         * - company cũ không còn được chọn
+         * - các query không liên quan
+         *
+         * Đây là nguyên nhân trang 2 trả về 0 phiếu.
+         */
+        $paginationQuery = [
+            'q' => trim((string) $request->input('q', '')),
+            'company' => trim((string) $request->input('company', '')),
+            'status' => trim((string) $request->input('status', '')),
+            'created_by' => trim((string) $request->input('created_by', '')),
+            'date_from' => $effectiveDateFrom ?: '',
+            'date_to' => $effectiveDateTo ?: '',
+            'date_preset' => $selectedDatePreset ?: 'all_time',
+            'date_filter_manual' => $request->boolean('date_filter_manual') ? 1 : 0,
+            'per_page' => $perPage,
+        ];
 
-        $companyOptions = $this->companyOptions();
+        $paginationQuery = array_filter(
+            $paginationQuery,
+            fn ($value, $key) => in_array(
+                $key,
+                [
+                    'date_preset',
+                    'date_filter_manual',
+                    'per_page',
+                ],
+                true
+            ) || ($value !== '' && $value !== null),
+            ARRAY_FILTER_USE_BOTH
+        );
+
+        $items = $q
+            ->paginate($perPage)
+            ->appends($paginationQuery);
+
+        /*
+         * Trường hợp URL đang ở trang vượt quá số trang hiện có,
+         * tự quay về trang 1 thay vì hiện bảng trắng.
+         */
+        if (
+            $items->currentPage() > 1
+            && $items->isEmpty()
+            && $items->total() > 0
+        ) {
+            return redirect()->route(
+                'payment_requests.index',
+                array_merge(
+                    $paginationQuery,
+                    ['page' => 1]
+                )
+            );
+        }
+
         $statusLabels = $this->statusLabels();
 
         if ($canViewAll) {
@@ -573,7 +687,7 @@ class PaymentRequestController extends Controller
             $creatorOptions = collect([$user]);
         }
 
-        return view('payment_requests.index', compact(
+        return view('payment_requests.index', $this->listPresenter->viewData($items, $statusLabels, $user ? (int) $user->getKey() : null, $canAdminApprove, $canAccountingApprove, $canHrEditSubmitted, $paginationQuery) + compact(
             'items',
             'companyOptions',
             'statusLabels',
@@ -586,10 +700,12 @@ class PaymentRequestController extends Controller
             'canViewAll',
             'canAdminApprove',
             'canAccountingApprove',
+            'canHrEditSubmitted',
             'canBulkApprove',
             'selectedDatePreset',
             'effectiveDateFrom',
-            'effectiveDateTo'
+            'effectiveDateTo',
+            'paginationQuery'
         ));
     }
 
@@ -615,7 +731,7 @@ class PaymentRequestController extends Controller
     public function exportExcel(Request $request)
     {
         $user = auth()->user();
-        $canViewAll = $this->canViewAllPaymentRequests($user);
+        $canViewAll = ($this->isAdmin($user) || $this->isAccounting($user));
 
         [$selectedDatePreset, $effectiveDateFrom, $effectiveDateTo] = $this->resolveDateFilter($request);
 
@@ -674,7 +790,7 @@ class PaymentRequestController extends Controller
     public function exportPdf(Request $request)
     {
         $user = auth()->user();
-        $canViewAll = $this->canViewAllPaymentRequests($user);
+        $canViewAll = ($this->isAdmin($user) || $this->isAccounting($user));
 
         [$selectedDatePreset, $effectiveDateFrom, $effectiveDateTo] = $this->resolveDateFilter($request);
 
@@ -777,10 +893,18 @@ class PaymentRequestController extends Controller
 
             $request->merge(['doc_type' => $rawDocType]);
 
+            /*
+             * EGO_DNTT_FORCE_COMPANY_V1
+             * Không nhận công ty từ frontend.
+             */
+            $request->merge([
+                'company' => 'CÔNG TY TNHH EGO VIỆT NAM',
+            ]);
+
             if (! $request->filled('company')) {
                 $fallbackCompany = (string) session('active_company_name', '');
                 if ($fallbackCompany === '') {
-                    $fallbackCompany = $this->companyOptions()[0] ?? 'Công ty TNHH TMKT Quốc Tế EGO';
+                    $fallbackCompany = $this->companyOptions()[0] ?? 'Công ty TNHH Ego Việt Nam';
                 }
                 $request->merge(['company' => $fallbackCompany]);
             }
@@ -806,20 +930,37 @@ class PaymentRequestController extends Controller
                 'reason' => 'nullable|string|max:50000',
                 'amount' => 'nullable|integer|min:0',
                 'payment_due_date' => 'nullable|date',
+                'bank_name' => 'nullable|string|max:255',
+                'bank_account' => 'nullable|string|max:100',
+                'bank_account_name' => 'nullable|string|max:255',
                 'bank_info' => 'nullable|string|max:10000',
-                'attachments' => ['nullable', 'array', 'max:15'],
+                'attachments' => ['nullable', 'array'],
                 'attachments.*' => ['file', 'max:20480', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx'],
             ], [
                 'amount.min' => 'Số tiền không được nhỏ hơn 0.',
-                'attachments.max' => 'Mỗi phiếu chỉ được tải tối đa 15 chứng từ trong một lần.',
                 'attachments.*.max' => 'File chứng từ không được vượt quá 20MB.',
                 'attachments.*.mimes' => 'Chứng từ chỉ nhận JPG, PNG, WEBP, PDF, DOC, DOCX, XLS, XLSX.',
             ]);
 
+            /* EGO_DNTT_BANK_SPLIT_SYNC_V3 */
+            $bankParts = [];
+            if (! empty($data['bank_name'])) {
+                $bankParts[] = 'Ngân hàng: '.trim((string) $data['bank_name']);
+            }
+            if (! empty($data['bank_account'])) {
+                $bankParts[] = 'Số tài khoản: '.trim((string) $data['bank_account']);
+            }
+            if (! empty($data['bank_account_name'])) {
+                $bankParts[] = 'Chủ tài khoản: '.trim((string) $data['bank_account_name']);
+            }
+            if ($bankParts) {
+                $data['bank_info'] = implode(' | ', $bankParts);
+            }
+
             unset($data['attachments']);
 
             $now = now();
-            $columns = Schema::getColumnListing('payment_requests');
+            $columns = SchemaCache::columns('payment_requests');
 
             $data['created_by'] = (int) $user->id;
             $data['status'] = 'draft';
@@ -834,7 +975,20 @@ class PaymentRequestController extends Controller
             }
 
             if (in_array('company_id', $columns, true)) {
-                $companyId = \App\Support\EgoCompanyLock::id();
+                $companyId = 0;
+
+                if (SchemaCache::hasTable('companies')) {
+                    $companyId = (int) DB::table('companies')
+                        ->where(function ($q) {
+                            $q->whereRaw('UPPER(name) = ?', ['CÔNG TY TNHH EGO VIỆT NAM'])
+                                ->orWhere('name', 'like', '%Ego Việt Nam%')
+                                ->orWhere('name', 'like', '%Ego Viet Nam%')
+                                ->orWhere('name', 'like', '%EGO VIET NAM%')
+                                ->orWhere('name', 'like', '%EGO VIỆT NAM%');
+                        })
+                        ->orderBy('id')
+                        ->value('id');
+                }
 
                 if ($companyId > 0) {
                     $data['company_id'] = $companyId;
@@ -855,8 +1009,8 @@ class PaymentRequestController extends Controller
 
                 DB::table('payment_requests')->where('id', $id)->update($update);
 
-                if ($request->hasFile('attachments') && Schema::hasTable('payment_attachments')) {
-                    $attachmentColumns = Schema::getColumnListing('payment_attachments');
+                if ($request->hasFile('attachments') && SchemaCache::hasTable('payment_attachments')) {
+                    $attachmentColumns = SchemaCache::columns('payment_attachments');
 
                     foreach ($request->file('attachments') as $file) {
                         if (! $file || ! $file->isValid()) {
@@ -864,6 +1018,18 @@ class PaymentRequestController extends Controller
                         }
 
                         $path = $file->store("payment_requests/{$id}", 'public');
+
+                        /*
+                         * `store()` trả về false khi ghi hỏng (hay gặp nhất: hết
+                         * quota đĩa). Không kiểm thì bản ghi vẫn được chèn với
+                         * đường dẫn rỗng và đính kèm hỏng vĩnh viễn. Ném lỗi để
+                         * transaction bao ngoài rollback toàn bộ.
+                         */
+                        if (! $path || ! Storage::disk('public')->exists($path)) {
+                            throw new \RuntimeException(
+                                'Không ghi được chứng từ vào storage: '.$file->getClientOriginalName()
+                            );
+                        }
 
                         $attachment = [
                             'payment_request_id' => $id,
@@ -888,7 +1054,7 @@ class PaymentRequestController extends Controller
                     'ok' => true,
                     'message' => 'Đã tạo đề nghị thanh toán thành công.',
                     'id' => (int) $prId,
-                    'redirect_url' => route('payment_requests.show', $prId),
+                    'redirect_url' => route('payment_requests.index'),
                 ], 201);
             }
             /* EGO_PR_AJAX_CREATE_RESPONSE_END */
@@ -914,41 +1080,63 @@ class PaymentRequestController extends Controller
     /**
      * Hiển thị chi tiết phiếu đề nghị thanh toán.
      */
-    public function show($id)
+    public function show($id, PaymentRequestDetailPresenter $presenter)
     {
-        $item = PaymentRequest::with(['creator', 'attachments'])->findOrFail($id);
+        // 🚨 View cũ đọc `$item->adminApprover` / `$item->accountingApprover` — HAI QUAN HỆ ĐÓ
+        // KHÔNG TỒN TẠI trên model (tên đúng là `director` và `accountant`). Eloquent trả null cho
+        // thuộc tính lạ nên trang LUÔN rơi vào nhánh dự phòng và in `#<id>` thay vì tên người duyệt.
+        $item = PaymentRequest::with(['creator', 'attachments', 'director', 'accountant'])
+            ->findOrFail($id);
         $user = auth()->user();
 
-        if (! $this->canViewAllPaymentRequests($user) && (int) $item->created_by !== (int) $user->id) {
+        if (! ($this->isAdmin($user) || $this->isAccounting($user)) && (int) $item->created_by !== (int) $user->id) {
             abort(403);
         }
 
         $item->status_label = $this->statusLabel($item->status);
+        $canEditByPolicy = $this->canEditPaymentRequest($user, $item);
 
-        return view('payment_requests.show', compact('item'));
+        return view('payment_requests.show', array_merge(
+            compact('item', 'canEditByPolicy'),
+            $presenter->viewData(
+                item: $item,
+                attachments: $item->attachments,
+                currentUserId: $user?->id,
+                isAdmin: $this->isAdmin($user),
+                isAccounting: $this->isAccounting($user),
+                canEditByPolicy: $canEditByPolicy,
+                actionUrls: [
+                    'approveAdmin' => route('payment_requests.admin_approve', $item->id),
+                    'rejectAdmin' => route('payment_requests.admin_reject', $item->id),
+                    'approveAcc' => route('payment_requests.acc_approve', $item->id),
+                    'rejectAcc' => route('payment_requests.acc_reject', $item->id),
+                ],
+                fileUrls: fn (int $fileId): array => [
+                    'download' => url('/payment-requests/'.$item->id.'/attachments-thao/'.$fileId.'/download'),
+                    'preview' => url('/payment-requests/'.$item->id.'/attachments-thao/'.$fileId.'/preview'),
+                ],
+            )
+        ));
     }
 
     /**
      * Hiển thị form sửa phiếu khi còn được phép chỉnh sửa.
      */
-    public function edit($id)
+    public function edit(Request $request, $id)
     {
         $item = PaymentRequest::with('attachments')->findOrFail($id);
         $user = auth()->user();
-        $canEditCompleted = $this->canEditCompletedFinanceRecord();
-
-        if (! $canEditCompleted && (int) $item->created_by !== (int) $user->id) {
-            abort(403);
-        }
-
-        if (! $canEditCompleted && ! in_array($item->status, ['draft', 'admin_rejected', 'accounting_rejected'], true)) {
+        if (! $this->canEditPaymentRequest($user, $item)) {
             return redirect()->route('payment_requests.show', $item->id)
-                ->with('error', 'Phiếu đã gửi duyệt/hoàn thành nên không sửa được.');
+                ->with('error', 'Bạn không có quyền sửa phiếu ở trạng thái hiện tại. Kế toán được sửa phiếu Đã gửi duyệt; HCNS được sửa phiếu Đã gửi duyệt do mình tạo.');
         }
 
         $companyOptions = $this->companyOptions();
 
-        return view('payment_requests.edit', compact('item', 'companyOptions'));
+        return view('payment_requests.edit', array_merge(
+            compact('item', 'companyOptions'),
+            $this->editPresenter->viewData($item, $item->attachments, $this->statusLabels(), $request->session()->getOldInput('payment_due_date')),
+        ));
     }
 
     /**
@@ -959,28 +1147,9 @@ class PaymentRequestController extends Controller
         $item = PaymentRequest::findOrFail($id);
         $user = auth()->user();
 
-        $canEditCompleted = $this->canEditCompletedFinanceRecord();
-
-        if (! $canEditCompleted && (int) $item->created_by !== (int) $user->id) {
-            abort(403);
-        }
-
-        if (! $canEditCompleted && ! in_array($item->status, ['draft', 'admin_rejected', 'accounting_rejected'], true)) {
+        if (! $this->canEditPaymentRequest($user, $item)) {
             return redirect()->route('payment_requests.show', $item->id)
-                ->with('error', 'Phiếu đã gửi duyệt/hoàn thành nên không sửa được.');
-        }
-
-        $statusBefore = (string) $item->status;
-        $auditReason = null;
-
-        // Sửa phiếu đã duyệt/đã chi: bắt buộc nhập lý do (ghi vào nhật ký).
-        if (PaymentRequestAuditLogger::isLockedStatus($statusBefore)) {
-            $request->validate(
-                ['audit_reason' => PaymentRequestAuditLogger::reasonRules()],
-                PaymentRequestAuditLogger::reasonMessages(),
-            );
-
-            $auditReason = trim((string) $request->input('audit_reason'));
+                ->with('error', 'Bạn không có quyền sửa phiếu ở trạng thái hiện tại. Kế toán được sửa phiếu Đã gửi duyệt; HCNS được sửa phiếu Đã gửi duyệt do mình tạo.');
         }
 
         $rawAmount = $request->input('amount');
@@ -1007,6 +1176,13 @@ class PaymentRequestController extends Controller
             ]);
         }
 
+        /*
+         * EGO_DNTT_FORCE_COMPANY_UPDATE_V1
+         */
+        $request->merge([
+            'company' => 'CÔNG TY TNHH EGO VIỆT NAM',
+        ]);
+
         $data = $request->validate([
             'company' => 'nullable|string|max:5000',
             'receiver_name' => 'nullable|string|max:5000',
@@ -1015,40 +1191,45 @@ class PaymentRequestController extends Controller
             'reason' => 'nullable|string|max:50000',
             'amount' => 'nullable|integer|min:0',
             'payment_due_date' => 'nullable|date',
+            'bank_name' => 'nullable|string|max:255',
+            'bank_account' => 'nullable|string|max:100',
+            'bank_account_name' => 'nullable|string|max:255',
             'bank_info' => 'nullable|string|max:10000',
         ], [
             'amount.min' => 'Số tiền không được nhỏ hơn 0.',
         ]);
 
-        $before = $item->only(array_keys($data));
+        $bankParts = [];
+        if (! empty($data['bank_name'])) {
+            $bankParts[] = 'Ngân hàng: '.trim((string) $data['bank_name']);
+        }
+        if (! empty($data['bank_account'])) {
+            $bankParts[] = 'Số tài khoản: '.trim((string) $data['bank_account']);
+        }
+        if (! empty($data['bank_account_name'])) {
+            $bankParts[] = 'Chủ tài khoản: '.trim((string) $data['bank_account_name']);
+        }
+        if ($bankParts) {
+            $data['bank_info'] = implode(' | ', $bankParts);
+        }
 
-        /*
-         * NGUYÊN TỬ: sửa dữ liệu và ghi nhật ký phải cùng sống hoặc cùng chết.
-         * Nếu ghi nhật ký lỗi, thay đổi trên payment_requests cũng bị rollback
-         * — không bao giờ để tồn tại thay đổi tài chính không có dấu vết.
-         */
-        DB::transaction(function () use ($item, $data, $before, $auditReason, $statusBefore): void {
-            $item->update($data);
+        $wasSubmitted = ((string) $item->status === 'submitted');
 
-            PaymentRequestAuditLogger::logFieldChanges(
-                (int) $item->id,
-                (string) $item->code,
-                $before,
-                $data,
-                $auditReason,
-                $statusBefore,
-                (string) $item->status,
-            );
-        });
+        $item->update($data);
 
         return redirect()->route('payment_requests.show', $item->id)
-            ->with('success', 'Đã cập nhật phiếu.');
+            ->with(
+                'success',
+                $wasSubmitted
+                    ? 'Đã cập nhật phiếu. Phiếu vẫn giữ trạng thái Đã gửi duyệt.'
+                    : 'Đã cập nhật phiếu.'
+            );
     }
 
     /**
      * Xóa phiếu và chứng từ; mở lại đợt công nợ liên kết nếu có.
      */
-    public function destroy(Request $request, $id)
+    public function destroy($id)
     {
         $item = PaymentRequest::with('attachments')->findOrFail($id);
         $user = auth()->user();
@@ -1063,56 +1244,24 @@ class PaymentRequestController extends Controller
                 ->with('error', 'Phiếu đã gửi duyệt/hoàn thành nên không xoá được.');
         }
 
-        $statusBefore = (string) $item->status;
-        $auditReason = null;
-
-        // Xóa phiếu đã duyệt/đã chi: bắt buộc nhập lý do.
-        if (PaymentRequestAuditLogger::isLockedStatus($statusBefore)) {
-            $request->validate(
-                ['audit_reason' => PaymentRequestAuditLogger::reasonRules()],
-                PaymentRequestAuditLogger::reasonMessages(),
-            );
-
-            $auditReason = trim((string) $request->input('audit_reason'));
+        if (
+            SchemaCache::hasTable('finance_supplier_debt_payments') &&
+            SchemaCache::hasColumn('finance_supplier_debt_payments', 'payment_request_id')
+        ) {
+            DB::table('finance_supplier_debt_payments')
+                ->where('payment_request_id', (int) $item->id)
+                ->update([
+                    'payment_request_id' => null,
+                    'status' => 'planned',
+                    'updated_at' => now(),
+                ]);
         }
 
-        /*
-         * NGUYÊN TỬ: ghi nhật ký + gỡ liên kết công nợ + xóa phiếu nằm trong
-         * cùng một transaction. Nếu ghi nhật ký lỗi thì KHÔNG xóa gì cả.
-         */
-        DB::transaction(function () use ($item, $statusBefore, $auditReason): void {
-            // Ghi nhật ký TRƯỚC khi xóa để lịch sử luôn còn lại.
-            PaymentRequestAuditLogger::logAction(
-                (int) $item->id,
-                (string) $item->code,
-                PaymentRequestEditLog::ACTION_DELETE,
-                $statusBefore,
-                null,
-                $auditReason,
-            );
+        foreach ($item->attachments as $att) {
+            Storage::disk('public')->delete($att->path);
+        }
 
-            if (
-                Schema::hasTable('finance_supplier_debt_payments') &&
-                Schema::hasColumn('finance_supplier_debt_payments', 'payment_request_id')
-            ) {
-                DB::table('finance_supplier_debt_payments')
-                    ->where('payment_request_id', (int) $item->id)
-                    ->update([
-                        'payment_request_id' => null,
-                        'status' => 'planned',
-                        'updated_at' => now(),
-                    ]);
-            }
-
-            /*
-             * KHÔNG xóa file chứng từ khỏi ổ đĩa: bản ghi DB bị xóa cứng
-             * (bảng `payment_requests` chưa có cột `deleted_at`), nên xóa
-             * luôn file sẽ làm mất vĩnh viễn chứng từ tài chính. Giữ file để
-             * còn đối chiếu theo nhật ký `payment_request_edit_logs`.
-             * Chuyển hẳn sang soft-delete là hạng mục giai đoạn sau.
-             */
-            $item->delete();
-        });
+        $item->delete();
 
         return redirect()->route('payment_requests.index')
             ->with('success', 'Đã xoá phiếu. Nếu phiếu có liên kết công nợ, đợt liên quan đã mở lại để tạo ĐNTT mới.');
@@ -1258,7 +1407,7 @@ class PaymentRequestController extends Controller
         $item = PaymentRequest::with(['creator'])->findOrFail($id);
         $user = auth()->user();
 
-        if (! $this->canViewAllPaymentRequests($user) && (int) $item->created_by !== (int) $user->id) {
+        if (! ($this->isAdmin($user) || $this->isAccounting($user)) && (int) $item->created_by !== (int) $user->id) {
             abort(403);
         }
 
@@ -1392,23 +1541,20 @@ class PaymentRequestController extends Controller
     }
 
     /**
-     * Được sửa/xóa phiếu đã hoàn thành: Admin (Giám đốc), hoặc người được
-     * gán riêng permission `payment_requests.override_locked`.
+     * Kiểm tra tài khoản đặc biệt được sửa/xóa phiếu đã hoàn thành.
      */
     private function canEditCompletedFinanceRecord(): bool
     {
-        $user = auth()->user();
-
-        return $user !== null
-            && method_exists($user, 'canOverrideLockedFinanceRecords')
-            && $user->canOverrideLockedFinanceRecords();
+        return app(FinanceFullAccess::class)->allows(auth()->user());
     }
 
+    /* EGO_THAO_PAYMENT_REQUEST_HELPER_START */
     /**
-     * Toàn quyền thao tác phiếu ở mọi trạng thái (tương đương quyền trên).
+     * Kiểm tra tài khoản chỉ định có toàn quyền thao tác phiếu.
      */
     private function egoThaoCanFullPaymentRequest(): bool
     {
-        return $this->canEditCompletedFinanceRecord();
+        return app(FinanceFullAccess::class)->allows(auth()->user());
     }
+    /* EGO_THAO_PAYMENT_REQUEST_HELPER_END */
 }

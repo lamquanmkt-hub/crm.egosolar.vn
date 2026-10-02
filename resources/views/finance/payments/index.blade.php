@@ -3,7 +3,7 @@
 @section('title', 'Phiếu chi')
 
 @section('content')
-<div class="container-fluid py-4">
+<div class="container-fluid tw:py-6">
     <style>
         .finance-page-out {
             --primary-color: #dc2626;
@@ -270,7 +270,7 @@
 
     <div class="finance-page-out">
         <div class="finance-hero-out">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div class="tw:flex flex-wrap tw:justify-between tw:items-start tw:gap-4">
                 <div>
                     <span class="finance-badge-out">💸 Quản lý dòng tiền ra</span>
                     <h1 class="finance-title-out">Chi / Phiếu chi</h1>
@@ -280,37 +280,37 @@
                 </div>
 
                 <div class="modern-toolbar-out">
-                    <a href="{{ route('finance.payments.index') }}" class="btn finance-action-btn-out finance-btn-light-out">
+                    <x-ui.button variant="none" size="none" class="finance-action-btn-out finance-btn-light-out" href="{{ route('finance.payments.index') }}">
                         Danh sách
-                    </a>
-                    <a href="{{ route('finance.payments.create') }}" class="btn finance-action-btn-out finance-btn-primary-out">
+                    </x-ui.button>
+                    <x-ui.button variant="none" size="none" class="finance-action-btn-out finance-btn-primary-out" href="{{ route('finance.payments.create') }}">
                         + Tạo phiếu chi
-                    </a>
+                    </x-ui.button>
                 </div>
             </div>
         </div>
 
         @if(session('success'))
-            <div class="alert alert-success border-0 rounded-4 shadow-sm mb-4">
+            <x-ui.alert variant="success" class="tw:border-0 tw:rounded-[1rem] tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mb-6">
                 {{ session('success') }}
-            </div>
+            </x-ui.alert>
         @endif
 
         @if ($errors->any())
-            <div class="alert alert-danger border-0 rounded-4 shadow-sm mb-4">
-                <div class="fw-bold mb-2">Có lỗi cần sửa</div>
-                <ul class="mb-0 ps-3">
+            <x-ui.alert variant="danger" class="tw:border-0 tw:rounded-[1rem] tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mb-6">
+                <div class="tw:font-bold tw:mb-2">Có lỗi cần sửa</div>
+                <ul class="tw:mb-0 ps-3">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
                 </ul>
-            </div>
+            </x-ui.alert>
         @endif
 
-        <div class="row g-3 mb-4">
-            <div class="col-xl-3 col-md-6">
+        <div class="tw:row tw:g-3 tw:mb-6">
+            <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                 <div class="finance-card-out stat-card-out">
-                    <div class="d-flex justify-content-between align-items-start">
+                    <div class="tw:flex tw:justify-between tw:items-start">
                         <div>
                             <div class="stat-label-out">Tổng phiếu chi</div>
                             <div class="stat-value-out">{{ number_format($stats['total_count']) }}</div>
@@ -320,9 +320,9 @@
                 </div>
             </div>
 
-            <div class="col-xl-3 col-md-6">
+            <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                 <div class="finance-card-out stat-card-out">
-                    <div class="d-flex justify-content-between align-items-start">
+                    <div class="tw:flex tw:justify-between tw:items-start">
                         <div>
                             <div class="stat-label-out">Tổng tiền đã chi</div>
                             <div class="stat-value-out">{{ number_format($stats['total_amount'], 0, ',', '.') }} đ</div>
@@ -332,9 +332,9 @@
                 </div>
             </div>
 
-            <div class="col-xl-3 col-md-6">
+            <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                 <div class="finance-card-out stat-card-out">
-                    <div class="d-flex justify-content-between align-items-start">
+                    <div class="tw:flex tw:justify-between tw:items-start">
                         <div>
                             <div class="stat-label-out">Chi hôm nay</div>
                             <div class="stat-value-out">{{ number_format($stats['today_amount'], 0, ',', '.') }} đ</div>
@@ -344,9 +344,9 @@
                 </div>
             </div>
 
-            <div class="col-xl-3 col-md-6">
+            <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                 <div class="finance-card-out stat-card-out">
-                    <div class="d-flex justify-content-between align-items-start">
+                    <div class="tw:flex tw:justify-between tw:items-start">
                         <div>
                             <div class="stat-label-out">Chi tháng này</div>
                             <div class="stat-value-out">{{ number_format($stats['this_month_amount'], 0, ',', '.') }} đ</div>
@@ -357,7 +357,7 @@
             </div>
         </div>
 
-        <div class="finance-card-out mb-4">
+        <div class="finance-card-out tw:mb-6">
             <div class="block-header-out">
                 <h3 class="block-title-out">Bộ lọc tìm kiếm</h3>
                 <div class="block-subtitle-out">Mặc định đang lọc trong tháng hiện tại.</div>
@@ -365,57 +365,56 @@
 
             <div class="block-body-out">
                 <form method="GET" action="{{ route('finance.payments.index') }}">
-                    <div class="row g-3">
-                        <div class="col-xl-3 col-md-6">
+                    <div class="tw:row tw:g-3">
+                        <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                             <label class="modern-label-out">Tìm kiếm</label>
-                            <input
+                            <x-ui.input
                                 type="text"
                                 name="q"
-                                class="form-control modern-input-out"
+                                class="modern-input-out"
                                 placeholder="Mã phiếu, người nhận, SĐT..."
-                                value="{{ request('q') }}"
-                            >
+                                value="{{ request('q') }}" />
                         </div>
 
-                        <div class="col-xl-2 col-md-6">
+                        <div class="tw:min-[75rem]:col12-2 tw:md:col12-6">
                             <label class="modern-label-out">Từ ngày</label>
-                            <input type="date" name="date_from" class="form-control modern-input-out" value="{{ request('date_from', $defaultDateFrom ?? now()->startOfMonth()->format('Y-m-d')) }}">
+                            <x-ui.input type="date" name="date_from" class="modern-input-out" value="{{ request('date_from', $defaultDateFrom ?? now()->startOfMonth()->format('Y-m-d')) }}" />
                         </div>
 
-                        <div class="col-xl-2 col-md-6">
+                        <div class="tw:min-[75rem]:col12-2 tw:md:col12-6">
                             <label class="modern-label-out">Đến ngày</label>
-                            <input type="date" name="date_to" class="form-control modern-input-out" value="{{ request('date_to', $defaultDateTo ?? now()->endOfMonth()->format('Y-m-d')) }}">
+                            <x-ui.input type="date" name="date_to" class="modern-input-out" value="{{ request('date_to', $defaultDateTo ?? now()->endOfMonth()->format('Y-m-d')) }}" />
                         </div>
 
-                        <div class="col-xl-2 col-md-6">
+                        <div class="tw:min-[75rem]:col12-2 tw:md:col12-6">
                             <label class="modern-label-out">Loại chi</label>
-                            <select name="category" class="form-select modern-select-out">
+                            <x-ui.select name="category" class="modern-select-out">
                                 <option value="">Tất cả</option>
                                 @foreach($categories as $key => $label)
                                     <option value="{{ $key }}" @selected(request('category') === $key)>{{ $label }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="col-xl-2 col-md-6">
+                        <div class="tw:min-[75rem]:col12-2 tw:md:col12-6">
                             <label class="modern-label-out">Phương thức</label>
-                            <select name="payment_method" class="form-select modern-select-out">
+                            <x-ui.select name="payment_method" class="modern-select-out">
                                 <option value="">Tất cả</option>
                                 @foreach($paymentMethods as $key => $label)
                                     <option value="{{ $key }}" @selected(request('payment_method') === $key)>{{ $label }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="col-xl-1 col-md-6 d-flex align-items-end">
-                            <button class="btn finance-action-btn-out finance-btn-primary-out w-100">Lọc</button>
+                        <div class="tw:min-[75rem]:col12-1 tw:md:col12-6 tw:flex tw:items-end">
+                            <x-ui.button variant="none" size="none" type="submit" class="finance-action-btn-out finance-btn-primary-out tw:w-full">Lọc</x-ui.button>
                         </div>
                     </div>
                 </form>
             </div>
         </div>
 
-        <div class="finance-card-out mb-4">
+        <div class="finance-card-out tw:mb-6">
             <div class="block-header-out">
                 <h3 class="block-title-out">{{ $mode === 'create' ? 'Tạo phiếu chi mới' : 'Tạo nhanh phiếu chi' }}</h3>
                 <div class="block-subtitle-out">Nhập nhanh thông tin để lưu phiếu chi.</div>
@@ -425,57 +424,57 @@
                 <form method="POST" action="{{ route('finance.payments.store') }}">
                     @csrf
 
-                    <div class="row g-3">
-                        <div class="col-xl-2 col-md-6">
+                    <div class="tw:row tw:g-3">
+                        <div class="tw:min-[75rem]:col12-2 tw:md:col12-6">
                             <label class="modern-label-out">Ngày chi</label>
-                            <input type="date" name="payment_date" class="form-control modern-input-out" value="{{ old('payment_date', now()->format('Y-m-d')) }}" required>
+                            <x-ui.input type="date" name="payment_date" class="modern-input-out" value="{{ old('payment_date', now()->format('Y-m-d')) }}" required />
                         </div>
 
-                        <div class="col-xl-3 col-md-6">
+                        <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                             <label class="modern-label-out">Người nhận</label>
-                            <input type="text" name="payee_name" class="form-control modern-input-out" value="{{ old('payee_name') }}" placeholder="VD: Công ty ABC" required>
+                            <x-ui.input type="text" name="payee_name" class="modern-input-out" value="{{ old('payee_name') }}" placeholder="VD: Công ty ABC" required />
                         </div>
 
-                        <div class="col-xl-2 col-md-6">
+                        <div class="tw:min-[75rem]:col12-2 tw:md:col12-6">
                             <label class="modern-label-out">Số điện thoại</label>
-                            <input type="text" name="payee_phone" class="form-control modern-input-out" value="{{ old('payee_phone') }}" placeholder="Không bắt buộc">
+                            <x-ui.input type="text" name="payee_phone" class="modern-input-out" value="{{ old('payee_phone') }}" placeholder="Không bắt buộc" />
                         </div>
 
-                        <div class="col-xl-2 col-md-6">
+                        <div class="tw:min-[75rem]:col12-2 tw:md:col12-6">
                             <label class="modern-label-out">Loại chi</label>
-                            <select name="category" class="form-select modern-select-out" required>
+                            <x-ui.select name="category" class="modern-select-out" required>
                                 @foreach($categories as $key => $label)
                                     <option value="{{ $key }}" @selected(old('category', 'chi_nha_cung_cap') === $key)>{{ $label }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="col-xl-3 col-md-6">
+                        <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                             <label class="modern-label-out">Phương thức</label>
-                            <select name="payment_method" class="form-select modern-select-out" required>
+                            <x-ui.select name="payment_method" class="modern-select-out" required>
                                 @foreach($paymentMethods as $key => $label)
                                     <option value="{{ $key }}" @selected(old('payment_method', 'cash') === $key)>{{ $label }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="col-xl-3 col-md-6">
+                        <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                             <label class="modern-label-out">Số tiền</label>
-                            <input type="number" min="1000" step="any" name="amount" class="form-control modern-input-out" value="{{ old('amount') }}" placeholder="VD: 3000000" required>
+                            <x-ui.input type="number" min="1000" step="any" name="amount" class="modern-input-out" value="{{ old('amount') }}" placeholder="VD: 3000000" required />
                         </div>
 
-                        <div class="col-xl-9 col-md-6">
+                        <div class="tw:min-[75rem]:col12-9 tw:md:col12-6">
                             <label class="modern-label-out">Ghi chú</label>
-                            <input type="text" name="note" class="form-control modern-input-out" value="{{ old('note') }}" placeholder="Nội dung chi tiền...">
+                            <x-ui.input type="text" name="note" class="modern-input-out" value="{{ old('note') }}" placeholder="Nội dung chi tiền..." />
                         </div>
 
-                        <div class="col-12 d-flex justify-content-end gap-2 pt-2">
-                            <a href="{{ route('finance.payments.index') }}" class="btn finance-action-btn-out finance-btn-light-out">
+                        <div class="tw:col12-12 tw:flex tw:justify-end tw:gap-2 pt-2">
+                            <x-ui.button variant="none" size="none" class="finance-action-btn-out finance-btn-light-out" href="{{ route('finance.payments.index') }}">
                                 Làm mới
-                            </a>
-                            <button type="submit" class="btn finance-action-btn-out finance-btn-primary-out">
+                            </x-ui.button>
+                            <x-ui.button variant="none" size="none" class="finance-action-btn-out finance-btn-primary-out" type="submit">
                                 Lưu phiếu chi
-                            </button>
+                            </x-ui.button>
                         </div>
                     </div>
                 </form>
@@ -483,7 +482,7 @@
         </div>
 
         <div class="finance-card-out">
-            <div class="block-header-out d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="block-header-out tw:flex tw:justify-between tw:items-center flex-wrap tw:gap-2">
                 <div>
                     <h3 class="block-title-out">Danh sách phiếu chi</h3>
                     <div class="block-subtitle-out">Toàn bộ lịch sử phiếu chi trong phạm vi lọc hiện tại.</div>
@@ -502,19 +501,19 @@
                                 <th>Người nhận</th>
                                 <th>Loại chi</th>
                                 <th>Phương thức</th>
-                                <th class="text-end">Số tiền</th>
+                                <th class="tw:text-right">Số tiền</th>
                                 <th class="pe-4">Ghi chú</th>
-                                <th class="pe-4 text-center">Xóa</th>
+                                <th class="pe-4 tw:text-center">Xóa</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($payments as $payment)
                                 <tr>
-                                    <td class="ps-4 fw-bold">{{ $payment->code }}</td>
+                                    <td class="ps-4 tw:font-bold">{{ $payment->code }}</td>
                                     <td>{{ optional($payment->payment_date)->format('d/m/Y') }}</td>
                                     <td>
-                                        <div class="fw-bold">{{ $payment->payee_name }}</div>
-                                        <div class="text-muted small">{{ $payment->payee_phone }}</div>
+                                        <div class="tw:font-bold">{{ $payment->payee_name }}</div>
+                                        <div class="tw:text-[rgba(33,37,41,0.75)] small">{{ $payment->payee_phone }}</div>
                                     </td>
                                     <td>
                                         <span class="modern-pill-out pill-red-out">
@@ -526,15 +525,15 @@
                                             {{ $paymentMethods[$payment->payment_method] ?? $payment->payment_method }}
                                         </span>
                                     </td>
-                                    <td class="text-end money-out">{{ number_format($payment->amount, 0, ',', '.') }} đ</td>
-                                    <td class="text-muted">{{ $payment->note }}</td>
-<td class="pe-4 text-center">
+                                    <td class="tw:text-right money-out">{{ number_format($payment->amount, 0, ',', '.') }} đ</td>
+                                    <td class="tw:text-[rgba(33,37,41,0.75)]!">{{ $payment->note }}</td>
+<td class="pe-4 tw:text-center">
     <form action="{{ route('finance.payments.destroy', $payment->id) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa phiếu chi này không?');" class="d-inline">
         @csrf
         @method('DELETE')
-        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+        <x-ui.button variant="outline-danger" size="sm" type="submit" class="rounded-pill tw:px-4">
             Xóa
-        </button>
+        </x-ui.button>
     </form>
 </td>
                                 </tr>
@@ -556,7 +555,7 @@
                 </div>
 
                 @if($payments->count())
-                    <div class="p-4">
+                    <div class="tw:p-6">
                         {{ $payments->links() }}
                     </div>
                 @endif

@@ -13,118 +13,103 @@ class EnforcePageAccess
 
     public function handle(Request $request, Closure $next): Response
     {
-        /* EGO_SERIAL_WARRANTY_WAREHOUSE_ACCESS_START */
-        if ($request->is('serial-warranty') || $request->is('serial-warranty/*')) {
-            $egoSerialUser = $request->user();
-
-            if ($egoSerialUser && (
-            (method_exists($egoSerialUser, 'hasAnyRole') && $egoSerialUser->hasAnyRole(['admin', 'warehouse', 'kho'])) ||
-            (method_exists($egoSerialUser, 'hasRole') && (
-                $egoSerialUser->hasRole('admin') ||
-                $egoSerialUser->hasRole('warehouse') ||
-                $egoSerialUser->hasRole('kho')
-            )) ||
-            (isset($egoSerialUser->role) && in_array(strtolower((string) $egoSerialUser->role), ['admin', 'warehouse', 'kho'], true))
-        )) {
-                return $next($request);
-            }
-        }
-        /* EGO_SERIAL_WARRANTY_WAREHOUSE_ACCESS_END */
-
         $user = $request->user();
 
         if (! $user) {
             return $next($request);
         }
 
-        /* EGO_EMPLOYEE_SELF_SERVICE_PUBLIC_ROUTES_V1
-         * Các trang tự phục vụ nhân sự luôn mở cho mọi tài khoản đã đăng nhập.
-         * Quyền duyệt/chuyển người duyệt vẫn được kiểm tra trong Controller.
-         */
-        $routeName = optional($request->route())->getName();
-
-        /* EGO_SHARED_MODULES_ALL_AUTH_ROLES_V2_START
-         * Các module nội bộ dùng chung luôn mở cho mọi tài khoản đã đăng nhập.
-         * Quyền duyệt/xóa/chỉnh sửa chi tiết vẫn do Controller hiện tại kiểm tra.
+        /*
+         * EGO_WAREHOUSE_SUPPLIER_DEBT_FULL_ACCESS
+         *
+         * Kho được thao tác toàn bộ module Công nợ nhà cung cấp.
+         * Không cấp page.finance để tránh mở toàn bộ Tài chính.
          */
         if (
-            $routeName
-            && \Illuminate\Support\Str::is([
-                'payment_requests.*',
-                'payment-requests.*',
-                'de-xuat.*',
-                'company-documents.*',
-            ], $routeName)
+            method_exists($user, 'hasAnyRole')
+            && $user->hasAnyRole(['warehouse', 'kho'])
         ) {
-            return $next($request);
-        }
-        /* EGO_SHARED_MODULES_ALL_AUTH_ROLES_V2_END */
+            /*
+             * Toàn bộ nghiệp vụ Supplier Debts:
+             * GET / POST / PUT / PATCH / DELETE.
+             */
+            if (
+                $request->is('finance/supplier-debts')
+                || $request->is('finance/supplier-debts/*')
+            ) {
+                return $next($request);
+            }
 
-        if (
-            $routeName
-            && \Illuminate\Support\Str::is([
-                'hr.attendance.my',
-                'hr.attendance.checkin',
-                'hr.attendance.checkout',
-                'hr.attendance.guide.*',
-                'hr.leave.index',
-                'hr.leave.create',
-                'hr.leave.store',
-                'hr.leave.approve',
-                'hr.leave.reject',
-                'hr.leave.transfer-approver',
-                'hr.leave.cancel',
-                'hr.leave.attachments.*',
-                'hr.online-work.create',
-            ], $routeName)
-        ) {
-            return $next($request);
+            /*
+             * Sau khi tạo ĐNTT từ công nợ NCC, controller redirect sang
+             * payment-requests/{id}. Cho Kho xem ĐÚNG phiếu liên kết
+             * với công nợ NCC, không mở tất cả ĐNTT.
+             */
+            if (
+                in_array(strtoupper($request->method()), ['GET', 'HEAD'], true)
+                && preg_match(
+                    '#^payment-requests/([0-9]+)$#',
+                    trim($request->path(), '/'),
+                    $supplierDebtPaymentMatch
+                )
+            ) {
+                try {
+                    $paymentRequestId = (int) $supplierDebtPaymentMatch[1];
+
+                    if (
+                        \Illuminate\Support\Facades\Schema::hasTable(
+                            'finance_supplier_debt_payments'
+                        )
+                        && \Illuminate\Support\Facades\DB::table(
+                            'finance_supplier_debt_payments'
+                        )
+                            ->where(
+                                'payment_request_id',
+                                $paymentRequestId
+                            )
+                            ->exists()
+                    ) {
+                        return $next($request);
+                    }
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
         }
 
         /*
-         * EGO_WAREHOUSE_PROJECT_MATERIAL_ACCESS_V1
+         * EGO_HR_SELF_SERVICE_ACCESS_V1
          *
-         * Role Kho được mở đúng màn hình xử lý vật tư công trình.
-         * Controller vẫn kiểm tra công ty, công trình và phiếu vật tư.
-         * Không mở các tab tài chính hoặc chức năng kỹ thuật khác.
+         * Chấm công cá nhân / nghỉ phép / tăng ca là chức năng cá nhân dùng
+         * xuyên mọi workspace. Không để PageAccessService chặn theo phòng ban.
+         * Các thao tác nhạy cảm (duyệt/từ chối/chuyển người duyệt, tải/xoá file)
+         * vẫn được controller kiểm tra quyền theo từng bản ghi.
          */
-        $isWarehouseOnly = $user->hasAnyRole(['warehouse', 'kho'])
-            && ! $user->hasAnyRole([
-                'admin',
-                'management',
-                'manager',
-                'technical_manager',
-                'technical_leader',
-                'sales_manager',
-                'sales',
-                'sales_staff',
-                'ky_thuat',
-            ]);
+        $method = strtoupper($request->method());
+        $path = trim($request->path(), '/');
 
-        $isWarehouseMaterialRoute = $routeName
-            && \Illuminate\Support\Str::is([
-                'project-test.warehouse.*',
-                'warehouse-projects.*',
-            ], $routeName);
+        $isPersonalAttendance =
+            ($method === 'GET' && in_array($path, [
+                'nhan-su/cham-cong-cua-toi',
+                'nhan-su/huong-dan-cham-cong/dien-thoai',
+                'nhan-su/huong-dan-cham-cong/may-tinh',
+            ], true))
+            || ($method === 'POST' && in_array($path, [
+                'nhan-su/cham-cong/check-in',
+                'nhan-su/cham-cong/check-out',
+            ], true));
 
-        $isWarehouseProjectMaterialPage = $routeName === 'project-test.show'
-            && $request->query('tab') === 'materials';
+        $isLeaveSelfService =
+            $path === 'nhan-su/leave-requests'
+            || str_starts_with($path, 'nhan-su/leave-requests/')
+            || $path === 'nhan-su/online-work/create';
 
-        if (
-            $isWarehouseOnly
-            && ($isWarehouseMaterialRoute || $isWarehouseProjectMaterialPage)
-        ) {
+        $isOvertimeSelfService =
+            $path === 'nhan-su/tang-ca'
+            || str_starts_with($path, 'nhan-su/tang-ca/');
+
+        if ($isPersonalAttendance || $isLeaveSelfService || $isOvertimeSelfService) {
             return $next($request);
-        }
-
-        // Công trình chuẩn /du-an: Sales được vào module; phạm vi dữ liệu và quyền ghi
-        // tiếp tục bị khóa bởi EnsureUnifiedProjectAccess. Không mở chéo công trình nội bộ.
-        if ($routeName && \Illuminate\Support\Str::is('projects-unified.*', $routeName)) {
-            $isSales = method_exists($user, 'hasAnyRole')
-                && $user->hasAnyRole(['sales', 'sales_manager', 'sales_staff']);
-            if ($isSales) {
-                return $next($request);
-            }
         }
 
         $permission = $this->pageAccess->permissionForRequest($request);

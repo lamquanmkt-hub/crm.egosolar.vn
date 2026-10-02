@@ -4,7 +4,7 @@ use App\Http\Controllers\Projects\ProjectWorkflowV2Controller;
 use App\Http\Controllers\Projects\UnifiedProjectController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', \App\Http\Middleware\EnsureUnifiedProjectAccess::class])
+Route::middleware(['auth'])
     ->prefix('du-an')
     ->name('projects-unified.')
     ->controller(UnifiedProjectController::class)
@@ -65,33 +65,33 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUnifiedProjectAccess::clas
         Route::post('/{site}/tai-chinh/chi-phi-khac', 'storeProjectFinanceExpense')->whereNumber('site')->name('finance.expense.store');
         Route::put('/{site}/tai-chinh/chi-phi-khac/{expense}', 'updateProjectFinanceExpense')->whereNumber('site')->whereNumber('expense')->name('finance.expense.update');
         /* EGO_PROJECT_MAINTENANCE_CANONICAL_ROUTES_START */
-        Route::middleware('role:ky_thuat|technical|technician|technical_staff|technical_leader|technical_manager|accounting|admin|manager|warehouse|kho|sales|sales_manager|cskh')
+        Route::middleware('role:technical|technical_manager|accounting|admin|manager|warehouse|sales|sales_manager|cskh')
             ->prefix('bao-tri-bao-hanh')
             ->name('maintenance.')
             ->group(function (): void {
-                Route::get('/', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceController::class, 'index'])->name('index');
-                Route::get('/sites/search', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceController::class, 'sitesSearch'])->name('sites-search');
-                Route::post('/', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceController::class, 'store'])->name('store');
+                Route::get('/', [\App\Http\Controllers\Technical\SolarMaintenanceController::class, 'index'])->name('index');
+                Route::get('/sites/search', [\App\Http\Controllers\Technical\SolarMaintenanceController::class, 'sitesSearch'])->name('sites-search');
+                Route::post('/', [\App\Http\Controllers\Technical\SolarMaintenanceController::class, 'store'])->name('store');
 
-                Route::get('/cong-trinh/{site}', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceDetailController::class, 'site'])
+                Route::get('/cong-trinh/{site}', [\App\Http\Controllers\Technical\SolarMaintenanceDetailController::class, 'site'])
                     ->whereNumber('site')->name('site');
-                Route::post('/cong-trinh/{site}/files', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceAttachmentController::class, 'storeSite'])
+                Route::post('/cong-trinh/{site}/files', [\App\Http\Controllers\Technical\SolarMaintenanceAttachmentController::class, 'storeSite'])
                     ->whereNumber('site')->name('site-files.store');
 
-                Route::get('/site-files/{document}/preview', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceAttachmentController::class, 'previewSite'])
+                Route::get('/site-files/{document}/preview', [\App\Http\Controllers\Technical\SolarMaintenanceAttachmentController::class, 'previewSite'])
                     ->whereNumber('document')->name('site-files.preview');
-                Route::get('/site-files/{document}/download', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceAttachmentController::class, 'downloadSite'])
+                Route::get('/site-files/{document}/download', [\App\Http\Controllers\Technical\SolarMaintenanceAttachmentController::class, 'downloadSite'])
                     ->whereNumber('document')->name('site-files.download');
-                Route::delete('/site-files/{document}', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceAttachmentController::class, 'destroySite'])
+                Route::delete('/site-files/{document}', [\App\Http\Controllers\Technical\SolarMaintenanceAttachmentController::class, 'destroySite'])
                     ->whereNumber('document')->name('site-files.destroy');
 
-                Route::post('/{schedule}/files', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceAttachmentController::class, 'storeSchedule'])
+                Route::post('/{schedule}/files', [\App\Http\Controllers\Technical\SolarMaintenanceAttachmentController::class, 'storeSchedule'])
                     ->whereNumber('schedule')->name('schedule-files.store');
-                Route::get('/schedule-files/{attachment}/preview', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceAttachmentController::class, 'previewSchedule'])
+                Route::get('/schedule-files/{attachment}/preview', [\App\Http\Controllers\Technical\SolarMaintenanceAttachmentController::class, 'previewSchedule'])
                     ->whereNumber('attachment')->name('schedule-files.preview');
-                Route::get('/schedule-files/{attachment}/download', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceAttachmentController::class, 'downloadSchedule'])
+                Route::get('/schedule-files/{attachment}/download', [\App\Http\Controllers\Technical\SolarMaintenanceAttachmentController::class, 'downloadSchedule'])
                     ->whereNumber('attachment')->name('schedule-files.download');
-                Route::delete('/schedule-files/{attachment}', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceAttachmentController::class, 'destroySchedule'])
+                Route::delete('/schedule-files/{attachment}', [\App\Http\Controllers\Technical\SolarMaintenanceAttachmentController::class, 'destroySchedule'])
                     ->whereNumber('attachment')->name('schedule-files.destroy');
 
                 Route::post('/{schedule}/cong-viec', [\App\Http\Controllers\Technical\SolarMaintenanceWorkItemController::class, 'store'])
@@ -106,21 +106,21 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUnifiedProjectAccess::clas
                 Route::delete('/{schedule}/binh-luan/{comment}', [\App\Http\Controllers\Technical\SolarMaintenanceCommentController::class, 'destroy'])
                     ->whereNumber('schedule')->whereNumber('comment')->name('comments.destroy');
 
-                Route::post('/{schedule}/gui-duyet', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceApprovalController::class, 'submit'])
+                Route::post('/{schedule}/gui-duyet', [\App\Http\Controllers\Technical\SolarMaintenanceApprovalController::class, 'submit'])
                     ->whereNumber('schedule')->name('approval.submit');
-                Route::post('/{schedule}/phan-cong/duyet', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceController::class, 'approveAssignment'])
+                Route::post('/{schedule}/phan-cong/duyet', [\App\Http\Controllers\Technical\SolarMaintenanceController::class, 'approveAssignment'])
                     ->whereNumber('schedule')->name('assignment.approve');
-                Route::post('/{schedule}/phan-cong/nhan-viec', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceController::class, 'acceptAssignment'])
+                Route::post('/{schedule}/phan-cong/nhan-viec', [\App\Http\Controllers\Technical\SolarMaintenanceController::class, 'acceptAssignment'])
                     ->whereNumber('schedule')->name('assignment.accept');
-                Route::post('/{schedule}/phe-duyet', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceApprovalController::class, 'approve'])
+                Route::post('/{schedule}/phe-duyet', [\App\Http\Controllers\Technical\SolarMaintenanceApprovalController::class, 'approve'])
                     ->whereNumber('schedule')->name('approval.approve');
-                Route::post('/{schedule}/hoan-thanh', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceApprovalController::class, 'complete'])
+                Route::post('/{schedule}/hoan-thanh', [\App\Http\Controllers\Technical\SolarMaintenanceApprovalController::class, 'complete'])
                     ->whereNumber('schedule')->name('approval.complete');
-                Route::post('/{schedule}/yeu-cau-chinh-sua', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceApprovalController::class, 'requestRevision'])
+                Route::post('/{schedule}/yeu-cau-chinh-sua', [\App\Http\Controllers\Technical\SolarMaintenanceApprovalController::class, 'requestRevision'])
                     ->whereNumber('schedule')->name('approval.revision');
-                Route::post('/{schedule}/tu-choi', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceApprovalController::class, 'reject'])
+                Route::post('/{schedule}/tu-choi', [\App\Http\Controllers\Technical\SolarMaintenanceApprovalController::class, 'reject'])
                     ->whereNumber('schedule')->name('approval.reject');
-                Route::post('/{schedule}/mo-lai', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceApprovalController::class, 'reopen'])
+                Route::post('/{schedule}/mo-lai', [\App\Http\Controllers\Technical\SolarMaintenanceApprovalController::class, 'reopen'])
                     ->whereNumber('schedule')->name('approval.reopen');
 
                 Route::post('/phieu-bao-hanh', [\App\Http\Controllers\Technical\SolarWarrantyClaimController::class, 'store'])
@@ -132,15 +132,15 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUnifiedProjectAccess::clas
                 Route::post('/kho-bao-hanh/{movement}/status', [\App\Http\Controllers\Technical\SolarWarrantyStockController::class, 'updateStatus'])
                     ->whereNumber('movement')->name('stock.status');
 
-                Route::get('/{schedule}/json', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceController::class, 'showJson'])
+                Route::get('/{schedule}/json', [\App\Http\Controllers\Technical\SolarMaintenanceController::class, 'showJson'])
                     ->whereNumber('schedule')->name('json');
-                Route::put('/{schedule}', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceController::class, 'update'])
+                Route::put('/{schedule}', [\App\Http\Controllers\Technical\SolarMaintenanceController::class, 'update'])
                     ->whereNumber('schedule')->name('update');
-                Route::post('/{schedule}/status', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceController::class, 'updateStatus'])
+                Route::post('/{schedule}/status', [\App\Http\Controllers\Technical\SolarMaintenanceController::class, 'updateStatus'])
                     ->whereNumber('schedule')->name('status');
-                Route::delete('/{schedule}', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceController::class, 'destroy'])
+                Route::delete('/{schedule}', [\App\Http\Controllers\Technical\SolarMaintenanceController::class, 'destroy'])
                     ->whereNumber('schedule')->name('destroy');
-                Route::get('/{schedule}', [\App\Http\Controllers\Synced\Technical\SolarMaintenanceDetailController::class, 'show'])
+                Route::get('/{schedule}', [\App\Http\Controllers\Technical\SolarMaintenanceDetailController::class, 'show'])
                     ->whereNumber('schedule')->name('show');
             });
         /* EGO_PROJECT_MAINTENANCE_CANONICAL_ROUTES_END */

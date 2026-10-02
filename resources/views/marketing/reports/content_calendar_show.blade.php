@@ -105,17 +105,17 @@
     $feedbackTreeLocal = $feedbackTree ?? collect();
 @endphp
 
-<div class="container-fluid px-4 mt-3 cc-show-page">
+<div class="container-fluid tw:px-6 tw:mt-4 cc-show-page">
 
     {{-- HEADER --}}
-    <div class="cc-page-header mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+    <div class="cc-page-header tw:mb-4">
+        <div class="tw:flex flex-wrap tw:items-start tw:justify-between tw:gap-4">
             <div class="cc-head-left">
-                <div class="cc-breadcrumb small text-muted mb-1">
+                <div class="cc-breadcrumb small tw:text-[rgba(33,37,41,0.75)] tw:mb-1">
                     Marketing <span class="mx-1">/</span> Lịch biên tập <span class="mx-1">/</span> Chi tiết
                 </div>
 
-                <h3 class="cc-title mb-2">{{ $item->title }}</h3>
+                <h3 class="cc-title tw:mb-2">{{ $item->title }}</h3>
 
                 <div class="cc-subline small">
                     <span class="cc-pill">
@@ -129,14 +129,14 @@
                     @endif
 
                     <span class="cc-dot">•</span>
-                    <span class="text-muted"><i class="bi bi-calendar3"></i> {{ $publishDMY }}</span>
+                    <span class="tw:text-[rgba(33,37,41,0.75)]"><i class="bi bi-calendar3"></i> {{ $publishDMY }}</span>
 
                     <span class="cc-dot">•</span>
-                    <span class="text-muted"><i class="bi bi-person"></i> {{ $creatorName }}</span>
+                    <span class="tw:text-[rgba(33,37,41,0.75)]"><i class="bi bi-person"></i> {{ $creatorName }}</span>
 
                     @if(!empty($item->link))
                         <span class="cc-dot">•</span>
-                        <a class="text-muted text-decoration-none"
+                        <a class="tw:text-[rgba(33,37,41,0.75)] tw:no-underline"
                            href="{{ $item->link }}"
                            target="_blank"
                            rel="noopener noreferrer"
@@ -147,24 +147,21 @@
                 </div>
             </div>
 
-            <div class="cc-head-right d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <div class="cc-head-right tw:flex tw:items-center tw:gap-2 flex-wrap tw:justify-end">
                 <span class="cc-status {{ $s['class'] }}">{{ $s['label'] }}</span>
 
-                <a href="{{ route('marketing.reports.content-calendar') }}"
-                   class="btn btn-outline-secondary cc-btn">
+                <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-btn" :href="route('marketing.reports.content-calendar')">
                     <i class="bi bi-arrow-left"></i> Về danh sách
-                </a>
+                </x-ui.button>
 
-                <button class="btn btn-outline-secondary cc-btn" type="button" id="ccCopyTitle"
-                        data-cc-copy="{{ $item->title }}">
+                <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-btn" type="button" id="ccCopyTitle" data-cc-copy="{{ $item->title }}">
                     <i class="bi bi-clipboard"></i> Copy tiêu đề
-                </button>
+                </x-ui.button>
 
                 @if(!empty($item->link))
-                    <a class="btn btn-outline-secondary cc-btn"
-                       href="{{ $item->link }}" target="_blank" rel="noopener">
+                    <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-btn" :href="$item->link" target="_blank" rel="noopener">
                         <i class="bi bi-box-arrow-up-right"></i> Mở link
-                    </a>
+                    </x-ui.button>
                 @endif
             </div>
         </div>
@@ -176,25 +173,25 @@
         <div class="col-lg-8">
 
             {{-- CONTENT EDITOR --}}
-            <div class="card mb-3 cc-card">
-                <div class="card-header d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
+            <x-ui.card class="tw:mb-4 cc-card">
+                <x-ui.card-header class="tw:flex flex-wrap tw:gap-2 tw:items-center tw:justify-between">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                         <span class="cc-card-title"><i class="bi bi-file-text"></i> Nội dung bài viết</span>
-                        <span class="cc-hint small text-muted">Gõ nội dung → Lưu. Có tab Preview để xem nhanh.</span>
+                        <span class="cc-hint small tw:text-[rgba(33,37,41,0.75)]">Gõ nội dung → Lưu. Có tab Preview để xem nhanh.</span>
                     </div>
 
-                    <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-outline-secondary cc-btn-sm" type="button" id="ccCopyContent">
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                        <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-btn-sm" type="button" id="ccCopyContent">
                             <i class="bi bi-clipboard"></i> Copy nội dung
-                        </button>
-                        <button class="btn btn-ego cc-btn-sm" type="button" id="ccSubmitEditor">
+                        </x-ui.button>
+                        <x-ui.button variant="none" size="none" class="btn-ego cc-btn-sm tw:text-[16px]/[24px]" type="button" id="ccSubmitEditor">
                             <i class="bi bi-save2"></i> Lưu
-                        </button>
+                        </x-ui.button>
                     </div>
-                </div>
+                </x-ui.card-header>
 
-                <div class="card-body">
-                    <ul class="nav nav-pills cc-tabs mb-3" id="ccTab" role="tablist">
+                <x-ui.card-body>
+                    <ul class="nav nav-pills cc-tabs tw:mb-4" id="ccTab" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="cc-edit-tab" data-bs-toggle="pill" data-bs-target="#cc-edit" type="button" role="tab">
                                 Soạn thảo
@@ -215,28 +212,25 @@
                                 @csrf
                                 @method('PUT')
 
-                                <textarea name="full_content"
+                                <x-ui.input as="textarea" name="full_content"
                                           id="ccEditor"
-                                          class="form-control cc-editor"
+                                          class="cc-editor"
                                           rows="16"
-                                          placeholder="Nhập nội dung chi tiết...">{{ $item->full_content }}</textarea>
+                                          placeholder="Nhập nội dung chi tiết...">{{ $item->full_content }}</x-ui.input>
 
-                                <div class="d-flex flex-wrap gap-2 mt-3">
-                                    <button class="btn btn-ego cc-btn" type="submit">
+                                <div class="tw:flex flex-wrap tw:gap-2 tw:mt-4">
+                                    <x-ui.button variant="none" size="none" class="btn-ego cc-btn tw:text-[16px]/[24px]" type="submit">
                                         <i class="bi bi-save2"></i> Lưu nội dung
-                                    </button>
+                                    </x-ui.button>
 
-                                    <a href="{{ route('marketing.reports.content-calendar') }}"
-                                       class="btn btn-outline-secondary cc-btn">
+                                    <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-btn" :href="route('marketing.reports.content-calendar')">
                                         <i class="bi bi-list-ul"></i> Về danh sách
-                                    </a>
+                                    </x-ui.button>
 
                                     @if(!empty($item->link))
-                                        <button type="button"
-                                                class="btn btn-outline-secondary cc-btn"
-                                                data-cc-copy="{{ $item->link }}">
+                                        <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-btn" type="button" data-cc-copy="{{ $item->link }}">
                                             <i class="bi bi-clipboard"></i> Copy link
-                                        </button>
+                                        </x-ui.button>
                                     @endif
                                 </div>
                             </form>
@@ -244,7 +238,7 @@
 
                         <div class="tab-pane fade" id="cc-preview" role="tabpanel">
                             <div class="cc-preview-wrap">
-                                <div class="cc-preview-title small text-muted mb-2">
+                                <div class="cc-preview-title small tw:text-[rgba(33,37,41,0.75)] tw:mb-2">
                                     <i class="bi bi-eye"></i> Xem trước (format đơn giản)
                                 </div>
                                 <div class="cc-preview" id="ccPreviewBox"></div>
@@ -252,19 +246,19 @@
                         </div>
                     </div>
 
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
 
             {{-- ATTACHMENTS + UPLOAD --}}
-            <div class="card cc-card">
-                <div class="card-header d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
+            <x-ui.card class="cc-card">
+                <x-ui.card-header class="tw:flex flex-wrap tw:gap-2 tw:items-center tw:justify-between">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                         <span class="cc-card-title"><i class="bi bi-images"></i> Ảnh / File đính kèm</span>
-                        <span class="small text-muted">Kéo thả để upload nhanh, xem thumbnail ngay.</span>
+                        <span class="small tw:text-[rgba(33,37,41,0.75)]">Kéo thả để upload nhanh, xem thumbnail ngay.</span>
                     </div>
-                </div>
+                </x-ui.card-header>
 
-                <div class="card-body">
+                <x-ui.card-body>
 
                     <form method="POST"
                           action="{{ route('marketing.reports.content-calendar.files', $item->id) }}"
@@ -275,16 +269,16 @@
 
                         <div class="cc-dropzone" id="ccDropzone">
                             <div class="cc-dropzone-ico"><i class="bi bi-cloud-arrow-up"></i></div>
-                            <div class="fw-semibold">Kéo thả ảnh/file vào đây</div>
-                            <div class="text-muted small">hoặc bấm để chọn file (JPG/PNG/PDF/DOCX...)</div>
+                            <div class="tw:font-semibold">Kéo thả ảnh/file vào đây</div>
+                            <div class="tw:text-[rgba(33,37,41,0.75)] small">hoặc bấm để chọn file (JPG/PNG/PDF/DOCX...)</div>
                             <input type="file" name="file" class="d-none" id="ccFileInput" required>
                         </div>
 
-                        <div class="cc-upload-meta mt-3 d-none" id="ccUploadMeta">
+                        <div class="cc-upload-meta tw:mt-4 d-none" id="ccUploadMeta">
                             <div class="cc-upload-left">
                                 <div class="cc-filepicked">
                                     <div class="cc-filepicked-name" id="ccPickedName">—</div>
-                                    <div class="cc-filepicked-sub text-muted small" id="ccPickedSub">—</div>
+                                    <div class="cc-filepicked-sub tw:text-[rgba(33,37,41,0.75)] small" id="ccPickedSub">—</div>
                                 </div>
                                 <div class="cc-img-preview d-none" id="ccImgPreviewWrap">
                                     <img id="ccImgPreview" alt="preview">
@@ -292,12 +286,12 @@
                             </div>
 
                             <div class="cc-upload-right">
-                                <button class="btn btn-ego cc-btn w-100" type="submit" id="ccUploadBtn">
+                                <x-ui.button variant="none" size="none" class="btn-ego cc-btn tw:w-full tw:text-[16px]/[24px]" type="submit" id="ccUploadBtn">
                                     <i class="bi bi-upload"></i> Upload
-                                </button>
-                                <button class="btn btn-outline-secondary cc-btn w-100 mt-2" type="button" id="ccClearPicked">
+                                </x-ui.button>
+                                <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] tw:w-full tw:mt-2 cc-btn" type="button" id="ccClearPicked">
                                     <i class="bi bi-x-lg"></i> Bỏ chọn
-                                </button>
+                                </x-ui.button>
                             </div>
                         </div>
                     </form>
@@ -326,21 +320,19 @@
 
                                     <div class="cc-file-info">
                                         <div class="cc-file-name" title="{{ $f->file_name }}">{{ $f->file_name }}</div>
-                                        <div class="cc-file-sub small text-muted">
+                                        <div class="cc-file-sub small tw:text-[rgba(33,37,41,0.75)]">
                                             {{ $f->file_type ?? (strtoupper(pathinfo($f->file_name, PATHINFO_EXTENSION)) ?: 'FILE') }}
                                         </div>
                                     </div>
 
                                     <div class="cc-file-actions">
-                                        <button type="button" class="btn btn-outline-secondary cc-mini"
-                                                data-cc-copy="{{ $url }}" title="Copy URL">
+                                        <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-mini" type="button" data-cc-copy="{{ $url }}" title="Copy URL">
                                             <i class="bi bi-clipboard"></i>
-                                        </button>
+                                        </x-ui.button>
 
-                                        <a class="btn btn-outline-secondary cc-mini"
-                                           href="{{ $url }}" target="_blank" rel="noopener" title="Mở file">
+                                        <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-mini" :href="$url" target="_blank" rel="noopener" title="Mở file">
                                             <i class="bi bi-box-arrow-up-right"></i>
-                                        </a>
+                                        </x-ui.button>
 
                                         <form method="POST"
                                               action="{{ route('marketing.reports.content-calendar.files.delete', ['id' => $item->id, 'fileId' => $f->id]) }}"
@@ -348,9 +340,9 @@
                                               style="display:inline;">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn btn-outline-danger cc-mini" title="Xóa file">
+                                            <x-ui.button variant="outline-danger" size="none" class="tw:text-[16px]/[24px] cc-mini" type="submit" title="Xóa file">
                                                 <i class="bi bi-trash"></i>
-                                            </button>
+                                            </x-ui.button>
                                         </form>
                                     </div>
                                 </div>
@@ -359,30 +351,30 @@
                     @else
                         <div class="cc-empty">
                             <div class="cc-empty-ico"><i class="bi bi-image"></i></div>
-                            <div class="fw-semibold">Chưa có file nào</div>
-                            <div class="text-muted small">Hãy upload ảnh/file ngay phía trên (kéo thả hoặc bấm chọn file).</div>
+                            <div class="tw:font-semibold">Chưa có file nào</div>
+                            <div class="tw:text-[rgba(33,37,41,0.75)] small">Hãy upload ảnh/file ngay phía trên (kéo thả hoặc bấm chọn file).</div>
                         </div>
                     @endif
 
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
 
             {{-- FEEDBACK (Facebook-like) --}}
-            <div class="card cc-card mt-3">
-                <div class="card-header d-flex align-items-center justify-content-between">
+            <x-ui.card class="cc-card tw:mt-4">
+                <x-ui.card-header class="tw:flex tw:items-center tw:justify-between">
                     <span class="cc-card-title">
                         <i class="bi bi-chat-dots"></i> Feedback
                     </span>
-                    <span class="cc-hint small text-muted">Góp ý dạng comment (có thể kèm ảnh).</span>
-                </div>
+                    <span class="cc-hint small tw:text-[rgba(33,37,41,0.75)]">Góp ý dạng comment (có thể kèm ảnh).</span>
+                </x-ui.card-header>
 
-                <div class="card-body">
+                <x-ui.card-body>
 
                     {{-- FORM GỬI FEEDBACK (comment cha) --}}
                     <form method="POST"
                           action="{{ route('marketing.reports.content-calendar.feedback.store', $item->id) }}"
                           enctype="multipart/form-data"
-                          class="cc-fb-form mb-3">
+                          class="cc-fb-form tw:mb-4">
                         @csrf
 
                         <input type="hidden" name="parent_id" value="">
@@ -393,11 +385,11 @@
                             </div>
 
                             <div class="cc-fb-box">
-                                <textarea name="message"
-                                          class="form-control cc-input cc-fb-input"
+                                <x-ui.input as="textarea" name="message"
+                                          class="cc-input cc-fb-input"
                                           rows="2"
                                           placeholder="Viết bình luận... (có thể kèm ảnh)"
-                                          required></textarea>
+                                          required></x-ui.input>
 
                                 <div class="cc-fb-actions">
                                     <label class="cc-fb-attach">
@@ -405,9 +397,9 @@
                                         <i class="bi bi-image"></i> Ảnh
                                     </label>
 
-                                    <button class="btn btn-ego cc-btn-sm" type="submit">
+                                    <x-ui.button variant="none" size="none" class="btn-ego cc-btn-sm tw:text-[16px]/[24px]" type="submit">
                                         <i class="bi bi-send"></i> Gửi
-                                    </button>
+                                    </x-ui.button>
                                 </div>
 
                                 <div class="cc-fb-preview d-none">
@@ -472,7 +464,7 @@
                                                 <form method="POST"
                                                       action="{{ route('marketing.reports.content-calendar.feedback.store', $item->id) }}"
                                                       enctype="multipart/form-data"
-                                                      class="cc-fb-form cc-fb-form--reply mt-2">
+                                                      class="cc-fb-form cc-fb-form--reply tw:mt-2">
                                                     @csrf
                                                     <input type="hidden" name="parent_id" value="{{ $fb->id }}">
 
@@ -482,11 +474,11 @@
                                                         </div>
 
                                                         <div class="cc-fb-box">
-                                                            <textarea name="message"
-                                                                      class="form-control cc-input cc-fb-input"
+                                                            <x-ui.input as="textarea" name="message"
+                                                                      class="cc-input cc-fb-input"
                                                                       rows="2"
                                                                       placeholder="Trả lời..."
-                                                                      required></textarea>
+                                                                      required></x-ui.input>
 
                                                             <div class="cc-fb-actions">
                                                                 <label class="cc-fb-attach">
@@ -494,14 +486,13 @@
                                                                     <i class="bi bi-image"></i> Ảnh
                                                                 </label>
 
-                                                                <div class="d-flex gap-2">
-                                                                    <button class="btn btn-ego cc-btn-sm" type="submit">
+                                                                <div class="tw:flex tw:gap-2">
+                                                                    <x-ui.button variant="none" size="none" class="btn-ego cc-btn-sm tw:text-[16px]/[24px]" type="submit">
                                                                         <i class="bi bi-send"></i> Gửi
-                                                                    </button>
-                                                                    <button class="btn btn-outline-secondary cc-btn-sm js-cancel-reply" type="button"
-                                                                            data-parent-id="{{ $fb->id }}">
+                                                                    </x-ui.button>
+                                                                    <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-btn-sm js-cancel-reply" type="button" data-parent-id="{{ $fb->id }}">
                                                                         Huỷ
-                                                                    </button>
+                                                                    </x-ui.button>
                                                                 </div>
                                                             </div>
 
@@ -520,29 +511,27 @@
                                             <div class="cc-edit-wrap d-none" data-edit-wrap="{{ $fb->id }}">
                                                 <form method="POST"
                                                       action="{{ route('marketing.reports.content-calendar.feedback.update', ['id' => $item->id, 'feedbackId' => $fb->id]) }}"
-                                                      class="mt-2">
+                                                      class="tw:mt-2">
                                                     @csrf
                                                     @method('PUT')
 
-                                                    <textarea name="message"
-                                                              class="form-control cc-input"
+                                                    <x-ui.input as="textarea" name="message"
+                                                              class="cc-input"
                                                               rows="2"
-                                                              required>{{ $fb->message }}</textarea>
+                                                              required>{{ $fb->message }}</x-ui.input>
 
-                                                    <div class="d-flex gap-2 mt-2">
-                                                        <button class="btn btn-ego cc-btn-sm" type="submit">
+                                                    <div class="tw:flex tw:gap-2 tw:mt-2">
+                                                        <x-ui.button variant="none" size="none" class="btn-ego cc-btn-sm tw:text-[16px]/[24px]" type="submit">
                                                             <i class="bi bi-save2"></i> Lưu
-                                                        </button>
-                                                        <button class="btn btn-outline-secondary cc-btn-sm js-cancel-edit"
-                                                                type="button"
-                                                                data-fb-id="{{ $fb->id }}">Huỷ</button>
+                                                        </x-ui.button>
+                                                        <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-btn-sm js-cancel-edit" type="button" data-fb-id="{{ $fb->id }}">Huỷ</x-ui.button>
                                                     </div>
                                                 </form>
                                             </div>
 
                                             {{-- Replies --}}
                                             @if($children && $children->count())
-                                                <div class="cc-replies mt-2">
+                                                <div class="cc-replies tw:mt-2">
                                                     @foreach($children as $ch)
                                                         @php
                                                             $cname = $ch->user->name ?? 'User';
@@ -580,23 +569,21 @@
                                                                     {{-- Child inline edit --}}
                                                                     <div class="cc-edit-wrap d-none" data-edit-wrap="{{ $ch->id }}">
                                                                         <form method="POST"
-                                                                              action="{{ route('marketing.reports.content-calendar.feedback.update', $ch->id) }}"
-                                                                              class="mt-2">
+                                                                              action="{{ route('marketing.reports.content-calendar.feedback.update', ['id' => $item->id, 'feedbackId' => $ch->id]) }}"
+                                                                              class="tw:mt-2">
                                                                             @csrf
                                                                             @method('PUT')
 
-                                                                            <textarea name="message"
-                                                                                      class="form-control cc-input"
+                                                                            <x-ui.input as="textarea" name="message"
+                                                                                      class="cc-input"
                                                                                       rows="2"
-                                                                                      required>{{ $ch->message }}</textarea>
+                                                                                      required>{{ $ch->message }}</x-ui.input>
 
-                                                                            <div class="d-flex gap-2 mt-2">
-                                                                                <button class="btn btn-ego cc-btn-sm" type="submit">
+                                                                            <div class="tw:flex tw:gap-2 tw:mt-2">
+                                                                                <x-ui.button variant="none" size="none" class="btn-ego cc-btn-sm tw:text-[16px]/[24px]" type="submit">
                                                                                     <i class="bi bi-save2"></i> Lưu
-                                                                                </button>
-                                                                                <button class="btn btn-outline-secondary cc-btn-sm js-cancel-edit"
-                                                                                        type="button"
-                                                                                        data-fb-id="{{ $ch->id }}">Huỷ</button>
+                                                                                </x-ui.button>
+                                                                                <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] cc-btn-sm js-cancel-edit" type="button" data-fb-id="{{ $ch->id }}">Huỷ</x-ui.button>
                                                                             </div>
                                                                         </form>
                                                                     </div>
@@ -673,13 +660,13 @@
                     @else
                         <div class="cc-empty">
                             <div class="cc-empty-ico"><i class="bi bi-chat-left-dots"></i></div>
-                            <div class="fw-semibold">Chưa có feedback nào</div>
-                            <div class="text-muted small">Khi có comment/ảnh, hệ thống sẽ hiển thị ở đây.</div>
+                            <div class="tw:font-semibold">Chưa có feedback nào</div>
+                            <div class="tw:text-[rgba(33,37,41,0.75)] small">Khi có comment/ảnh, hệ thống sẽ hiển thị ở đây.</div>
                         </div>
                     @endif
 
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
 
         </div> {{-- end col-lg-8 --}}
 
@@ -687,50 +674,50 @@
         <div class="col-lg-4">
 
             {{-- Info + Update --}}
-            <div class="card mb-3 cc-card cc-sticky">
-                <div class="card-header">
+            <x-ui.card class="tw:mb-4 cc-card cc-sticky">
+                <x-ui.card-header>
                     <span class="cc-card-title"><i class="bi bi-info-circle"></i> Thông tin</span>
-                </div>
+                </x-ui.card-header>
 
-                <div class="card-body small">
+                <x-ui.card-body class="small">
 
                     <form method="POST" action="{{ route('marketing.reports.content-calendar.update', $item->id) }}" class="cc-side-form">
                         @csrf
                         @method('PUT')
 
                         <div class="cc-side-row">
-                            <label class="form-label fw-semibold mb-1">Ngày đăng</label>
-                            <input type="date"
+                            <x-ui.label class="tw:font-semibold tw:mb-1">Ngày đăng</x-ui.label>
+                            <x-ui.input type="date"
                                    name="publish_date"
-                                   class="form-control cc-input"
-                                   value="{{ \Carbon\Carbon::parse($item->publish_date)->format('Y-m-d') }}">
+                                   class="cc-input"
+                                   value="{{ \Carbon\Carbon::parse($item->publish_date)->format('Y-m-d') }}" />
                         </div>
 
                         <div class="cc-side-row">
-                            <label class="form-label fw-semibold mb-1">Trạng thái</label>
-                            <select name="status" class="form-control cc-input">
+                            <x-ui.label class="tw:font-semibold tw:mb-1">Trạng thái</x-ui.label>
+                            <x-ui.select name="status" class="cc-input">
                                 <option value="draft"     {{ $item->status==='draft' ? 'selected' : '' }}>Nháp</option>
                                 <option value="scheduled" {{ $item->status==='scheduled' ? 'selected' : '' }}>Lên lịch</option>
                                 <option value="submitted" {{ $item->status==='submitted' ? 'selected' : '' }}>Chờ duyệt</option>
                                 <option value="approved"  {{ $item->status==='approved' ? 'selected' : '' }}>Đã duyệt</option>
                                 <option value="posted"    {{ $item->status==='posted' ? 'selected' : '' }}>Đã đăng</option>
                                 <option value="rejected"  {{ $item->status==='rejected' ? 'selected' : '' }}>Từ chối</option>
-                            </select>
+                            </x-ui.select>
                         </div>
 
                         <div class="cc-side-row">
-                            <label class="form-label fw-semibold mb-1">Link (Drive/Facebook...)</label>
-                            <input type="url"
+                            <x-ui.label class="tw:font-semibold tw:mb-1">Link (Drive/Facebook...)</x-ui.label>
+                            <x-ui.input type="url"
                                    name="link"
-                                   class="form-control cc-input"
+                                   class="cc-input"
                                    placeholder="https://..."
-                                   value="{{ $item->link }}">
-                            <div class="text-muted small mt-1">Nhập đúng https:// để bấm mở link.</div>
+                                   value="{{ $item->link }}" />
+                            <div class="tw:text-[rgba(33,37,41,0.75)] small tw:mt-1">Nhập đúng https:// để bấm mở link.</div>
                         </div>
 
-                        <button class="btn btn-ego cc-btn w-100" type="submit">
+                        <x-ui.button variant="none" size="none" class="btn-ego cc-btn tw:w-full tw:text-[16px]/[24px]" type="submit">
                             <i class="bi bi-save2"></i> Cập nhật
-                        </button>
+                        </x-ui.button>
                     </form>
 
                     {{-- Metrics (view + edit on same page) --}}
@@ -771,14 +758,14 @@
                             </div>
                         </div>
 
-                        <div class="cc-metric-note text-muted small">
+                        <div class="cc-metric-note tw:text-[rgba(33,37,41,0.75)] small">
                             (Số liệu lấy theo tuần của ngày đăng.)
                         </div>
 
                         <hr class="cc-hr">
 
                         <div class="cc-metric-edit">
-                            <div class="fw-semibold mb-2">Chỉnh sửa chỉ số (tuần này)</div>
+                            <div class="tw:font-semibold tw:mb-2">Chỉnh sửa chỉ số (tuần này)</div>
 
                             <form id="ccMetricForm">
                                 @csrf
@@ -786,79 +773,78 @@
 
                                 <div class="cc-metric-formgrid">
                                     <div>
-                                        <label class="form-label small fw-semibold mb-1">Reach</label>
-                                        <input type="number" min="0" name="reach" class="form-control cc-input" value="{{ (int)($w->reach ?? 0) }}">
+                                        <x-ui.label class="small tw:font-semibold tw:mb-1">Reach</x-ui.label>
+                                        <x-ui.input type="number" min="0" name="reach" class="cc-input" value="{{ (int)($w->reach ?? 0) }}" />
                                     </div>
                                     <div>
-                                        <label class="form-label small fw-semibold mb-1">Views</label>
-                                        <input type="number" min="0" name="views" class="form-control cc-input" value="{{ (int)($w->views ?? 0) }}">
+                                        <x-ui.label class="small tw:font-semibold tw:mb-1">Views</x-ui.label>
+                                        <x-ui.input type="number" min="0" name="views" class="cc-input" value="{{ (int)($w->views ?? 0) }}" />
                                     </div>
                                     <div>
-                                        <label class="form-label small fw-semibold mb-1">Likes</label>
-                                        <input type="number" min="0" name="likes" class="form-control cc-input" value="{{ (int)($w->likes ?? 0) }}">
+                                        <x-ui.label class="small tw:font-semibold tw:mb-1">Likes</x-ui.label>
+                                        <x-ui.input type="number" min="0" name="likes" class="cc-input" value="{{ (int)($w->likes ?? 0) }}" />
                                     </div>
                                     <div>
-                                        <label class="form-label small fw-semibold mb-1">Comments</label>
-                                        <input type="number" min="0" name="comments" class="form-control cc-input" value="{{ (int)($w->comments ?? 0) }}">
+                                        <x-ui.label class="small tw:font-semibold tw:mb-1">Comments</x-ui.label>
+                                        <x-ui.input type="number" min="0" name="comments" class="cc-input" value="{{ (int)($w->comments ?? 0) }}" />
                                     </div>
                                     <div>
-                                        <label class="form-label small fw-semibold mb-1">Shares</label>
-                                        <input type="number" min="0" name="shares" class="form-control cc-input" value="{{ (int)($w->shares ?? 0) }}">
+                                        <x-ui.label class="small tw:font-semibold tw:mb-1">Shares</x-ui.label>
+                                        <x-ui.input type="number" min="0" name="shares" class="cc-input" value="{{ (int)($w->shares ?? 0) }}" />
                                     </div>
                                     <div>
-                                        <label class="form-label small fw-semibold mb-1">Leads</label>
-                                        <input type="number" min="0" name="leads" class="form-control cc-input" value="{{ (int)($w->leads ?? 0) }}">
+                                        <x-ui.label class="small tw:font-semibold tw:mb-1">Leads</x-ui.label>
+                                        <x-ui.input type="number" min="0" name="leads" class="cc-input" value="{{ (int)($w->leads ?? 0) }}" />
                                     </div>
 
                                     <div>
-                                        <label class="form-label small fw-semibold mb-1">Phút Livestream</label>
-                                        <input type="number" min="0" name="duration_min" class="form-control cc-input"
-                                               value="{{ (int)($w->duration_min ?? 0) }}">
+                                        <x-ui.label class="small tw:font-semibold tw:mb-1">Phút Livestream</x-ui.label>
+                                        <x-ui.input type="number" min="0" name="duration_min" class="cc-input"
+                                               value="{{ (int)($w->duration_min ?? 0) }}" />
                                     </div>
                                 </div>
 
-                                <div class="mt-2">
-                                    <label class="form-label small fw-semibold mb-1">Ghi chú</label>
-                                    <textarea name="note" rows="2" class="form-control cc-input" placeholder="Ghi chú...">{{ $w->note ?? '' }}</textarea>
+                                <div class="tw:mt-2">
+                                    <x-ui.label class="small tw:font-semibold tw:mb-1">Ghi chú</x-ui.label>
+                                    <x-ui.input as="textarea" name="note" rows="2" class="cc-input" placeholder="Ghi chú...">{{ $w->note ?? '' }}</x-ui.input>
                                 </div>
 
-                                <button class="btn btn-ego cc-btn w-100 mt-3" type="submit" id="ccMetricSaveBtn">
+                                <x-ui.button variant="none" size="none" class="btn-ego cc-btn tw:w-full tw:mt-4 tw:text-[16px]/[24px]" type="submit" id="ccMetricSaveBtn">
                                     <i class="bi bi-save2"></i> Lưu chỉ số
-                                </button>
+                                </x-ui.button>
 
-                                <div class="cc-toast text-muted small mt-2 d-none" id="ccMetricToast">—</div>
+                                <div class="cc-toast tw:text-[rgba(33,37,41,0.75)] small tw:mt-2 d-none" id="ccMetricToast">—</div>
                             </form>
                         </div>
                     </div>
 
                     {{-- Quick actions --}}
-                    <div class="card mb-3 cc-card mt-3">
-                        <div class="card-header">
+                    <x-ui.card class="tw:mb-4 cc-card tw:mt-4">
+                        <x-ui.card-header>
                             <span class="cc-card-title"><i class="bi bi-lightning-charge"></i> Hành động</span>
-                        </div>
-                        <div class="card-body d-grid gap-2">
-                            <button class="btn btn-ego cc-btn w-100" type="button" id="ccSubmitEditor2">
+                        </x-ui.card-header>
+                        <x-ui.card-body class="d-grid tw:gap-2">
+                            <x-ui.button variant="none" size="none" class="btn-ego cc-btn tw:w-full tw:text-[16px]/[24px]" type="button" id="ccSubmitEditor2">
                                 <i class="bi bi-save2"></i> Lưu nội dung
-                            </button>
+                            </x-ui.button>
 
-                            <button class="btn btn-outline-secondary cc-btn w-100" type="button" id="ccScrollUpload">
+                            <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] tw:w-full cc-btn" type="button" id="ccScrollUpload">
                                 <i class="bi bi-cloud-arrow-up"></i> Upload ảnh/file
-                            </button>
+                            </x-ui.button>
 
-                            <a href="{{ route('marketing.reports.content-calendar') }}"
-                               class="btn btn-outline-secondary cc-btn w-100">
+                            <x-ui.button variant="outline-secondary" size="none" class="tw:text-[16px]/[24px] tw:w-full cc-btn" :href="route('marketing.reports.content-calendar')">
                                 <i class="bi bi-list-ul"></i> Về danh sách
-                            </a>
-                        </div>
-                    </div>
+                            </x-ui.button>
+                        </x-ui.card-body>
+                    </x-ui.card>
 
                     {{-- Mini lists --}}
-                    <div class="card mb-3 cc-card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
+                    <x-ui.card class="tw:mb-4 cc-card">
+                        <x-ui.card-header class="tw:flex tw:justify-between tw:items-center">
                             <div class="cc-card-title"><i class="bi bi-clock-history"></i> Bài viết sắp lên lịch</div>
                             <span class="cc-chip">Top 8</span>
-                        </div>
-                        <div class="card-body p-0">
+                        </x-ui.card-header>
+                        <x-ui.card-body class="tw:p-0">
                             <div class="cc-mini-list">
                                 @if(isset($upcoming) && $upcoming->count())
                                     @foreach($upcoming as $u)
@@ -873,15 +859,15 @@
                                     <div class="cc-mini-empty">Chưa có nội dung sắp lên lịch</div>
                                 @endif
                             </div>
-                        </div>
-                    </div>
+                        </x-ui.card-body>
+                    </x-ui.card>
 
-                    <div class="card mb-3 cc-card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
+                    <x-ui.card class="tw:mb-4 cc-card">
+                        <x-ui.card-header class="tw:flex tw:justify-between tw:items-center">
                             <div class="cc-card-title"><i class="bi bi-file-earmark"></i> Nháp gần đây</div>
                             <span class="cc-chip">Top 8</span>
-                        </div>
-                        <div class="card-body p-0">
+                        </x-ui.card-header>
+                        <x-ui.card-body class="tw:p-0">
                             <div class="cc-mini-list">
                                 @if(isset($drafts) && $drafts->count())
                                     @foreach($drafts as $u)
@@ -896,15 +882,15 @@
                                     <div class="cc-mini-empty">Không có nháp</div>
                                 @endif
                             </div>
-                        </div>
-                    </div>
+                        </x-ui.card-body>
+                    </x-ui.card>
 
-                    <div class="card cc-card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
+                    <x-ui.card class="cc-card">
+                        <x-ui.card-header class="tw:flex tw:justify-between tw:items-center">
                             <div class="cc-card-title"><i class="bi bi-shield-check"></i> Chờ duyệt</div>
                             <span class="cc-chip">Top 8</span>
-                        </div>
-                        <div class="card-body p-0">
+                        </x-ui.card-header>
+                        <x-ui.card-body class="tw:p-0">
                             <div class="cc-mini-list">
                                 @if(isset($submitted) && $submitted->count())
                                     @foreach($submitted as $u)
@@ -919,11 +905,11 @@
                                     <div class="cc-mini-empty">Không có nội dung chờ duyệt</div>
                                 @endif
                             </div>
-                        </div>
-                    </div>
+                        </x-ui.card-body>
+                    </x-ui.card>
 
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
 
         </div> {{-- end col-lg-4 --}}
     </div>
@@ -1019,13 +1005,15 @@ body{
   box-shadow: var(--cc-shadow-sm);
   overflow: hidden;
 }
-.cc-card .card-header{
+.cc-card .card-header,
+    .cc-card [data-ego-card-header]{
   background: transparent !important;
   border-bottom: 1px solid rgba(15,23,42,.08) !important;
   padding: 14px 16px !important;
 }
 .cc-card-title{ font-weight: 600; display:inline-flex; align-items:center; gap: 8px; }
-.cc-card .card-body{ padding: 16px !important; }
+.cc-card .card-body,
+    .cc-card [data-ego-card-body]{ padding: 16px !important; }
 
 .cc-tabs .nav-link{
   border-radius: 999px;
@@ -1037,7 +1025,24 @@ body{
   color: #fff;
 }
 
-.cc-editor{
+/*
+ * Nhân đôi bộ chọn (0,2,0) là CỐ Ý, không phải thừa.
+ *
+ * Khối này nằm trong khối đẩy vào "styles" nên layout đặt nó ở dòng 152, còn
+ * Vite nạp app.css ở dòng 163 — tức app.css nạp SAU. Khi ô còn class
+ * `.form-control` thì đối thủ là Bootstrap trên CDN (dòng 19, rất sớm) nên
+ * `.cc-editor` thắng nhờ đứng sau. Sau khi chuyển sang component x-ui.input,
+ * đối thủ thành utility Tailwind trong app.css — cùng độ đặc hiệu (0,1,0) nhưng
+ * ĐỨNG SAU, nên `.cc-editor` thua: đo được padding 14px -> 6px, bo góc
+ * 14px -> 6px, cỡ chữ 14px -> 16px, viền và nền cũng đổi. Nhân đôi để thắng lại
+ * mà không dùng !important.
+ *
+ * ⚠️ Trong bình luận này KHÔNG được viết tên thẻ component kèm dấu ngoặc góc,
+ * cũng không viết a-còng kèm tên chỉ thị: Blade quét cả bên trong thẻ style và
+ * sẽ hiểu đó là thẻ/chỉ thị thật. Đã vấp: viết dạng thẻ vào đây làm Blade nuốt
+ * hết phần còn lại của tệp ("unexpected end of file, expecting endif").
+ */
+.cc-editor.cc-editor{
   border-radius: 14px;
   border: 1px solid rgba(15,23,42,.12);
   background: rgba(255,255,255,.95);
@@ -1045,7 +1050,7 @@ body{
   line-height: 1.6;
   font-size: 14px;
 }
-.cc-editor:focus{
+.cc-editor.cc-editor:focus{
   border-color: rgba(14,165,166,.35);
   box-shadow: 0 0 0 .2rem rgba(14,165,166,.12);
 }

@@ -2,7 +2,6 @@
 
 namespace App\Models\CRM\Customers;
 
-use App\Models\Concerns\LockedToEgoInternationalOrUnassigned;
 use App\Models\Core\Region;
 use App\Models\CRM\Leads\Lead;
 use App\Models\CRM\Membership\Membership;
@@ -17,7 +16,6 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Customer extends Model
 {
-    use LockedToEgoInternationalOrUnassigned;
     use HasFactory;
 
     protected $table = 'crm_customers';

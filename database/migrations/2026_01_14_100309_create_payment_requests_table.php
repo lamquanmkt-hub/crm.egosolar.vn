@@ -11,34 +11,36 @@ return new class extends Migration
      */
     public function up(): void
     {
-Schema::create('payment_requests', function (Blueprint $table) {
-    $table->id();
+        if (! Schema::hasTable('payment_requests')) {
+            Schema::create('payment_requests', function (Blueprint $table) {
+                $table->id();
 
-    $table->string('code')->unique();
-    $table->foreignId('created_by')->constrained('users');
+                $table->string('code')->unique();
+                $table->foreignId('created_by')->constrained('users');
 
-    $table->string('receiver_name');
-    $table->string('department')->nullable();
-    $table->string('reason');
-    $table->unsignedBigInteger('amount');
-    $table->string('bank_info')->nullable();
+                $table->string('receiver_name');
+                $table->string('department')->nullable();
+                $table->string('reason');
+                $table->unsignedBigInteger('amount');
+                $table->string('bank_info')->nullable();
 
-    $table->enum('status', [
-        'draft','submitted',
-        'admin_approved','admin_rejected',
-        'accounting_approved','accounting_rejected',
-    ])->default('draft');
+                $table->enum('status', [
+                    'draft', 'submitted',
+                    'admin_approved', 'admin_rejected',
+                    'accounting_approved', 'accounting_rejected',
+                ])->default('draft');
 
-    $table->foreignId('admin_approved_by')->nullable()->constrained('users');
-    $table->timestamp('admin_approved_at')->nullable();
-    $table->text('admin_note')->nullable();
+                $table->foreignId('admin_approved_by')->nullable()->constrained('users');
+                $table->timestamp('admin_approved_at')->nullable();
+                $table->text('admin_note')->nullable();
 
-    $table->foreignId('accounting_approved_by')->nullable()->constrained('users');
-    $table->timestamp('accounting_approved_at')->nullable();
-    $table->text('accounting_note')->nullable();
+                $table->foreignId('accounting_approved_by')->nullable()->constrained('users');
+                $table->timestamp('accounting_approved_at')->nullable();
+                $table->text('accounting_note')->nullable();
 
-    $table->timestamps();
-});
+                $table->timestamps();
+            });
+        }
     }
 
     /**

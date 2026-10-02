@@ -25,12 +25,25 @@ final class OrderEndpointsSmokeTest extends TestCase
         $this->get('/orders')->assertRedirect('/login');
     }
 
-    /** User đã đăng nhập xem được danh sách đơn hàng. */
-    public function test_authenticated_user_can_view_orders_index(): void
+    /**
+     * User có quyền `page.orders` xem được danh sách đơn hàng.
+     *
+     * `page.orders` nằm trong `role_permissions.always_enforce_permissions`
+     * nên luôn bị kiểm tra ở backend, kể cả với role chưa bật ma trận quyền trang.
+     */
+    public function test_user_with_orders_page_permission_can_view_index(): void
+    {
+        $this->actingAs($this->userWithPermissions(['page.orders']))
+            ->get('/orders')
+            ->assertOk();
+    }
+
+    /** Không có `page.orders` thì bị chặn 403, không phụ thuộc role. */
+    public function test_user_without_orders_page_permission_is_forbidden(): void
     {
         $this->actingAs(User::factory()->create())
             ->get('/orders')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     /** User không có role tạo đơn bị chặn 403 khỏi API catalog. */
@@ -44,7 +57,7 @@ final class OrderEndpointsSmokeTest extends TestCase
     /** Sales (được phép tạo đơn) gọi API catalog nhận JSON có key products. */
     public function test_product_catalog_returns_products_for_sales_role(): void
     {
-        $this->actingAs($this->userWithRole('sales'))
+        $this->actingAs($this->userWithRole('sales', permissions: ['page.orders']))
             ->get('/orders/product-catalog')
             ->assertOk()
             ->assertJsonStructure(['products']);

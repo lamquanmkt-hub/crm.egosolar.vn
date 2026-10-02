@@ -11,17 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-	    Schema::dropIfExists('media_relations');
-        Schema::create('media_relations', function (Blueprint $table) {
-            $table->id();
-	        $table->foreignId('media_id')->constrained('media_files')->cascadeOnDelete();
-	        $table->morphs('model'); // model_id + model_type
-	        $table->string('usage_type', 50)->nullable(); // main_image, gallery, avatar, attachment
-	        $table->integer('sort_order')->default(0);
-	        $table->foreignId('attached_by')->nullable()->constrained('users')->nullOnDelete();
-	        $table->timestamps();
-	        $table->index(['usage_type']);
-        });
+        Schema::dropIfExists('media_relations');
+        if (! Schema::hasTable('media_relations')) {
+            Schema::create('media_relations', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('media_id')->constrained('media_files')->cascadeOnDelete();
+                $table->morphs('model'); // model_id + model_type
+                $table->string('usage_type', 50)->nullable(); // main_image, gallery, avatar, attachment
+                $table->integer('sort_order')->default(0);
+                $table->foreignId('attached_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->timestamps();
+                $table->index(['usage_type']);
+            });
+        }
     }
 
     /**

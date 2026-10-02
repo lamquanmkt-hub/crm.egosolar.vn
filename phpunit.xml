@@ -11,6 +11,23 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!--
+            Test kiến trúc (Pest arch): phân tích tĩnh, KHÔNG boot app, KHÔNG chạm DB.
+            Để riêng testsuite nên chạy được một mình bằng nhóm "arch":
+            ./vendor/bin/pest  (kèm tuỳ chọn group=arch)
+        -->
+        <testsuite name="Architecture">
+            <directory>tests/Architecture</directory>
+        </testsuite>
+        <!--
+            Browser test (Pest 4 + Playwright, xem tests/Browser và
+            .claude/skills/laravel-clean-arch/references/browser-testing.md).
+            Cần `pnpm install` + `npx playwright install chromium`; CI chạy ở job riêng,
+            job `tests` bỏ qua bằng tuỳ chọn exclude-testsuite=Browser.
+        -->
+        <testsuite name="Browser">
+            <directory>tests/Browser</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
@@ -18,10 +35,18 @@
         </include>
     </source>
     <php>
+        <!--
+            Bộ test đã vượt 128MB mặc định (246 test, ~129MB). Khi chạm trần,
+            lỗi hiện ra là "Allowed memory size exhausted" NGAY TRONG trang báo
+            lỗi của Laravel — nó che mất lỗi thật và làm tưởng test hỏng.
+        -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
+        <!-- Test luôn nhìn schema thật: tắt cache schema liên-request. -->
+        <env name="EGO_SCHEMA_CACHE_TTL" value="0"/>
         <!-- DB test = bản sao schema production (database/schema/mysql-schema.sql).
              Raw SQL trong app là MariaDB-specific nên KHÔNG dùng sqlite. -->
         <env name="DB_CONNECTION" value="mysql"/>

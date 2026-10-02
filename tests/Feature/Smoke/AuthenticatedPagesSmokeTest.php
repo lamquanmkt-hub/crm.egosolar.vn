@@ -45,18 +45,28 @@ final class AuthenticatedPagesSmokeTest extends TestCase
 
     /**
      * Trang ĐANG hỏng sẵn TRƯỚC đợt refactor 2026-07-20 (đã đối chiếu commit
-     * gốc 8a2fa03 và bản deploy a0332f7 — không phải regression).
+     * gốc 8a2fa03 và bản deploy 93f2aa4 — không phải regression).
      *
      * Cố ý liệt kê tường minh thay vì lọc âm thầm, để lỗi vẫn nhìn thấy được.
      * Sửa xong cái nào thì xoá khỏi danh sách này.
      *
+     * ⚠️ Ghi chú trong danh sách này PHẢI đối chiếu lịch sử git trước khi viết.
+     * Hai ghi chú cũ ở đây từng sai theo hướng nguy hiểm — chúng nói "chưa từng
+     * tồn tại" trong khi mã nguồn VẪN CÒN trong lịch sử, khiến người đọc tưởng đó
+     * là tính năng chưa làm thay vì mã bị mất và khôi phục được:
+     *   - `marketing.budget`: 5 route đầy đủ nằm trong routes/web.phpbk2 và bk3 ở
+     *     commit 8a2fa03, trong nhóm ->prefix('marketing')->name('marketing.').
+     *   - `OrderController@myOrders`: có trong OrderController.phpbk:455 và
+     *     .phpbk2:256; view orders/my-orders.blade.php và cả 3 method OrderService
+     *     mà nó gọi ĐỀU CÒN — chỉ mất đúng thân method.
+     * Dấu vết cho thấy mã bị mất trong một lần khôi phục web.php ngày 2026-05-06
+     * (xem tên file web.php.broken_before_restore_20260506_102318 và
+     * web.php.current_500_20260506_102439 ở commit đầu).
+     *
      * @var array<string, string> uri => nguyên nhân
      */
     private const KNOWN_BROKEN = [
-        'orders/my/dashboard' => 'Route trỏ OrderController@myOrders — method chưa từng tồn tại',
-        'marketing/dashboard' => "View gọi route('marketing.budget') — route chưa từng được định nghĩa",
-        'marketing/report/seo' => 'Thiếu view marketing/reports/seo.blade.php',
-        'marketing/report/overview' => 'Thiếu view marketing/reports/overview.blade.php',
+        // Trống — mọi trang GET không tham số đều không còn trả 5xx (2026-09-02).
     ];
 
     /** Không trang GET nào được trả 5xx. */

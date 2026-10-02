@@ -3,22 +3,25 @@
 @section('title', 'Thêm Brand')
 
 @section('content')
-    <div class="container-fluid px-4">
+    {{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+         thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+         quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+    <div class="container-fluid tw:px-6 tw:py-4">
 
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1 class="fw-bold text-uppercase text-secondary mb-0">THÊM BRAND</h1>
-            <a href="{{ route('brands.index') }}" class="btn btn-outline-secondary">
+        <div class="tw:flex tw:justify-between tw:items-center tw:mb-4">
+            <h1 class="tw:font-bold tw:uppercase tw:text-[#6c757d] tw:mb-0">THÊM BRAND</h1>
+            <x-ui.button href="{{ route('brands.index') }}" variant="outline-secondary">
                 <i class="bi bi-arrow-left"></i> Quay lại
-            </a>
+            </x-ui.button>
         </div>
 
-        <div class="card shadow-sm">
-            <div class="card-body">
+        <x-ui.card class="shadow-sm">
+            <x-ui.card-body>
                 <form method="POST" action="{{ route('brands.store') }}">
                     @include('brands._form', ['brand' => null, 'buttonText' => 'Tạo brand'])
                 </form>
-            </div>
-        </div>
+            </x-ui.card-body>
+        </x-ui.card>
 
     </div>
 @endsection

@@ -169,7 +169,8 @@
         font-size: 12px;
     }
 
-    .card-body {
+    .card-body,
+    [data-ego-card-body] {
         padding: 14px 16px;
     }
 
@@ -545,7 +546,7 @@
                 <p>Thông tin khách hàng, dự án và ngày báo giá.</p>
             </div>
 
-            <div class="card-body">
+            <x-ui.card-body>
                 <div class="grid-4">
                     <div class="field">
                         <label>Chọn khách hàng</label>
@@ -646,7 +647,7 @@
                 <input type="hidden" name="customer_address" id="customer_address" value="{{ old('customer_address', $quotation->customer_address) }}">
                 <input type="hidden" name="billing_company_name" id="billing_company_name" value="{{ old('billing_company_name', $quotation->billing_company_name) }}">
                 <input type="hidden" name="billing_address" id="billing_address" value="{{ old('billing_address', $quotation->billing_address) }}">
-            </div>
+            </x-ui.card-body>
         </div>
 
         <div class="cardx">
@@ -655,7 +656,7 @@
                 <p>Cột VAT đã ẩn, hệ thống mặc định VAT = 0.</p>
             </div>
 
-            <div class="card-body">
+            <x-ui.card-body>
                 @foreach($sections as $key => $section)
                     @php
                         $sectionItems = $groupedItems->get($key, collect());
@@ -724,7 +725,7 @@
                                             </td>
 
                                             <td>
-                                                <input type="text" class="js-price money-input" name="items[{{ $rowKey }}][unit_price]" value="{{ $fmt($item->unit_price) }}">
+                                                <input type="text" class="js-price money-input" name="items[{{ $rowKey }}][unit_price]" value="{{ $fmt($item->unit_price) }}" step="any" inputmode="decimal">
                                             </td>
 
                                             <td>
@@ -755,7 +756,7 @@
                         </div>
                     </div>
                 @endforeach
-            </div>
+            </x-ui.card-body>
         </div>
 
         <div class="cardx">
@@ -764,7 +765,7 @@
                 <p>Nội dung in cuối PDF/Excel.</p>
             </div>
 
-            <div class="card-body">
+            <x-ui.card-body>
                 <div class="terms-grid">
                     <div class="field">
                         <label>Điều kiện thanh toán</label>
@@ -786,7 +787,7 @@
                         <textarea name="om_terms">{{ old('om_terms', $quotation->om_terms) }}</textarea>
                     </div>
                 </div>
-            </div>
+            </x-ui.card-body>
         </div>
 
         <input type="hidden" id="discount" name="discount_amount" value="{{ old('discount_amount', $quotation->discount_amount ?: 0) }}">
@@ -948,7 +949,7 @@ function addRow(sectionKey, product = null) {
         </td>
 
         <td>
-            <input type="text" class="js-price money-input" name="items[${index}][unit_price]" value="${moneyPlain(price)}">
+            <input type="text" class="js-price money-input" name="items[${index}][unit_price]" value="${moneyPlain(price)}" step="any" inputmode="decimal">
         </td>
 
         <td>

@@ -11,12 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('crm_order_items', function (Blueprint $table) {
-            if (!Schema::hasColumn('crm_order_items', 'warehouse_id')) {
-                $table->unsignedBigInteger('warehouse_id')->nullable()->after('order_id');
-                $table->index(['warehouse_id']);
-            }
-        });
+        if (Schema::hasTable('crm_order_items')) {
+            Schema::table('crm_order_items', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_order_items', 'warehouse_id')) {
+                    $table->unsignedBigInteger('warehouse_id')->nullable()->after('order_id');
+                    $table->index(['warehouse_id']);
+                }
+            });
+        }
     }
 
     /**
@@ -24,11 +26,13 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('crm_order_items', function (Blueprint $table) {
-            if (Schema::hasColumn('crm_order_items', 'warehouse_id')) {
-                $table->dropIndex(['warehouse_id']);
-                $table->dropColumn('warehouse_id');
-            }
-        });
+        if (Schema::hasTable('crm_order_items')) {
+            Schema::table('crm_order_items', function (Blueprint $table) {
+                if (Schema::hasColumn('crm_order_items', 'warehouse_id')) {
+                    $table->dropIndex(['warehouse_id']);
+                    $table->dropColumn('warehouse_id');
+                }
+            });
+        }
     }
 };

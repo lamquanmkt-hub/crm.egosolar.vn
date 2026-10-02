@@ -8,9 +8,11 @@ use App\Enums\MaterialRequestStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Projects\Site;
 use App\Models\User;
+use App\Services\Projects\EngineerDirectory;
 use App\Services\Projects\ProjectWorkflowV2Service;
-use App\Services\Projects\UnifiedProjectAccess;
-use App\Services\Projects\UnifiedProjectRevenue;
+use App\View\Presenters\Projects\ProjectFinancePanelPresenter;
+use App\View\Presenters\Projects\ProjectWorkflowStepPresenter;
+use App\View\Presenters\Projects\UnifiedProjectDetailPresenter;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -113,8 +115,6 @@ class UnifiedProjectController extends Controller
             $projects->getCollection()->pluck('id')->map(fn ($id) => (int) $id)
         );
         $canSeeFinance = $this->canViewFinance($user);
-        $canSeeRevenue = $canSeeFinance || app(UnifiedProjectAccess::class)->isSalesScoped($user);
-        $revenueMap = $canSeeRevenue ? app(UnifiedProjectRevenue::class)->forSites($projects->getCollection()) : [];
         $materialMap = $this->materialSummary(
             $projects->getCollection()->pluck('id')->map(fn ($id) => (int) $id),
             $canSeeFinance
@@ -158,7 +158,7 @@ class UnifiedProjectController extends Controller
 
         $companyOptions = $this->companies();
         $engineers = $this->engineers();
-        $financeSummary = $canSeeRevenue
+        $financeSummary = $canSeeFinance
             ? $this->financeSummary($summaryRows->pluck('id')->map(fn ($id) => (int) $id), $summaryRows)
             : null;
 
@@ -171,11 +171,7 @@ class UnifiedProjectController extends Controller
             'engineers' => $engineers,
             'canCreate' => $this->canCreate($user),
             'canSeeFinance' => $canSeeFinance,
-            'canWriteFinance' => $this->canWriteFinance($user),
             'financeSummary' => $financeSummary,
-            'canSeeRevenue' => $canSeeRevenue,
-            'revenueMap' => $revenueMap,
-            'isSalesScope' => app(UnifiedProjectAccess::class)->isSalesScoped($user),
             'scopeLabel' => $this->scopeLabel($user),
             'workflowDefinitions' => $workflowV2->definitions(),
             'workflowCounts' => $workflowSummary['counts'],
@@ -192,10 +188,7 @@ class UnifiedProjectController extends Controller
             'companies' => $this->companies(),
             'engineers' => $this->engineers(),
             'phases' => self::phases(),
-            'activeCompanyId' => app(UnifiedProjectAccess::class)->isSalesScoped($user)
-                ? \App\Support\EgoCompanyLock::id() : $this->activeCompanyId($request),
-            'isSalesScope' => app(UnifiedProjectAccess::class)->isSalesScoped($user),
-            'canEnterContract' => $this->canViewFinance($user) || app(UnifiedProjectAccess::class)->isSalesScoped($user),
+            'activeCompanyId' => $this->activeCompanyId($request),
             'canSeeFinance' => $this->canViewFinance($user),
         ]);
     }
@@ -205,39 +198,32 @@ class UnifiedProjectController extends Controller
         $user = $request->user();
         abort_unless($user && $this->canCreate($user), 403);
 
-        $salesScope = app(UnifiedProjectAccess::class)->isSalesScoped($user);
-
         $data = $request->validate([
             'company_id' => ['nullable', 'integer'],
             'name' => ['required', 'string', 'max:255'],
             'project_type' => ['required', Rule::in(['solar_farm', 'factory', 'industrial', 'large_residential', 'other'])],
-            'address' => ['required', 'string', 'max:700'],
-            'contact_name' => ['nullable', 'string', 'max:255'],
-            'contact_phone' => ['nullable', 'string', 'max:60'],
+            // Cỡ khớp cột thật của `sites` (varchar 255/120/50/50) — trước đây 700/255/60/100, vượt cột thì lỗi SQL thay vì thông báo.
+            'address' => ['required', 'string', 'max:255'],
+            'contact_name' => ['nullable', 'string', 'max:120'],
+            'contact_phone' => ['nullable', 'string', 'max:50'],
             'system_kwp' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
-            'system_type' => ['nullable', 'string', 'max:100'],
-            'lead_engineer_id' => [$salesScope ? 'nullable' : 'required', 'integer', 'exists:users,id'],
+            'system_type' => ['nullable', 'string', 'max:50'],
+            'lead_engineer_id' => ['required', 'integer', 'exists:users,id'],
             'target_completion_at' => ['nullable', 'date'],
             'priority' => ['required', Rule::in(['low', 'normal', 'high', 'urgent'])],
             'note' => ['nullable', 'string'],
             'contract_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        // Sales may set the initial canonical contract amount; other finance writes remain admin-only.
-        if (! $this->canViewFinance($user) && ! $salesScope) {
+        // Kỹ thuật có thể tạo dự án nhưng không được ghi dữ liệu tài chính bằng POST trực tiếp.
+        if (! $this->canViewFinance($user)) {
             unset($data['contract_amount']);
         }
-        if ($salesScope) {
-            $data['company_id'] = \App\Support\EgoCompanyLock::id();
-            $data['lead_engineer_id'] = null;
-        }
 
-        $site = DB::transaction(function () use ($data, $user, $salesScope): Site {
+        $site = DB::transaction(function () use ($data, $user): Site {
             $row = [
                 'company_id' => ($data['company_id'] ?? 0) > 0 ? (int) $data['company_id'] : null,
                 'created_by' => (int) $user->id,
-                'request_source' => $salesScope ? 'sales' : 'technical',
-                'sales_user_id' => $salesScope ? (int) $user->id : null,
                 'project_code' => $this->nextProjectCode(),
                 'project_type' => $data['project_type'],
                 'name' => trim($data['name']),
@@ -250,7 +236,7 @@ class UnifiedProjectController extends Controller
                 'approved_progress_percent' => 0,
                 'project_phase_status' => 'in_progress',
                 'priority' => $data['priority'],
-                'lead_engineer_id' => !empty($data['lead_engineer_id']) ? (int) $data['lead_engineer_id'] : null,
+                'lead_engineer_id' => (int) $data['lead_engineer_id'],
                 'target_completion_at' => $data['target_completion_at'] ?? null,
                 'address' => trim($data['address']),
                 'contact_name' => $data['contact_name'] ?? null,
@@ -275,7 +261,7 @@ class UnifiedProjectController extends Controller
 
         return redirect()
             ->route('projects-unified.show', $site)
-            ->with('success', 'Đã tạo công trình mới.');
+            ->with('success', 'Đã khởi tạo dự án mới.');
     }
 
     public function searchMaterialProducts(Request $request): JsonResponse
@@ -502,7 +488,7 @@ class UnifiedProjectController extends Controller
             ->groupBy(fn ($document) => (string) ($document->category ?? 'other'))
             ->map(fn ($items) => $items->count());
 
-        return view('projects-unified.show', [
+        return view('projects-unified.show', array_merge([
             'site' => $site,
             'project' => $projectPresentation,
             'phases' => self::phases(),
@@ -518,13 +504,10 @@ class UnifiedProjectController extends Controller
             'phaseChecklist' => $phaseChecklist,
             'legacy' => $legacy,
             'finance' => $finance,
-            'salesRevenue' => app(UnifiedProjectAccess::class)->isSalesScoped($user)
-                ? (app(UnifiedProjectRevenue::class)->forSites(collect([$site]))[(int) $site->id] ?? null) : null,
             'exportedMaterialRequests' => $exportedMaterialRequests,
             'financeExpenses' => $financeExpenses,
             'canManage' => $this->canManage($user),
             'canSeeFinance' => $canSeeFinance,
-            'canWriteFinance' => $this->canWriteFinance($user),
             'canProposeMaterials' => $materialWorkflow['can_propose'],
             'canApproveMaterials' => $materialWorkflow['can_approve'],
             'canWarehouse' => $materialWorkflow['can_warehouse'],
@@ -546,7 +529,17 @@ class UnifiedProjectController extends Controller
             'canSubmitPhase' => $this->canSubmitProjectPhase($site, $user),
             'canApprovePhase' => $this->canApproveProjectPhase($user),
             'workflow' => $workflow,
-        ]);
+        ], app(UnifiedProjectDetailPresenter::class)->viewData(
+            $site,
+            $projectPresentation,
+            $workflow,
+            $progressEngine,
+            $materialWorkflow['proposals'],
+            $materialWorkflow['items'],
+            $canSeeFinance,
+            $request->query('step'),
+        ), app(ProjectWorkflowStepPresenter::class)->viewData($site, $workflow, $user, $request->query('step')),
+            app(ProjectFinancePanelPresenter::class)->viewData($finance)));
     }
 
     /**
@@ -1115,7 +1108,7 @@ class UnifiedProjectController extends Controller
     public function updateAdminProjectFinance(Request $request, Site $site): RedirectResponse
     {
         $user = $request->user();
-        abort_unless($user && $this->canWriteFinance($user), 403);
+        abort_unless($user && $this->canViewFinance($user), 403);
         $this->abortIfCannotView($site, $user);
 
         $data = $request->validate([
@@ -1253,7 +1246,7 @@ class UnifiedProjectController extends Controller
     public function updateProjectPayment(Request $request, Site $site, string $source, int $payment): RedirectResponse
     {
         $user = $request->user();
-        abort_unless($user && $this->canWriteFinance($user), 403);
+        abort_unless($user && $this->canViewFinance($user), 403);
         $this->abortIfCannotView($site, $user);
 
         $data = $request->validate([
@@ -1327,7 +1320,7 @@ class UnifiedProjectController extends Controller
     public function storeProjectFinanceExpense(Request $request, Site $site): RedirectResponse
     {
         $user = $request->user();
-        abort_unless($user && $this->canWriteFinance($user), 403);
+        abort_unless($user && $this->canViewFinance($user), 403);
         $this->abortIfCannotView($site, $user);
         abort_unless(Schema::hasTable('project_finance_expenses'), 503);
         $data = $this->validateProjectExpense($request);
@@ -1348,7 +1341,7 @@ class UnifiedProjectController extends Controller
     public function updateProjectFinanceExpense(Request $request, Site $site, int $expense): RedirectResponse
     {
         $user = $request->user();
-        abort_unless($user && $this->canWriteFinance($user), 403);
+        abort_unless($user && $this->canViewFinance($user), 403);
         $this->abortIfCannotView($site, $user);
         $row = Schema::hasTable('project_finance_expenses') ? DB::table('project_finance_expenses')->where('id', $expense)->where('site_id', $site->id)->first() : null;
         abort_unless($row, 404);
@@ -1905,7 +1898,7 @@ class UnifiedProjectController extends Controller
 
     private function canRecordPayment($user): bool
     {
-        return $this->canWriteFinance($user);
+        return $this->canViewFinance($user);
     }
 
     private function applyExistingProjectScope(Builder $query): void
@@ -1921,24 +1914,38 @@ class UnifiedProjectController extends Controller
             });
         }
 
-        // Canonical visibility no longer depends on a live legacy row.
+        if (! Schema::hasTable('project_test_projects')
+            || ! Schema::hasColumn('sites', 'legacy_source')
+            || ! Schema::hasColumn('sites', 'legacy_source_id')) {
+            return;
+        }
+
+        $query->where(function (Builder $source): void {
+            $source->whereNull('sites.legacy_source')
+                ->orWhere('sites.legacy_source', '!=', 'project_test')
+                ->orWhereNull('sites.legacy_source_id')
+                ->orWhere('sites.legacy_source_id', '<=', 0)
+                ->orWhereExists(function ($legacy): void {
+                    $legacy->selectRaw('1')
+                        ->from('project_test_projects as live_legacy_project')
+                        ->whereColumn('live_legacy_project.id', 'sites.legacy_source_id');
+
+                    if (Schema::hasColumn('project_test_projects', 'deleted_at')) {
+                        $legacy->whereNull('live_legacy_project.deleted_at');
+                    }
+
+                    if (Schema::hasColumn('project_test_projects', 'status')) {
+                        $legacy->where(function ($status): void {
+                            $status->whereNull('live_legacy_project.status')
+                                ->orWhereNotIn('live_legacy_project.status', ['deleted', 'removed', 'trashed', 'archived']);
+                        });
+                    }
+                });
+        });
     }
 
     private function applyFilters(Builder $query, Request $request): void
     {
-        if ($request->boolean('mine')) {
-            if (app(UnifiedProjectAccess::class)->isSalesScoped($request->user())) {
-                $query->where(function (Builder $owner) use ($request): void {
-                    $owner->where('sites.created_by', (int) $request->user()->id)
-                        ->orWhere('sites.sales_user_id', (int) $request->user()->id);
-                });
-            } else {
-                $query->where('sites.lead_engineer_id', (int) $request->user()->id);
-            }
-        }
-        if (in_array($request->query('source'), ['sales', 'technical', 'internal', 'cskh', 'warranty'], true)) {
-            $query->where('sites.request_source', $request->query('source'));
-        }
         $keyword = trim((string) $request->input('q', ''));
         if ($keyword !== '') {
             $query->where(function (Builder $sub) use ($keyword): void {
@@ -2057,10 +2064,6 @@ class UnifiedProjectController extends Controller
 
     private function applyUserScope(Builder $query, $user): void
     {
-        if (app(UnifiedProjectAccess::class)->isSalesScoped($user)) {
-            app(UnifiedProjectAccess::class)->applySalesScope($query, $user);
-            return;
-        }
         if ($this->canManage($user) || $this->hasGlobalFinanceScope($user) || $this->canWarehouse($user)) {
             return;
         }
@@ -2248,7 +2251,6 @@ class UnifiedProjectController extends Controller
         $wanted = [
             'id', 'project_phase', 'stage', 'status', 'target_completion_at',
             'completed_at', 'warranty_to', 'contract_amount', 'company_id',
-            'contract_amount_after_vat', 'quote_grand_total',
         ];
 
         return array_values(array_filter($wanted, fn (string $column) => Schema::hasColumn('sites', $column)));
@@ -2345,49 +2347,53 @@ class UnifiedProjectController extends Controller
         return $query->orderBy('name')->get();
     }
 
+    /**
+     * Danh sách kỹ sư phụ trách.
+     *
+     * Logic đã chuyển sang {@see EngineerDirectory} để form tạo công trình
+     * (`SiteController@create`) dùng chung cùng một quy tắc vai trò.
+     */
     private function engineers(): Collection
     {
-        $query = User::query()->select(['id', 'name', 'email']);
-
-        if (Schema::hasColumn('users', 'is_active')) {
-            $query->where('is_active', 1);
-        }
-
-        $users = $query->orderBy('name')->get();
-
-        if (! method_exists(User::class, 'roles')) {
-            return $users;
-        }
-
-        try {
-            $users->load('roles:id,name');
-
-            $technicalRoles = [
-                'admin', 'management', 'director', 'general_director',
-                'technical_manager', 'technical_leader', 'technical', 'technician', 'engineer', 'engineering'];
-
-            $filtered = $users->filter(function ($user) use ($technicalRoles): bool {
-                $roles = $user->roles?->pluck('name')->map(fn ($role) => strtolower((string) $role))->all() ?? [];
-
-                return count(array_intersect($roles, $technicalRoles)) > 0;
-            })->values();
-
-            return $filtered->isNotEmpty() ? $filtered : $users;
-        } catch (\Throwable $e) {
-            return $users;
-        }
+        return app(EngineerDirectory::class)->options();
     }
 
     private function financeSummary(Collection $siteIds, Collection $sites): array
     {
-        return app(UnifiedProjectRevenue::class)->summary($sites);
+        $contract = $sites->sum(function (Site $site) {
+            foreach (['contract_amount_after_vat', 'contract_amount'] as $column) {
+                if (isset($site->{$column}) && (float) $site->{$column} > 0) {
+                    return (float) $site->{$column};
+                }
+            }
+
+            return 0.0;
+        });
+
+        $received = $this->projectReceivedAmount($siteIds);
+
+        return [
+            'contract' => $contract,
+            'received' => $received,
+            'debt' => max(0, $contract - $received),
+        ];
     }
 
     private function singleFinanceSummary(Site $site, ?Collection $exportedRequests = null, ?Collection $financeExpenses = null): array
     {
         $received = $this->projectReceivedAmount(collect([(int) $site->id]));
 
-        $contract = app(UnifiedProjectRevenue::class)->contract($site);
+        $contract = 0.0;
+        foreach (['contract_amount_after_vat', 'contract_amount'] as $column) {
+            if (isset($site->{$column}) && (float) $site->{$column} > 0) {
+                $contract = (float) $site->{$column};
+                break;
+            }
+        }
+        if ($contract <= 0) {
+            // Rơi về tổng tiền bản báo giá mới nhất (site_quotes).
+            $contract = $site->quoteGrandTotal();
+        }
 
         $laborCost = (float) ($site->labor_cost ?? 0);
         $transportCost = (float) ($site->transport_cost ?? 0);
@@ -2519,7 +2525,46 @@ class UnifiedProjectController extends Controller
      */
     private function projectReceivedAmount(Collection $siteIds): float
     {
-        return array_sum(app(UnifiedProjectRevenue::class)->receivedBySite($siteIds));
+        $ids = $siteIds->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return 0.0;
+        }
+
+        $received = 0.0;
+        $linkedReceiptIds = collect();
+
+        if (Schema::hasTable('project_payment_records')) {
+            $recordQuery = DB::table('project_payment_records')->whereIn('site_id', $ids->all());
+            if (Schema::hasColumn('project_payment_records', 'deleted_at')) {
+                $recordQuery->whereNull('deleted_at');
+            }
+            if (Schema::hasColumn('project_payment_records', 'status')) {
+                $recordQuery->where('status', 'CONFIRMED');
+            }
+            $received += (float) (clone $recordQuery)->sum('amount');
+
+            if (Schema::hasColumn('project_payment_records', 'receipt_id')) {
+                $linkedReceiptIds = (clone $recordQuery)
+                    ->whereNotNull('receipt_id')
+                    ->pluck('receipt_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values();
+            }
+        }
+
+        if (Schema::hasTable('receipts') && Schema::hasColumn('receipts', 'site_id') && Schema::hasColumn('receipts', 'amount')) {
+            $receiptQuery = DB::table('receipts')->whereIn('site_id', $ids->all());
+            if (Schema::hasColumn('receipts', 'deleted_at')) {
+                $receiptQuery->whereNull('deleted_at');
+            }
+            if ($linkedReceiptIds->isNotEmpty()) {
+                $receiptQuery->whereNotIn('id', $linkedReceiptIds->all());
+            }
+            $received += (float) $receiptQuery->sum('amount');
+        }
+
+        return $received;
     }
 
     private function legacyContext(Site $site): array
@@ -2866,7 +2911,6 @@ class UnifiedProjectController extends Controller
 
     private function canCreate($user): bool
     {
-        if (app(UnifiedProjectAccess::class)->isSalesScoped($user)) { return true; }
         if ($this->canManage($user)) {
             return true;
         }
@@ -2882,28 +2926,8 @@ class UnifiedProjectController extends Controller
             return false;
         }
 
-        // Finance/management keep their existing company-wide scope.
-        if ($this->hasGlobalFinanceScope($user)) {
-            return true;
-        }
-
-        // Sales may read finance only after canonical project ownership has been
-        // validated by abortIfCannotView / EnsureUnifiedProjectAccess.
-        return app(UnifiedProjectAccess::class)->isSalesScoped($user);
-    }
-
-    private function canWriteFinance($user): bool
-    {
-        if (! $user) {
-            return false;
-        }
-
-        // Sales access to project finance is deliberately read-only.
-        if (app(UnifiedProjectAccess::class)->isSalesScoped($user)) {
-            return false;
-        }
-
-        return $this->hasGlobalFinanceScope($user);
+        return (int) ($user->is_admin ?? 0) === 1
+            || count(array_intersect($this->roles($user), ['admin', 'super_admin'])) > 0;
     }
 
     private function hasGlobalFinanceScope($user): bool
@@ -2948,11 +2972,6 @@ class UnifiedProjectController extends Controller
 
     private function scopeLabel($user): string
     {
-        if (app(UnifiedProjectAccess::class)->isSalesScoped($user)) {
-            return app(UnifiedProjectAccess::class)->isSalesManager($user)
-                ? 'Công trình do Sales tạo trong công ty'
-                : 'Công trình do bạn tạo hoặc phụ trách Sales';
-        }
         if ($this->canManage($user)) {
             return 'Toàn bộ dự án theo công ty đang chọn';
         }
@@ -2968,10 +2987,6 @@ class UnifiedProjectController extends Controller
 
     private function abortIfCannotView(Site $site, $user): void
     {
-        if (app(UnifiedProjectAccess::class)->isSalesScoped($user)) {
-            abort_unless(app(UnifiedProjectAccess::class)->ownsSalesSite($site, $user), 403);
-            return;
-        }
         if ($this->canManage($user) || $this->hasGlobalFinanceScope($user) || $this->canWarehouse($user)) {
             return;
         }

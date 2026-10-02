@@ -25,11 +25,6 @@ class SolarMaintenanceSchedulePolicy
      */
     public function view(User $user, SolarMaintenanceSchedule $schedule): bool
     {
-        // EGO_TECHNICAL_VIEW_ALL_POLICY_V2
-        if (\App\Support\SolarMaintenanceAccess::isTechnician($user)) {
-            return true;
-        }
-
         if (! SolarMaintenanceAccess::canViewAny($user) || ! $this->sameCompany($user, $schedule)) {
             return false;
         }
@@ -46,7 +41,7 @@ class SolarMaintenanceSchedulePolicy
      */
     public function create(User $user): bool
     {
-        return SolarMaintenanceAccess::canManage($user);
+        return SolarMaintenanceAccess::canCreate($user);
     }
 
     /**
@@ -58,8 +53,22 @@ class SolarMaintenanceSchedulePolicy
             return false;
         }
 
-        return SolarMaintenanceAccess::isManager($user)
-            || SolarMaintenanceAccess::hasPermission($user, 'maintenance.update')
+        // Ban quản lý được phép hiệu chỉnh dữ liệu của các đợt trước để hoàn thiện hồ sơ.
+        // Kỹ thuật viên vẫn bị khóa khi đợt đã gửi duyệt, được duyệt hoặc hoàn thành.
+        if (SolarMaintenanceAccess::isManager($user)
+            || SolarMaintenanceAccess::hasPermission($user, 'maintenance.reopen')) {
+            return true;
+        }
+
+        if (in_array($schedule->status, ['pending_approval', 'approved', 'completed'], true)) {
+            return false;
+        }
+
+        if (SolarMaintenanceAccess::isTechnicianOnly($user)) {
+            return $this->canPerformAssignedWork($user, $schedule);
+        }
+
+        return SolarMaintenanceAccess::hasPermission($user, 'maintenance.update')
             || (SolarMaintenanceAccess::isTechnician($user) && $this->isAssigned($user, $schedule));
     }
 
@@ -76,17 +85,27 @@ class SolarMaintenanceSchedulePolicy
      */
     public function uploadAttachment(User $user, SolarMaintenanceSchedule $schedule): bool
     {
-        // Đồng bộ với màn hình O&M và các action workflow: mọi nhân sự Kỹ thuật
-        // hoặc quản lý đều được nộp minh chứng/báo cáo, kể cả khi đợt chưa gán người.
-        // Quyền này cố ý không phụ thuộc isAssigned() để khớp với UI/workflow:
-        // kỹ thuật có thể bổ sung minh chứng trước khi nhóm thực hiện được phân công.
-        if (SolarMaintenanceAccess::isTechnician($user)
-            || SolarMaintenanceAccess::isManager($user)) {
+        if (! $this->sameCompany($user, $schedule)) {
+            return false;
+        }
+
+        if (SolarMaintenanceAccess::isManager($user)) {
             return true;
         }
 
-        return $this->sameCompany($user, $schedule)
-            && SolarMaintenanceAccess::hasPermission($user, 'maintenance.files.upload');
+        if (! SolarMaintenanceAccess::isTechnicianOnly($user)
+            && SolarMaintenanceAccess::hasPermission($user, 'maintenance.files.upload')) {
+            return true;
+        }
+
+        // Khi đã gửi duyệt/được duyệt/hoàn thành, kỹ thuật viên không được bổ sung âm thầm.
+        // Quản lý vẫn có thể hoàn thiện hoặc quản trị hồ sơ sau khi đóng công việc.
+        if (in_array($schedule->status, ['pending_approval', 'approved', 'completed'], true)) {
+            return false;
+        }
+
+        return SolarMaintenanceAccess::isTechnician($user)
+            && $this->canPerformAssignedWork($user, $schedule);
     }
 
     /**
@@ -158,6 +177,24 @@ class SolarMaintenanceSchedulePolicy
     /**
      * Kiểm tra user và lịch có cùng công ty hay không (admin luôn đạt).
      */
+    private function canPerformAssignedWork(User $user, SolarMaintenanceSchedule $schedule): bool
+    {
+        if (! $this->isAssigned($user, $schedule)) {
+            return false;
+        }
+
+        $approval = $schedule->approvals()
+            ->where('approval_level', 'assignment')->latest('id')->first();
+
+        if (! $approval) {
+            return true;
+        }
+
+        return $approval->status === 'approved'
+            && $schedule->assignees()->where('user_id', $user->id)
+                ->whereNotNull('accepted_at')->exists();
+    }
+
     private function sameCompany(User $user, SolarMaintenanceSchedule $schedule): bool
     {
         if (SolarMaintenanceAccess::isAdmin($user)) {

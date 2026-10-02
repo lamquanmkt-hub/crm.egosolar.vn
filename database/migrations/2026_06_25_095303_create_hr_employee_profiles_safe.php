@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('hr_employee_profiles')) {
+        if (! Schema::hasTable('hr_employee_profiles')) {
             Schema::create('hr_employee_profiles', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('employee_id')->unique();
@@ -37,7 +37,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_employee_files')) {
+        if (! Schema::hasTable('hr_employee_files')) {
             Schema::create('hr_employee_files', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('employee_id');

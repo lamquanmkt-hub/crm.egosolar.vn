@@ -16,8 +16,6 @@
 </style>
 
 <div class="swr-wrap">
-    @include('customers._module_nav')
-
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:10px;flex-wrap:wrap">
         <div>
             <h1 style="font-size:28px;font-weight:900;margin:0">{{ $report->customer_name }}</h1>
@@ -29,7 +27,7 @@
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
             <a class="swr-btn light" href="{{ route('sales.work-reports.edit', $report->id) }}">Sửa</a>
-            <a class="swr-btn dark" href="{{ route('customers.pipeline') }}">Quay lại</a>
+            <a class="swr-btn dark" href="{{ route('sales.work-reports.index') }}">Quay lại</a>
         </div>
     </div>
 
@@ -124,46 +122,8 @@
 
 
 {{-- EGO_SALES_MANAGER_DROPDOWN_START --}}
-@php
-    $egoSalesManagerOptions = collect();
-
-    try {
-        $egoSalesManagerOptions = \App\Models\User::query()
-            ->get()
-            ->filter(function ($u) {
-                $roles = [];
-
-                foreach (['role', 'type', 'position', 'department'] as $field) {
-                    if (!empty($u->{$field})) {
-                        $roles[] = mb_strtolower((string) $u->{$field});
-                    }
-                }
-
-                if (method_exists($u, 'getRoleNames')) {
-                    foreach ($u->getRoleNames() as $roleName) {
-                        $roles[] = mb_strtolower((string) $roleName);
-                    }
-                }
-
-                $roleText = implode('|', array_unique(array_filter($roles)));
-
-                return str_contains($roleText, 'sales_manager')
-                    || str_contains($roleText, 'sales manager')
-                    || str_contains($roleText, 'trưởng phòng sales')
-                    || str_contains($roleText, 'truong_phong_sales')
-                    || str_contains($roleText, 'manager_sales');
-            })
-            ->map(function ($u) {
-                return [
-                    'id' => (string) $u->id,
-                    'name' => (string) ($u->name ?? $u->email ?? ('User #' . $u->id)),
-                ];
-            })
-            ->values();
-    } catch (\Throwable $e) {
-        $egoSalesManagerOptions = collect();
-    }
-@endphp
+{{-- $egoSalesManagerOptions do App\Services\Sales\SalesManagerDirectory cung cấp
+     qua ViewComposerServiceProvider — KHÔNG truy vấn User trong Blade. --}}
 
 <script>
 (function () {

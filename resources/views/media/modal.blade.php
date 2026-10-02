@@ -1,3 +1,14 @@
+{{--
+    EGO_VIEW_CHET — VIEW CHẾT, KHÔNG AI RENDER (rà soát 2026-09-04)
+
+    Không @include nào gọi partial này.
+
+    Partial mồ côi.
+
+    CHƯA XOÁ theo yêu cầu: chỉ đánh dấu để lần sau khỏi rà lại.
+    Nếu bạn đấu view này vào một route/@include, hãy XOÁ dấu này —
+    tests/Feature/View/DeadViewsMarkedTest.php sẽ báo đỏ để nhắc.
+--}}
 <!-- resources/views/media/modal.blade.php -->
 <div class="modal fade" id="mediaModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl">
@@ -8,14 +19,14 @@
             </div>
 
             <div class="modal-body">
-                <ul class="nav nav-tabs mb-3">
+                <ul class="nav nav-tabs tw:mb-4">
                     <li class="nav-item"><button type="button" class="nav-link active" data-bs-toggle="tab" data-bs-target="#media-upload">Tải lên</button></li>
                     <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#media-library">Thư viện</button></li>
                 </ul>
 
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="media-upload">
-                        <div class="mb-3">
+                        <div class="tw:mb-4">
                             <input type="file" id="media_file_input" class="form-control">
                         </div>
                         <div id="upload_result"></div>
@@ -56,10 +67,10 @@
                 .then(data=>{
                     let html = '';
                     data.forEach(m=>{
-                        html += `<div class="col-2 p-2">
-             <div class="border p-1 text-center selectable" data-id="${m.id}" onclick="toggleMediaItem(this)">
+                        html += `<div class="col-2 tw:p-2">
+             <div class="border p-1 tw:text-center selectable" data-id="${m.id}" onclick="toggleMediaItem(this)">
                <img src="${m.url}" class="img-fluid" style="max-height:100px; object-fit:cover;">
-               <div class="small text-truncate">${m.file_name}</div>
+               <div class="small tw:truncate">${m.file_name}</div>
              </div>
           </div>`;
                     });
@@ -101,10 +112,10 @@
                 .then(json=>{
                     // reload library so uploaded appears
                     loadMediaLibrary();
-                    document.getElementById('upload_result').innerHTML = `<div class="alert alert-success small">Upload thành công</div>`;
+                    document.getElementById('upload_result').innerHTML = `<x-ui.alert variant="success" class="tw:text-[0.875em]">Upload thành công</x-ui.alert>`;
                 })
                 .catch(err=>{
-                    document.getElementById('upload_result').innerHTML = `<div class="alert alert-danger small">Upload lỗi</div>`;
+                    document.getElementById('upload_result').innerHTML = `<x-ui.alert variant="danger" class="tw:text-[0.875em]">Upload lỗi</x-ui.alert>`;
                 });
         });
 

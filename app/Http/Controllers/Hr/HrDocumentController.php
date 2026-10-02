@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Database\Schema\Blueprint;
+use App\Support\ProbeFailureLog;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -20,8 +20,6 @@ class HrDocumentController extends Controller
      */
     public function operations()
     {
-        $this->ensureOperationItemsTable();
-        $this->ensureOperationStatusesTable();
 
         $groups = $this->operationGroups();
         $statuses = $this->operationStatuses();
@@ -51,7 +49,6 @@ class HrDocumentController extends Controller
      */
     public function storeOperationItem(Request $request)
     {
-        $this->ensureOperationItemsTable();
 
         $groups = $this->operationGroups();
 
@@ -93,7 +90,6 @@ class HrDocumentController extends Controller
      */
     public function updateOperationItem(Request $request, int $item)
     {
-        $this->ensureOperationItemsTable();
 
         $groups = $this->operationGroups();
 
@@ -135,7 +131,6 @@ class HrDocumentController extends Controller
      */
     public function deleteOperationItem(int $item)
     {
-        $this->ensureOperationItemsTable();
 
         DB::table('hr_operation_items')->where('id', $item)->delete();
 
@@ -278,7 +273,7 @@ class HrDocumentController extends Controller
      */
     private function folders(string $category)
     {
-        if (! Schema::hasTable('hr_document_folders') || ! Schema::hasTable('hr_document_files')) {
+        if (! SchemaCache::hasTable('hr_document_folders') || ! SchemaCache::hasTable('hr_document_files')) {
             return collect();
         }
 
@@ -315,34 +310,36 @@ class HrDocumentController extends Controller
         ];
 
         try {
-            if (Schema::hasTable('users')) {
+            if (SchemaCache::hasTable('users')) {
                 $q = DB::table('users');
 
-                if (Schema::hasColumn('users', 'deleted_at')) {
+                if (SchemaCache::hasColumn('users', 'deleted_at')) {
                     $q->whereNull('deleted_at');
                 }
 
-                if ($attendance && Schema::hasColumn('users', 'is_active')) {
+                if ($attendance && SchemaCache::hasColumn('users', 'is_active')) {
                     $q->where('is_active', 1);
                 }
 
                 $stats['employees'] = (int) $q->count();
             }
 
-            if (Schema::hasTable('departments')) {
+            if (SchemaCache::hasTable('departments')) {
                 $stats['departments'] = (int) DB::table('departments')->count();
             }
 
-            if (Schema::hasTable('positions')) {
+            if (SchemaCache::hasTable('positions')) {
                 $stats['positions'] = (int) DB::table('positions')->count();
             }
 
-            if ($attendance && Schema::hasTable('attendance_records') && Schema::hasColumn('attendance_records', 'work_date')) {
+            if ($attendance && SchemaCache::hasTable('attendance_records') && SchemaCache::hasColumn('attendance_records', 'work_date')) {
                 $stats['attendance_today'] = (int) DB::table('attendance_records')
                     ->whereDate('work_date', now()->toDateString())
                     ->count();
             }
         } catch (\Throwable $e) {
+            ProbeFailureLog::warn('HrDocumentController::stats', $e);
+
         }
 
         return $stats;
@@ -353,7 +350,6 @@ class HrDocumentController extends Controller
      */
     public function storeOperationGroup(Request $request)
     {
-        $this->ensureOperationGroupsTable();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:190'],
@@ -389,7 +385,6 @@ class HrDocumentController extends Controller
      */
     public function updateOperationGroup(Request $request, int $group)
     {
-        $this->ensureOperationGroupsTable();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:190'],
@@ -414,8 +409,6 @@ class HrDocumentController extends Controller
      */
     public function deleteOperationGroup(int $group)
     {
-        $this->ensureOperationGroupsTable();
-        $this->ensureOperationItemsTable();
 
         $row = DB::table('hr_operation_groups')->where('id', $group)->first();
         abort_unless($row, 404);
@@ -438,7 +431,6 @@ class HrDocumentController extends Controller
      */
     public function storeOperationStatus(Request $request)
     {
-        $this->ensureOperationStatusesTable();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:190'],
@@ -476,7 +468,6 @@ class HrDocumentController extends Controller
      */
     public function updateOperationStatus(Request $request, int $status)
     {
-        $this->ensureOperationStatusesTable();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:190'],
@@ -503,8 +494,6 @@ class HrDocumentController extends Controller
      */
     public function deleteOperationStatus(int $status)
     {
-        $this->ensureOperationStatusesTable();
-        $this->ensureOperationItemsTable();
 
         $row = DB::table('hr_operation_statuses')->where('id', $status)->first();
         abort_unless($row, 404);
@@ -529,7 +518,6 @@ class HrDocumentController extends Controller
      */
     private function operationGroups(): array
     {
-        $this->ensureOperationGroupsTable();
 
         $rows = DB::table('hr_operation_groups')
             ->orderBy('sort_order')
@@ -555,7 +543,6 @@ class HrDocumentController extends Controller
      */
     private function operationStatuses(): array
     {
-        $this->ensureOperationStatusesTable();
 
         $rows = DB::table('hr_operation_statuses')
             ->orderBy('sort_order')
@@ -572,76 +559,6 @@ class HrDocumentController extends Controller
         }
 
         return $rows->pluck('name', 'status_key')->toArray();
-    }
-
-    /**
-     * Tạo bảng hr_operation_items nếu chưa tồn tại.
-     */
-    private function ensureOperationItemsTable(): void
-    {
-        if (Schema::hasTable('hr_operation_items')) {
-            return;
-        }
-
-        Schema::create('hr_operation_items', function (Blueprint $table) {
-            $table->id();
-            $table->string('group_key', 80)->index();
-            $table->string('title');
-            $table->decimal('amount', 18, 2)->default(0);
-            $table->string('status', 50)->default('new')->index();
-            $table->string('owner')->nullable();
-            $table->date('due_date')->nullable()->index();
-            $table->text('note')->nullable();
-            $table->unsignedBigInteger('created_by')->nullable();
-            $table->timestamps();
-        });
-    }
-
-    /**
-     * Tạo bảng hr_operation_groups nếu chưa có và seed nhóm mặc định khi trống.
-     */
-    private function ensureOperationGroupsTable(): void
-    {
-        if (! Schema::hasTable('hr_operation_groups')) {
-            Schema::create('hr_operation_groups', function (Blueprint $table) {
-                $table->id();
-                $table->string('group_key', 80)->unique();
-                $table->string('name', 190);
-                $table->unsignedInteger('sort_order')->default(0);
-                $table->timestamps();
-            });
-        }
-
-        if (DB::table('hr_operation_groups')->count() === 0) {
-            $this->seedOperationGroups();
-        }
-    }
-
-    /**
-     * Tạo bảng hr_operation_statuses nếu chưa có, bổ sung cột color và seed trạng thái mặc định khi trống.
-     */
-    private function ensureOperationStatusesTable(): void
-    {
-        if (! Schema::hasTable('hr_operation_statuses')) {
-            Schema::create('hr_operation_statuses', function (Blueprint $table) {
-                $table->id();
-                $table->string('status_key', 80)->unique();
-                $table->string('name', 190);
-                $table->string('color', 30)->default('slate');
-                $table->unsignedInteger('sort_order')->default(0);
-                $table->timestamps();
-            });
-        }
-
-        if (Schema::hasTable('hr_operation_statuses') && ! Schema::hasColumn('hr_operation_statuses', 'color')) {
-            Schema::table('hr_operation_statuses', function (Blueprint $table) {
-                $table->string('color', 30)->default('slate')->after('name');
-            });
-        }
-
-        if (DB::table('hr_operation_statuses')->count() === 0) {
-            $this->seedOperationStatuses();
-        }
     }
 
     /**

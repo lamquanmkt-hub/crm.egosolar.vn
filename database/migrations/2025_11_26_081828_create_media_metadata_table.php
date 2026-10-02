@@ -11,28 +11,30 @@ return new class extends Migration
      */
     public function up(): void
     {
-	    Schema::create('media_metadata', function (Blueprint $table) {
-		    $table->id();
+        if (! Schema::hasTable('media_metadata')) {
+            Schema::create('media_metadata', function (Blueprint $table) {
+                $table->id();
 
-		    // Thông tin file
-		    $table->string('file_name');
-		    $table->string('original_name')->nullable();
-		    $table->string('mime_type')->nullable();
-		    $table->unsignedBigInteger('file_size')->nullable(); // bytes
-		    $table->string('disk')->default('public'); // public | s3...
+                // Thông tin file
+                $table->string('file_name');
+                $table->string('original_name')->nullable();
+                $table->string('mime_type')->nullable();
+                $table->unsignedBigInteger('file_size')->nullable(); // bytes
+                $table->string('disk')->default('public'); // public | s3...
 
-		    // Đường dẫn
-		    $table->string('path');
-		    $table->string('url')->nullable();
+                // Đường dẫn
+                $table->string('path');
+                $table->string('url')->nullable();
 
-		    // Polymorphic: media có thể thuộc về bất kỳ model nào
-		    $table->morphs('mediable'); // mediable_id, mediable_type
+                // Polymorphic: media có thể thuộc về bất kỳ model nào
+                $table->morphs('mediable'); // mediable_id, mediable_type
 
-		    // Metadata thêm
-		    $table->json('metadata')->nullable(); // ex: width, height, duration...
+                // Metadata thêm
+                $table->json('metadata')->nullable(); // ex: width, height, duration...
 
-		    $table->timestamps();
-	    });
+                $table->timestamps();
+            });
+        }
     }
 
     /**
@@ -40,6 +42,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-	    Schema::dropIfExists('media_metadata');
+        Schema::dropIfExists('media_metadata');
     }
 };

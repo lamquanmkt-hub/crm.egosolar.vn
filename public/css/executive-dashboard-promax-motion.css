@@ -541,3 +541,46 @@ body.exec-dashboard-dark #executiveDashboard::before {
         filter: none !important;
     }
 }
+
+
+/* ==========================================================
+   EGO_EXECUTIVE_LITE_CSS_V1
+   Dashboard Giám đốc ưu tiên hiệu năng.
+   ========================================================== */
+
+#executiveDashboard::before,
+#executiveDashboard::after{
+    animation:none !important;
+}
+
+#executiveDashboard::after{
+    display:none !important;
+}
+
+#executiveDashboard .exec-motion-orb{
+    display:none !important;
+
+    animation:none !important;
+    filter:none !important;
+}
+
+#executiveDashboard .exec-motion-live::before{
+    animation:none !important;
+}
+
+#executiveDashboard .exec-motion-reveal{
+    opacity:1 !important;
+    transform:none !important;
+    transition:none !important;
+}
+
+#executiveDashboard .exec-kpi{
+    transform:none !important;
+}
+
+#executiveDashboard canvas,
+#executiveDashboard svg{
+    animation:none !important;
+}
+
+

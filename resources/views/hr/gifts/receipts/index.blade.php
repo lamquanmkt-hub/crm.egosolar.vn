@@ -99,7 +99,7 @@
                             <td>{{ $receipt->items_count }}</td>
                             <td>{{ $receipt->creator->name ?? '—' }}</td>
                             <td>@include('hr.gifts.partials.status',['status'=>$receipt->status])</td>
-                            <td class="text-end">
+                            <td class="tw:text-right">
                                 <a class="gift-icon-btn" href="{{ route('hr.gifts.receipts.show',$receipt) }}"><i class="bi bi-eye"></i></a>
                             </td>
                         </tr>

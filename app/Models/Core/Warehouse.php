@@ -2,7 +2,6 @@
 
 namespace App\Models\Core;
 
-use App\Models\Concerns\LockedToEgoInternational;
 use App\Models\CRM\Orders\Order;
 use App\Models\Inventory\Catalog\Product;
 use App\Models\Inventory\Serial\SerialEventLine;
@@ -17,7 +16,6 @@ use Illuminate\Support\Collection;
 
 class Warehouse extends Model
 {
-    use LockedToEgoInternational;
     public function companies()
     {
         return $this->belongsToMany(

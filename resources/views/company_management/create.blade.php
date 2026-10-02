@@ -1,16 +1,16 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid py-4">
-    <div class="d-flex align-items-center justify-content-between mb-3">
+<div class="container-fluid tw:py-6">
+    <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
         <div>
-            <h3 class="mb-1 fw-bold">THÊM CÔNG TY</h3>
-            <div class="text-muted">Tạo công ty mới để gắn với kho và in PDF đơn hàng.</div>
+            <h3 class="tw:mb-1 tw:font-bold">THÊM CÔNG TY</h3>
+            <div class="tw:text-[rgba(33,37,41,0.75)]">Tạo công ty mới để gắn với kho và in PDF đơn hàng.</div>
         </div>
 
-        <a href="{{ route('company-management.index') }}" class="btn btn-light">
+        <x-ui.button href="{{ route('company-management.index') }}" variant="light">
             Quay lại
-        </a>
+        </x-ui.button>
     </div>
 
     @include('company_management.form', [

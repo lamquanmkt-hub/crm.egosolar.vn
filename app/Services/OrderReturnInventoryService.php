@@ -8,8 +8,8 @@ use App\Models\CRM\Orders\OrderReturn;
 use App\Models\Inventory\Catalog\Product;
 use App\Models\User;
 use App\Services\Inventory\Stock\StockLotService;
+use App\Support\SchemaCache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -20,10 +20,7 @@ class OrderReturnInventoryService
     /**
      * Khởi tạo service với service quản lý lô tồn kho.
      */
-    public function __construct(
-        private readonly StockLotService $stockLotService,
-        private readonly OrderReturnFinancialService $financialService,
-    ) {}
+    public function __construct(private readonly StockLotService $stockLotService) {}
 
     /**
      * Nhập kho hàng hoàn: chỉ hàng đạt điều kiện bán lại được cộng tồn, cập nhật serial.
@@ -116,12 +113,7 @@ class OrderReturnInventoryService
                 'Kho đã xử lý hàng hoàn. Chỉ hàng sellable được cộng tồn bán được.', $user
             );
 
-            // V4: kho và tài chính là hai nhánh độc lập. Sau khi nhập hoàn,
-            // hệ thống tự đối chiếu số tiền khách đã thanh toán để quyết định:
-            // giảm công nợ, hoàn tiền hay hoàn tất ngay nếu không phát sinh tiền hoàn.
-            $return = $this->financialService->reconcileAfterStockIn($return, $user);
-
-            return $return->fresh(['items.serials', 'refunds']);
+            return $return->fresh(['items.serials']);
         });
     }
 
@@ -130,7 +122,7 @@ class OrderReturnInventoryService
      */
     private function resolveOriginalCost(int $orderItemId): array
     {
-        if (! Schema::hasTable('crm_order_item_stock_allocations')) {
+        if (! SchemaCache::hasTable('crm_order_item_stock_allocations')) {
             return [0.0, 0.0];
         }
         $rows = DB::table('crm_order_item_stock_allocations')->where('order_item_id', $orderItemId)->get();
@@ -147,7 +139,7 @@ class OrderReturnInventoryService
      */
     private function createInventoryEvent(OrderReturn $return, User $user): ?int
     {
-        if (! Schema::hasTable('crm_inventory_events')) {
+        if (! SchemaCache::hasTable('crm_inventory_events')) {
             return null;
         }
         $eventId = (int) DB::table('crm_inventory_events')->insertGetId([
@@ -158,7 +150,7 @@ class OrderReturnInventoryService
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        if (Schema::hasTable('crm_inventory_event_refs')) {
+        if (SchemaCache::hasTable('crm_inventory_event_refs')) {
             DB::table('crm_inventory_event_refs')->insertOrIgnore([
                 'event_id' => $eventId,
                 'ref_type' => 'return',
@@ -205,7 +197,7 @@ class OrderReturnInventoryService
                 ]
             );
 
-            if ($eventId && Schema::hasTable('crm_serial_event_lines')) {
+            if ($eventId && SchemaCache::hasTable('crm_serial_event_lines')) {
                 DB::table('crm_serial_event_lines')->insertOrIgnore([
                     'event_id' => $eventId,
                     'serial_unit_id' => $serial->serial_unit_id,
@@ -216,7 +208,7 @@ class OrderReturnInventoryService
                 ]);
             }
 
-            if (Schema::hasTable('crm_serial_warranty_events')) {
+            if (SchemaCache::hasTable('crm_serial_warranty_events')) {
                 $serialCode = DB::table('crm_serial_unit_identifiers as sui')
                     ->join('crm_serial_identifiers as si', 'si.id', '=', 'sui.serial_identifier_id')
                     ->where('sui.serial_unit_id', $serial->serial_unit_id)

@@ -11,29 +11,31 @@ return new class extends Migration
      */
     public function up(): void
     {
-       Schema::table('tasks', function (Blueprint $table) {
-    if (!Schema::hasColumn('tasks', 'title')) {
-        $table->string('title')->nullable()->after('id');
-    }
-    if (!Schema::hasColumn('tasks', 'description')) {
-        $table->text('description')->nullable();
-    }
-    if (!Schema::hasColumn('tasks', 'requester_id')) {
-        $table->unsignedBigInteger('requester_id')->nullable();
-    }
-    if (!Schema::hasColumn('tasks', 'assignee_id')) {
-        $table->unsignedBigInteger('assignee_id')->nullable();
-    }
-    if (!Schema::hasColumn('tasks', 'priority')) {
-        $table->string('priority')->default('medium');
-    }
-    if (!Schema::hasColumn('tasks', 'status')) {
-        $table->string('status')->default('new');
-    }
-    if (!Schema::hasColumn('tasks', 'due_at')) {
-        $table->dateTime('due_at')->nullable();
-    }
-});
+        if (Schema::hasTable('tasks')) {
+            Schema::table('tasks', function (Blueprint $table) {
+                if (! Schema::hasColumn('tasks', 'title')) {
+                    $table->string('title')->nullable()->after('id');
+                }
+                if (! Schema::hasColumn('tasks', 'description')) {
+                    $table->text('description')->nullable();
+                }
+                if (! Schema::hasColumn('tasks', 'requester_id')) {
+                    $table->unsignedBigInteger('requester_id')->nullable();
+                }
+                if (! Schema::hasColumn('tasks', 'assignee_id')) {
+                    $table->unsignedBigInteger('assignee_id')->nullable();
+                }
+                if (! Schema::hasColumn('tasks', 'priority')) {
+                    $table->string('priority')->default('medium');
+                }
+                if (! Schema::hasColumn('tasks', 'status')) {
+                    $table->string('status')->default('new');
+                }
+                if (! Schema::hasColumn('tasks', 'due_at')) {
+                    $table->dateTime('due_at')->nullable();
+                }
+            });
+        }
 
     }
 

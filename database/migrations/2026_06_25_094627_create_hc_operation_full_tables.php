@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('hr_operation_expenses')) {
+        if (! Schema::hasTable('hr_operation_expenses')) {
             Schema::create('hr_operation_expenses', function (Blueprint $table) {
                 $table->id();
                 $table->string('category')->nullable();
@@ -26,7 +26,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_operation_assets')) {
+        if (! Schema::hasTable('hr_operation_assets')) {
             Schema::create('hr_operation_assets', function (Blueprint $table) {
                 $table->id();
                 $table->string('asset_name');
@@ -42,7 +42,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_operation_suppliers')) {
+        if (! Schema::hasTable('hr_operation_suppliers')) {
             Schema::create('hr_operation_suppliers', function (Blueprint $table) {
                 $table->id();
                 $table->string('supplier_name');
@@ -57,7 +57,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_operation_tasks')) {
+        if (! Schema::hasTable('hr_operation_tasks')) {
             Schema::create('hr_operation_tasks', function (Blueprint $table) {
                 $table->id();
                 $table->string('task_type')->nullable();

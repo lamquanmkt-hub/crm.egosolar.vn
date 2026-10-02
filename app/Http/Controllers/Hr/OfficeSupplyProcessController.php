@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Database\Schema\Blueprint;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller quy trình văn phòng phẩm (VPP): kho vật phẩm, nhập kho, phân bổ và lịch sử xuất nhập.
@@ -19,7 +18,6 @@ class OfficeSupplyProcessController extends Controller
      */
     public function index(Request $request)
     {
-        $this->ensureTables();
 
         $productQuery = DB::table('hr_vpp_products');
 
@@ -85,7 +83,6 @@ class OfficeSupplyProcessController extends Controller
      */
     public function productStore(Request $request)
     {
-        $this->ensureTables();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -145,7 +142,6 @@ class OfficeSupplyProcessController extends Controller
      */
     public function importStock(Request $request)
     {
-        $this->ensureTables();
 
         $data = $request->validate([
             'product_id' => ['nullable', 'integer'],
@@ -199,7 +195,6 @@ class OfficeSupplyProcessController extends Controller
      */
     public function allocateStock(Request $request)
     {
-        $this->ensureTables();
 
         $data = $request->validate([
             'department_name' => ['required', 'string', 'max:255'],
@@ -292,7 +287,6 @@ class OfficeSupplyProcessController extends Controller
      */
     public function detailJson($id)
     {
-        $this->ensureTables();
 
         $requestRow = DB::table('hr_vpp_requests as r')
             ->leftJoin('users as u', 'u.id', '=', 'r.created_by')
@@ -331,7 +325,6 @@ class OfficeSupplyProcessController extends Controller
      */
     public function show($id)
     {
-        $this->ensureTables();
 
         $requestRow = DB::table('hr_vpp_requests as r')
             ->leftJoin('users as u', 'u.id', '=', 'r.created_by')
@@ -366,7 +359,6 @@ class OfficeSupplyProcessController extends Controller
      */
     public function destroy($id)
     {
-        $this->ensureTables();
 
         $requestRow = DB::table('hr_vpp_requests')->where('id', $id)->first();
         abort_unless($requestRow, 404);
@@ -404,7 +396,6 @@ class OfficeSupplyProcessController extends Controller
      */
     public function productUpdate(Request $request, $id)
     {
-        $this->ensureTables();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -433,17 +424,16 @@ class OfficeSupplyProcessController extends Controller
      */
     public function productDestroy($id)
     {
-        $this->ensureTables();
 
         $product = DB::table('hr_vpp_products')->where('id', $id)->first();
         abort_unless($product, 404);
 
         DB::transaction(function () use ($id) {
-            if (Schema::hasTable('hr_vpp_items') && Schema::hasColumn('hr_vpp_items', 'product_id')) {
+            if (SchemaCache::hasTable('hr_vpp_items') && SchemaCache::hasColumn('hr_vpp_items', 'product_id')) {
                 DB::table('hr_vpp_items')->where('product_id', $id)->delete();
             }
 
-            if (Schema::hasTable('hr_vpp_movements')) {
+            if (SchemaCache::hasTable('hr_vpp_movements')) {
                 DB::table('hr_vpp_movements')->where('product_id', $id)->delete();
             }
 
@@ -458,7 +448,6 @@ class OfficeSupplyProcessController extends Controller
      */
     public function history()
     {
-        $this->ensureTables();
 
         $movements = DB::table('hr_vpp_movements as m')
             ->leftJoin('hr_vpp_products as p', 'p.id', '=', 'm.product_id')
@@ -632,7 +621,7 @@ class OfficeSupplyProcessController extends Controller
      */
     private function log(int $requestId, ?string $from, string $to, string $action, ?string $note = null): void
     {
-        if (! Schema::hasTable('hr_vpp_logs')) {
+        if (! SchemaCache::hasTable('hr_vpp_logs')) {
             return;
         }
 
@@ -676,135 +665,5 @@ class OfficeSupplyProcessController extends Controller
             ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($name)])
             ->whereRaw('LOWER(TRIM(unit)) = ?', [mb_strtolower($unit)])
             ->first();
-    }
-
-    /**
-     * Tạo các bảng VPP (products, requests, items, movements, logs) và bổ sung cột còn thiếu nếu chưa có.
-     */
-    private function ensureTables(): void
-    {
-        if (! Schema::hasTable('hr_vpp_products')) {
-            Schema::create('hr_vpp_products', function (Blueprint $table) {
-                $table->id();
-                $table->string('name');
-                $table->string('sku', 100)->nullable();
-                $table->string('unit', 50)->default('cái');
-                $table->decimal('current_stock', 12, 2)->default(0);
-                $table->decimal('min_stock', 12, 2)->default(0);
-                $table->text('note')->nullable();
-                $table->unsignedBigInteger('created_by')->nullable();
-                $table->timestamps();
-            });
-        }
-
-        if (! Schema::hasTable('hr_vpp_requests')) {
-            Schema::create('hr_vpp_requests', function (Blueprint $table) {
-                $table->id();
-                $table->string('code')->unique();
-                $table->string('department_name');
-                $table->string('requester_name')->nullable();
-                $table->string('requested_month', 20)->nullable();
-                $table->text('purpose')->nullable();
-                $table->text('note')->nullable();
-                $table->string('status', 50)->default('completed')->index();
-                $table->string('receiver_name')->nullable();
-                $table->text('received_note')->nullable();
-                $table->unsignedBigInteger('received_by')->nullable();
-                $table->timestamp('received_at')->nullable();
-                $table->text('completed_note')->nullable();
-                $table->timestamp('completed_at')->nullable();
-                $table->unsignedBigInteger('created_by')->nullable();
-                $table->timestamp('submitted_at')->nullable();
-                $table->timestamps();
-            });
-        }
-
-        if (! Schema::hasColumn('hr_vpp_requests', 'receiver_name')) {
-            Schema::table('hr_vpp_requests', function (Blueprint $table) {
-                $table->string('receiver_name')->nullable()->after('status');
-            });
-        }
-
-        if (! Schema::hasColumn('hr_vpp_requests', 'received_note')) {
-            Schema::table('hr_vpp_requests', function (Blueprint $table) {
-                $table->text('received_note')->nullable()->after('receiver_name');
-            });
-        }
-
-        if (! Schema::hasColumn('hr_vpp_requests', 'received_by')) {
-            Schema::table('hr_vpp_requests', function (Blueprint $table) {
-                $table->unsignedBigInteger('received_by')->nullable()->after('received_note');
-            });
-        }
-
-        if (! Schema::hasColumn('hr_vpp_requests', 'received_at')) {
-            Schema::table('hr_vpp_requests', function (Blueprint $table) {
-                $table->timestamp('received_at')->nullable()->after('received_by');
-            });
-        }
-
-        if (! Schema::hasColumn('hr_vpp_requests', 'completed_note')) {
-            Schema::table('hr_vpp_requests', function (Blueprint $table) {
-                $table->text('completed_note')->nullable()->after('received_at');
-            });
-        }
-
-        if (! Schema::hasColumn('hr_vpp_requests', 'completed_at')) {
-            Schema::table('hr_vpp_requests', function (Blueprint $table) {
-                $table->timestamp('completed_at')->nullable()->after('completed_note');
-            });
-        }
-
-        if (! Schema::hasTable('hr_vpp_items')) {
-            Schema::create('hr_vpp_items', function (Blueprint $table) {
-                $table->id();
-                $table->unsignedBigInteger('request_id')->index();
-                $table->unsignedBigInteger('product_id')->nullable()->index();
-                $table->string('item_name');
-                $table->string('unit', 50)->nullable();
-                $table->decimal('requested_qty', 12, 2)->default(0);
-                $table->decimal('hr_qty', 12, 2)->nullable();
-                $table->decimal('issued_qty', 12, 2)->nullable();
-                $table->timestamps();
-            });
-        }
-
-        if (! Schema::hasColumn('hr_vpp_items', 'product_id')) {
-            Schema::table('hr_vpp_items', function (Blueprint $table) {
-                $table->unsignedBigInteger('product_id')->nullable()->index()->after('request_id');
-            });
-        }
-
-        if (! Schema::hasTable('hr_vpp_movements')) {
-            Schema::create('hr_vpp_movements', function (Blueprint $table) {
-                $table->id();
-                $table->unsignedBigInteger('product_id')->index();
-                $table->unsignedBigInteger('request_id')->nullable()->index();
-                $table->string('type', 20)->index();
-                $table->decimal('qty', 12, 2)->default(0);
-                $table->decimal('before_qty', 12, 2)->default(0);
-                $table->decimal('after_qty', 12, 2)->default(0);
-                $table->string('department_name')->nullable();
-                $table->string('receiver_name')->nullable();
-                $table->string('reason')->nullable();
-                $table->text('note')->nullable();
-                $table->unsignedBigInteger('user_id')->nullable();
-                $table->timestamp('moved_at')->nullable();
-                $table->timestamps();
-            });
-        }
-
-        if (! Schema::hasTable('hr_vpp_logs')) {
-            Schema::create('hr_vpp_logs', function (Blueprint $table) {
-                $table->id();
-                $table->unsignedBigInteger('request_id')->index();
-                $table->string('from_status', 50)->nullable();
-                $table->string('to_status', 50)->nullable();
-                $table->string('action')->nullable();
-                $table->text('note')->nullable();
-                $table->unsignedBigInteger('user_id')->nullable();
-                $table->timestamps();
-            });
-        }
     }
 }

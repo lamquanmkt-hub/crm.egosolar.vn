@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('crm_product_stock_lots')) {
+        if (! Schema::hasTable('crm_product_stock_lots')) {
             Schema::create('crm_product_stock_lots', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('product_id')->index();
@@ -30,7 +30,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('crm_order_item_stock_allocations')) {
+        if (! Schema::hasTable('crm_order_item_stock_allocations')) {
             Schema::create('crm_order_item_stock_allocations', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('order_id')->index();

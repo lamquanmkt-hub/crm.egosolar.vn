@@ -1,11 +1,270 @@
-@import 'tailwindcss';
+/*
+ |============================================================================
+ | Tailwind sống chung Bootstrap — 3 quyết định, mỗi cái đều có số đo kèm theo
+ |============================================================================
+ | Mục tiêu: ĐỔI HẠ TẦNG CSS, KHÔNG đổi giao diện. Bootstrap 5.3.3 vẫn chạy qua CDN
+ | (169/302 view còn phụ thuộc); nó chỉ được gỡ ở bước cuối.
+ |
+ |----------------------------------------------------------------------------
+ | 1) TIỀN TỐ `tw:` — BẮT BUỘC, không phải để cho đẹp
+ |----------------------------------------------------------------------------
+ | Không có tiền tố, Tailwind quét view rồi sinh ra 90 class TRÙNG TÊN Bootstrap:
+ | `container`, `collapse`, `col-6`, `border`, `table`, `rounded`, `shadow`,
+ | `gap-2`, `h-100`… Chúng đang dùng hàng nghìn lần (mb-3: 340 chỗ, table: 442,
+ | border: 275). Nghĩa là BẤT KỲ cách nào cho utility Tailwind thắng Bootstrap —
+ | phân lớp, `!important`, đổi thứ tự nạp — đều lập tức phá 169 trang chưa chuyển,
+ | vì `.container` hay `.collapse` của Tailwind sẽ đè bản Bootstrap.
+ |
+ | Có tiền tố thì Tailwind CHỈ sinh class ta tự viết `tw:*`, không đụng tên nào của
+ | Bootstrap. CSS cũng tụt từ 36,6 kB xuống còn đúng phần đang dùng.
+ |
+ | Cú pháp: tài liệu v4 ghi `@import "tailwindcss" prefix(tw)`, nhưng ở đây dùng
+ | dạng import tách rời (để bỏ preflight). Đã thử và đo: đặt `prefix()` trên
+ | `utilities.css` thì BỊ BỎ QUA im lặng; phải đặt trên `theme.css` (prefix là tuỳ
+ | chọn của theme). Kèm theo, biến theme đổi tên thành `--tw-*`.
+ |
+ |----------------------------------------------------------------------------
+ | 2) UTILITIES NẰM NGOÀI @layer — cố ý
+ |----------------------------------------------------------------------------
+ | CSS ngoài lớp luôn thắng CSS trong lớp. Bootstrap CDN không phân lớp, nên nếu
+ | utilities nằm trong @layer thì chúng THUA cả quy tắc theo tên thẻ của Reboot:
+ | `h1` mang `tw:text-sm` vẫn ra 40px. Để ngoài lớp thì utility (0,1,0) thắng
+ | Reboot (0,0,1) bằng độ đặc hiệu, và thắng class Bootstrap bằng thứ tự nạp.
+ | Việc này CHỈ an toàn nhờ (1): không còn class trùng tên thì không phá được gì.
+ |
+ |----------------------------------------------------------------------------
+ | 3) KHÔNG NẠP PREFLIGHT
+ |----------------------------------------------------------------------------
+ | Preflight dùng selector theo tên thẻ nên tiền tố không cứu được. Đo trên
+ | Chrome 152: nạp cạnh Bootstrap làm đổi 3 thuộc tính — ul/li list-style-type
+ | disc->none (mất dấu đầu dòng), img display inline->block (xô lệch bố cục), vì
+ | Reboot chỉ đặt `ol,ul{padding-left:2rem}` và `img,svg{vertical-align:middle}`.
+ | ĐÁNH ĐỔI: `tw:border` chỉ đặt border-width, border-style vẫn none -> viết kèm
+ | `tw:border-solid`.
+ |
+ | KHI GỠ HẲN BOOTSTRAP: bỏ prefix, bỏ dòng này, đổi thành `@import 'tailwindcss';`
+ | để lấy lại preflight, rồi bỏ tiền tố `tw:` trong view bằng một lượt sed.
+ */
+@import 'tailwindcss/theme.css' layer(theme) prefix(tw);
+@import 'tailwindcss/utilities.css';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+/* KHÔNG quét view phân trang của Laravel. Hai lý do, đều đo được:
+   1. App không dùng chúng. `AppServiceProvider` gọi `Paginator::useBootstrap()`, và 11 chỗ
+      còn lại chỉ định thẳng `pagination::bootstrap-5` — bản Tailwind không bao giờ render.
+      48 class sinh ra từ đó (`dark:hover:bg-gray-900`, `cursor-not-allowed`, `-ml-px`…) là
+      CSS chết, chiếm 2,8 kB.
+   2. Nó nằm trong vendor/, mà vendor/ không có trong git. Job `assets` của CI chỉ chạy
+      `npm ci` chứ không `composer install`, nên CI build ra 36,65 kB còn máy dev ra
+      39,47 kB -> CI đỏ. Nguồn quét phải nằm trong repo thì build mới tất định.
+   Nếu sau này chuyển sang phân trang Tailwind thì khai lại dòng @source này VÀ thêm
+   `composer install` vào job assets. */
+/* KHÔNG quét storage/framework/views: thư mục đó là view đã biên dịch lúc chạy, nên bản
+   build phụ thuộc vào việc máy đã render trang nào — cùng mã nguồn cho ra CSS khác nhau.
+   Đo được: cache rỗng -> 493 class / 39.472 byte; sau `view:cache` -> 711 class / 55.860
+   byte (+218 class, +42%). Toàn bộ 218 class thừa đến từ view của package trong vendor
+   (Pulse/Telescope…) chứ không phải view của app — đã đối chiếu, 11/12 mẫu không xuất
+   hiện ở bất kỳ file nào dưới resources/.
+   Điều này còn làm ĐỎ CI: job `assets` build trên checkout sạch (cache rỗng) rồi so với
+   bản đã commit, nên bản commit build lúc cache đầy sẽ luôn lệch.
+   Nếu sau này cần class từ view của một package, khai @source thẳng tới thư mục đó trong
+   vendor/ — đường dẫn cố định, không phụ thuộc trạng thái lúc chạy. */
 @source '../**/*.blade.php';
 @source '../**/*.js';
+/* KHÔNG quét thư mục tests. File test canh giữ component có chứa chuỗi class thật
+   (`tw:ml-2`, `tw:px-2`…) để khẳng định component không đánh rơi trạng thái nào. Nếu để
+   Tailwind quét, chúng lọt vào CSS production, VÀ mỗi lần sửa test lại đổi nội dung
+   bundle -> job `assets` của CI đỏ dù chẳng có gì đổi ở giao diện. Đã vấp đúng lỗi này.
+   Lưu ý: `source(none)` đặt trên `@import 'tailwindcss/theme.css'` BỊ BỎ QUA IM LẶNG
+   (giống `prefix()` đặt sai chỗ) — phải dùng `@source not`. */
+@source not '../../tests';
+/* KHÔNG quét public/. Đó là thư mục ĐẦU RA, không phải nguồn: nó chứa asset đã build,
+   và bất cứ file HTML tạm nào để lại ở đó (ảnh chụp trang khi đối chiếu giao diện chẳng
+   hạn) đều bị quét và bơm class vào bundle production. Đã vấp thật: build từ mã CŨ vẫn
+   ra y hệt build từ mã MỚI vì `public/__snap/*.html` còn nằm đó. Nguồn quét phải là
+   resources/ và app/, chấm hết. */
+@source not '../../public';
+/* KHÔNG quét .claude/ — đó là thư mục tài liệu. File hướng dẫn chuyển đổi có trích dẫn
+   class thật (`tw:border-[rgba(15,23,42,0.12)]!`, `tw:px-6!`…) để giải thích cách làm, và
+   Tailwind quét thấy rồi sinh chúng vào CSS production dù không view nào dùng. Đã bắt được
+   khi kiểm CSS thật đang phục vụ: rule `!important` vẫn còn dù đã gỡ hết khỏi view. */
+@source not '../../.claude';
 
+/*
+ |----------------------------------------------------------------------------
+ | Token thiết kế — TRÍCH TỪ CSS ĐANG CHẠY, không phải giá trị mặc định
+ |----------------------------------------------------------------------------
+ | Mục tiêu của đợt chuyển sang Tailwind là ĐỔI HẠ TẦNG CSS, KHÔNG đổi giao diện.
+ | Vì vậy màu và font ở đây lấy nguyên từ layouts/app.blade.php và public/css/*,
+ | không dùng thang màu mặc định của Tailwind: bảng màu v4 là OKLCH (gam rộng hơn
+ | sRGB) nên `slate-500` KHÔNG bằng đúng `#64748b` cũ trên màn P3.
+ |
+ | Breakpoint: giữ nguyên thang mặc định của Tailwind v4 (min-width 40/48/64/80/96rem).
+ | CSS cũ dùng max-width tuỳ ý (700/720/760/991.98/1100/1200px); khi chuyển từng
+ | trang thì viết mobile-first, hoặc dùng biến thể max-* / max-[…] nếu cần port thẳng.
+ */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+
+    /* Nền & thẻ — từ khối <style> của layouts/app.blade.php */
+    --color-app-bg: #f6f8fc;
+    --color-app-card: #ffffff;
+    --color-app-border: rgb(15 23 42 / 0.08);
+
+    /* Các màu không trùng thang nào của Tailwind — bắt buộc khai tường minh */
+    --color-app-line: #edf2f6;
+    --color-app-line-2: #edf1f5;
+    --color-app-tint: #fbfdff;
+
+    --radius-card: 16px;
 }
+
+/*
+ * Ảnh nền của lớp component `x-ui.*` — data-URI SVG chép NGUYÊN VĂN từ
+ * bootstrap@5.3.3 đang chạy, để không lệch một pixel.
+ *
+ * ⚠️ Phải nằm ở `:root`, KHÔNG được để trong `@theme`.
+ * Tailwind v4 loại bỏ biến `@theme` mà nó cho là không ai dùng, và nó KHÔNG nhìn
+ * thấy `var(--…)` viết bên trong giá trị tuỳ ý của class
+ * (`tw:[background-image:var(--ui-select-caret)]`). Hậu quả đã gặp thật: luật lớp
+ * vẫn được sinh ra nhưng khai báo biến bị cắt, `var()` rỗng và ảnh nền thành
+ * `none` — đo bằng CDP mới thấy, nhìn mã nguồn không thấy.
+ */
+:root {
+    --ui-invalid-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+    --ui-select-caret: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    /* dấu × của `.btn-close` — cho <x-ui.close-button> */
+    --ui-close-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z'/%3e%3c/svg%3e");
+}
+
+/*
+ * Ô nhập của lớp component nằm trong `.input-group`.
+ *
+ * Bootstrap co giãn con của input-group bằng:
+ *     .input-group > .form-control, .input-group > .form-select
+ *         { position:relative; flex:1 1 auto; width:1%; min-width:0 }
+ * Component không mang những class đó nữa, nên ô rơi về `width:100%` của
+ * `tw:w-full` và nở rộng hơn thật — đo trên trang lịch nội dung: 566px -> 648px.
+ *
+ * Luật dưới đây chỉ chạm tới ô KHÔNG mang class Bootstrap, tức đúng những ô đã
+ * chuyển; ô còn `.form-control` vẫn do Bootstrap lo. Độ cụ thể 0-2-1 nên thắng
+ * `tw:w-full` (0-1-0) mà không cần `!important`.
+ */
+.input-group > input:not(.form-control),
+.input-group > select:not(.form-control):not(.form-select),
+.input-group > textarea:not(.form-control) {
+    position: relative;
+    flex: 1 1 auto;
+    width: 1%;
+    min-width: 0;
+}
+
+/*
+|============================================================================
+| Lưới 12 cột — chuyển từ Bootstrap sang utility của chính dự án
+|============================================================================
+| Bootstrap dựng lưới bằng flex + lề âm trên .row + padding trên `.row > *`,
+| điều khiển qua hai biến gutter. Đó KHÔNG phải thứ quy đổi 1-1 sang utility
+| rời được (grid+gap của Tailwind là mô hình hộp khác: padding con so với gap,
+| khác nhau ngay khi con có nền hoặc viền).
+|
+| Nên ở đây định nghĩa lại đúng mô hình đó bằng @utility, giữ nguyên từng con
+| số của Bootstrap 5.3.3. Đổi tên biến sang --ego-* để không phụ thuộc
+| --bs-gutter-* khi gỡ Bootstrap CDN.
+|
+| BREAKPOINT: thang Tailwind lệch Bootstrap ở sm/lg/xl (640 vs 576, 1024 vs 992,
+| 1280 vs 1200). Quy đổi máy móc sang sm:/lg:/xl: sẽ đổi bố cục ở các dải
+| 576-639, 992-1023, 1200-1279 — mà các khổ màn thường đo lại không chạm tới,
+| nên hỏng cũng không ai thấy. Vì vậy dùng biến thể min-[…] khớp đúng mốc
+| Bootstrap; chỉ md trùng nhau (768px) nên dùng thẳng md:.
+|   sm 36rem · md 48rem · lg 62rem · xl 75rem · xxl 87.5rem
+*/
+
+@utility row {
+    --ego-gx: 1.5rem;
+    --ego-gy: 0;
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: calc(-1 * var(--ego-gy));
+    margin-right: calc(-0.5 * var(--ego-gx));
+    margin-left: calc(-0.5 * var(--ego-gx));
+
+    & > * {
+        flex-shrink: 0;
+        width: 100%;
+        max-width: 100%;
+        padding-right: calc(var(--ego-gx) * 0.5);
+        padding-left: calc(var(--ego-gx) * 0.5);
+        margin-top: var(--ego-gy);
+    }
+}
+
+/* TÊN col12-* chứ KHÔNG phải col-*: Tailwind đã có sẵn utility `col-*` cho
+   `grid-column`. Đặt trùng tên thì SINH RA HAI LUẬT cùng tên trong một tệp CSS
+   (`col-8{grid-column:8}` và `col-8{flex:none;width:...}`) — đã đo thấy.
+
+   Phần trăm ghi đúng con số Bootstrap dùng. Lưu ý: trình rút gọn CSS làm tròn
+   66.66666667% thành 66.6667%, nên cột 8/12 lệch Bootstrap 0,016px — dưới một
+   phần sáu mươi điểm ảnh, chấp nhận và ghi lại thay vì giả vờ là 0. */
+@utility col12-1 { flex: 0 0 auto; width: 8.33333333%; }
+@utility col12-2 { flex: 0 0 auto; width: 16.66666667%; }
+@utility col12-3 { flex: 0 0 auto; width: 25%; }
+@utility col12-4 { flex: 0 0 auto; width: 33.33333333%; }
+@utility col12-5 { flex: 0 0 auto; width: 41.66666667%; }
+@utility col12-6 { flex: 0 0 auto; width: 50%; }
+@utility col12-7 { flex: 0 0 auto; width: 58.33333333%; }
+@utility col12-8 { flex: 0 0 auto; width: 66.66666667%; }
+@utility col12-9 { flex: 0 0 auto; width: 75%; }
+@utility col12-10 { flex: 0 0 auto; width: 83.33333333%; }
+@utility col12-11 { flex: 0 0 auto; width: 91.66666667%; }
+@utility col12-12 { flex: 0 0 auto; width: 100%; }
+
+@utility col12 {
+    flex: 1 0 0%;
+}
+
+/* col-auto của Bootstrap: co theo nội dung. THIẾU lớp này ở bản đầu là nguyên
+   nhân một hàng lai lọt ra production — hàng đã thành tw:row còn con vẫn
+   col-md-auto, và .tw:row>*{width:100%} đè .col-md-auto{width:auto} nên nút
+   bung rộng và rớt xuống dòng. */
+@utility col12-auto {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+/* Gutter: g-* đặt cả hai chiều, gx-*/gy-* đặt một chiều. Thang của Bootstrap:
+   0, .25rem, .5rem, 1rem, 1.5rem, 3rem. */
+@utility g-0  { --ego-gx: 0;       --ego-gy: 0; }
+@utility g-1  { --ego-gx: 0.25rem; --ego-gy: 0.25rem; }
+@utility g-2  { --ego-gx: 0.5rem;  --ego-gy: 0.5rem; }
+@utility g-3  { --ego-gx: 1rem;    --ego-gy: 1rem; }
+@utility g-4  { --ego-gx: 1.5rem;  --ego-gy: 1.5rem; }
+@utility g-5  { --ego-gx: 3rem;    --ego-gy: 3rem; }
+@utility gx-0 { --ego-gx: 0; }
+@utility gx-1 { --ego-gx: 0.25rem; }
+@utility gx-2 { --ego-gx: 0.5rem; }
+@utility gx-3 { --ego-gx: 1rem; }
+@utility gx-4 { --ego-gx: 1.5rem; }
+@utility gx-5 { --ego-gx: 3rem; }
+@utility gy-0 { --ego-gy: 0; }
+@utility gy-1 { --ego-gy: 0.25rem; }
+@utility gy-2 { --ego-gy: 0.5rem; }
+@utility gy-3 { --ego-gy: 1rem; }
+@utility gy-4 { --ego-gy: 1.5rem; }
+@utility gy-5 { --ego-gy: 3rem; }
+
+/*
+|----------------------------------------------------------------------------
+| Alpine — `x-cloak`
+|----------------------------------------------------------------------------
+| Alpine nạp bằng `@vite` (type=module, tức DEFER) nên có một khoảng giữa lúc
+| trình duyệt vẽ xong HTML và lúc Alpine gắn `x-show`. Trong khoảng đó mọi thứ
+| lẽ ra phải ẩn (panel thu lại, tab không active, modal) đều HIỆN ĐỦ rồi mới
+| biến mất — nháy một cái, và trên trang nhiều bảng thì là nháy rất to.
+|
+| `x-cloak` là thuộc tính Alpine tự gỡ sau khi khởi tạo; quy tắc dưới đây là
+| phần CSS bắt buộc phải tự khai, Alpine không kèm sẵn.
+|
+| Để NGOÀI @layer và có `!important` vì nó phải thắng cả `display` của utility
+| `tw:*` lẫn của Bootstrap trên cùng phần tử (xem phần đầu tệp về thứ tự nạp).
+*/
+[x-cloak] { display: none !important; }

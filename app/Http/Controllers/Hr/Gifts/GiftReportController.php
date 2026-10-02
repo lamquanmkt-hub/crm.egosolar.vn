@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Hr\Gifts;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hr\Gift;
-use App\Support\EgoCompanyLock;
+use App\Support\EgoCompanyScope;
 use App\Support\GiftAccess;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -63,7 +63,7 @@ final class GiftReportController extends Controller
 
     private function rows(CarbonImmutable $from, CarbonImmutable $to, Request $request): Collection
     {
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
         $start = $from->startOfDay();
         $end = $to->endOfDay();
 

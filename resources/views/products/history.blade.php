@@ -1,96 +1,87 @@
+{{-- Hai con số badge (đơn chờ duyệt, phiếu vật tư chờ duyệt) do
+     App\Services\System\SidebarStatusService cấp cho partials.sidebar qua view
+     composer. Trước đây đúng chỗ này có một khối 16 dòng CHÉP QUA 9 VIEW tự chạy
+     lại hai câu COUNT rồi nuốt lỗi bằng catch(Throwable). Giá trị nó tính ra bị
+     composer ghi đè nên không hiển thị ở đâu — chỉ tốn 2 câu truy vấn mỗi lần
+     dựng trang. --}}
 
-@php
-    $egoPendingOrdersCount = $egoPendingOrdersCount ?? 0;
-    $egoPendingMaterialRequestsCount = $egoPendingMaterialRequestsCount ?? 0;
-
-    try {
-        $egoPendingOrdersCount = (int) \Illuminate\Support\Facades\DB::table('crm_order_approvals')
-            ->where('status', 'pending')
-            ->distinct()
-            ->count('order_id');
-
-        $egoPendingMaterialRequestsCount = (int) \Illuminate\Support\Facades\DB::table('material_requests')
-            ->whereIn('status', ['SUBMITTED', 'ADMIN_APPROVED'])
-            ->count();
-    } catch (\Throwable $e) {
-        $egoPendingOrdersCount = 0;
-        $egoPendingMaterialRequestsCount = 0;
-    }
-@endphp
 
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid px-3 px-lg-4 mt-3 ego-stock-history-page">
+<div class="container-fluid tw:px-4 tw:mt-4 ego-stock-history-page">
 
-    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div class="tw:flex flex-wrap tw:justify-between tw:items-end tw:gap-2 mb-3">
         <div>
-            <div class="d-flex align-items-center gap-2">
+            <div class="tw:flex tw:items-center tw:gap-2">
                 <div class="ego-page-dot"></div>
-                <h3 class="fw-bold mb-0">Lịch sử nhập / xuất kho</h3>
+                <h3 class="tw:font-bold tw:mb-0">Lịch sử nhập / xuất kho</h3>
             </div>
-            <div class="text-muted small">Theo dõi biến động tồn kho từ đơn hàng và công trình</div>
+            <div class="tw:text-[rgba(33,37,41,0.75)] small">Theo dõi biến động tồn kho từ đơn hàng và công trình</div>
         </div>
 
-        <a href="{{ route('products.input') }}" class="btn ego-btn-soft">
+        <x-ui.button variant="none" size="none" class="ego-btn-soft" href="{{ route('products.input') }}">
             <i class="bi bi-arrow-left"></i> Quay lại sản phẩm
-        </a>
+        </x-ui.button>
     </div>
 
-    <form method="GET" class="card ego-card mb-3">
-        <div class="card-body">
-            <div class="row g-2 align-items-end">
-                <div class="col-12 col-lg-4">
-                    <label class="form-label ego-label">Tìm kiếm</label>
-                    <input type="text" name="q" class="form-control ego-control"
+    {{-- Thẻ card duy nhất KHÔNG phải <div> trong repo: <x-ui.card> render <div> nên
+         không dùng được cho <form>. Gắn thẳng móc + đúng bộ lớp của Ui\Card
+         (mb-3 của Bootstrap = 1rem = tw:mb-4). --}}
+    <form method="GET" data-ego-card class="ego-card tw:mb-4 tw:relative tw:flex tw:flex-col tw:min-w-0 tw:[word-wrap:break-word] tw:text-[#212529]">
+        <x-ui.card-body>
+            <div class="tw:row tw:g-2 tw:items-end">
+                <div class="tw:col12-12 tw:min-[62rem]:col12-4">
+                    <x-ui.label class="ego-label">Tìm kiếm</x-ui.label>
+                    <x-ui.input type="text" name="q" class="ego-control"
                            value="{{ request('q') }}"
-                           placeholder="Sản phẩm, SKU, kho, đơn hàng, công trình...">
+                           placeholder="Sản phẩm, SKU, kho, đơn hàng, công trình..." />
                 </div>
 
-                <div class="col-12 col-lg-3">
-                    <label class="form-label ego-label">Kho</label>
-                    <select name="warehouse_id" class="form-select ego-control">
+                <div class="tw:col12-12 tw:min-[62rem]:col12-3">
+                    <x-ui.label class="ego-label">Kho</x-ui.label>
+                    <x-ui.select name="warehouse_id" class="ego-control">
                         <option value="">Tất cả kho</option>
                         @foreach(($warehouses ?? collect()) as $w)
                             <option value="{{ $w->id }}" {{ request('warehouse_id') == $w->id ? 'selected' : '' }}>
                                 {{ $w->name }}
                             </option>
                         @endforeach
-                    </select>
+                    </x-ui.select>
                 </div>
 
-                <div class="col-12 col-lg-3">
-                    <label class="form-label ego-label">Loại</label>
-                    <select name="type" class="form-select ego-control">
+                <div class="tw:col12-12 tw:min-[62rem]:col12-3">
+                    <x-ui.label class="ego-label">Loại</x-ui.label>
+                    <x-ui.select name="type" class="ego-control">
                         <option value="">Tất cả</option>
                         <option value="in" {{ request('type') === 'in' ? 'selected' : '' }}>Nhập kho</option>
                         <option value="out" {{ request('type') === 'out' ? 'selected' : '' }}>Xuất kho</option>
-                    </select>
+                    </x-ui.select>
                 </div>
 
-                <div class="col-12 col-lg-2 d-flex gap-2">
-                    <button class="btn ego-btn-primary flex-fill">
+                <div class="tw:col12-12 tw:min-[62rem]:col12-2 tw:flex tw:gap-2">
+                    <x-ui.button variant="none" size="none" type="submit" class="ego-btn-primary flex-fill">
                         <i class="bi bi-funnel"></i> Lọc
-                    </button>
-                    <a href="{{ route('products.history') }}" class="btn ego-btn-soft">
+                    </x-ui.button>
+                    <x-ui.button variant="none" size="none" class="ego-btn-soft" href="{{ route('products.history') }}">
                         Reset
-                    </a>
+                    </x-ui.button>
                 </div>
             </div>
-        </div>
+        </x-ui.card-body>
     </form>
 
-    <div class="card ego-card">
+    <x-ui.card class="ego-card">
         <div class="table-responsive ego-table-wrap">
-            <table class="table align-middle mb-0 ego-history-table">
+            <table class="table align-middle tw:mb-0 ego-history-table">
                 <thead>
                 <tr>
                     <th style="width: 260px;">Đơn hàng / Công trình</th>
                     <th style="min-width: 280px;">Sản phẩm</th>
                     <th style="width: 180px;">Kho</th>
-                    <th class="text-center" style="width: 165px;">Số lượng<br>trước khi xuất/nhập</th>
-                    <th class="text-center" style="width: 130px;">Thay đổi</th>
-                    <th class="text-center" style="width: 165px;">Số lượng<br>sau khi xuất/nhập</th>
+                    <th class="tw:text-center" style="width: 165px;">Số lượng<br>trước khi xuất/nhập</th>
+                    <th class="tw:text-center" style="width: 130px;">Thay đổi</th>
+                    <th class="tw:text-center" style="width: 165px;">Số lượng<br>sau khi xuất/nhập</th>
                     <th style="min-width: 260px;">Ghi chú</th>
                     <th style="width: 170px;">Người xuất / nhập</th>
                     <th style="width: 180px;">Thời gian nhập / xuất</th>
@@ -153,11 +144,11 @@
                         </td>
 
                         <td>
-                            <div class="fw-bold ego-product-name">
+                            <div class="tw:font-bold ego-product-name">
                                 {{ $log->product_name ?? 'Không rõ sản phẩm' }}
                             </div>
                             @if(!empty($log->product_sku))
-                                <div class="small text-muted">SKU: {{ $log->product_sku }}</div>
+                                <div class="small tw:text-[rgba(33,37,41,0.75)]">SKU: {{ $log->product_sku }}</div>
                             @endif
                         </td>
 
@@ -168,19 +159,19 @@
                             </span>
                         </td>
 
-                        <td class="text-center">
+                        <td class="tw:text-center">
                             <span class="ego-before-qty">
                                 {{ $log->qty_before_safe !== null ? number_format((int)$log->qty_before_safe) : '—' }}
                             </span>
                         </td>
 
-                        <td class="text-center">
+                        <td class="tw:text-center">
                             <span class="ego-change {{ $isExport ? 'is-minus' : 'is-plus' }}">
                                 {{ $changeQty > 0 ? '+' : '' }}{{ number_format($changeQty) }}
                             </span>
                         </td>
 
-                        <td class="text-center">
+                        <td class="tw:text-center">
                             <span class="ego-current-qty">
                                 {{ $log->qty_after_safe !== null ? number_format((int)$log->qty_after_safe) : '—' }}
                             </span>
@@ -207,7 +198,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-5">
+                        <td colspan="9" class="tw:text-center tw:text-[rgba(33,37,41,0.75)]! py-5">
                             Chưa có lịch sử kho
                         </td>
                     </tr>
@@ -216,10 +207,10 @@
             </table>
         </div>
 
-        <div class="card-body d-flex justify-content-end py-2">
+        <x-ui.card-body class="tw:flex tw:justify-end tw:py-2">
             {{ $logs->links('pagination::bootstrap-5') }}
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 </div>
 
 <style>

@@ -1,55 +1,3 @@
-@php
-    $wfSelected = $workflow['selected'] ?? null;
-    $wfDefinition = $wfSelected['definition'] ?? [];
-    $wfRow = $wfSelected['row'] ?? null;
-    $wfAssignments = $wfSelected['assignments'] ?? collect();
-    $wfDocuments = $wfSelected['documents'] ?? collect();
-    $wfDocumentState = $wfSelected['document_state'] ?? ['items'=>[], 'missing'=>[], 'complete'=>false];
-    $wfMissingFiles = (array) ($wfDocumentState['file_missing'] ?? $wfDocumentState['missing'] ?? []);
-    $wfMissingInformation = (array) ($wfDocumentState['information_missing'] ?? []);
-    $wfFilesComplete = (bool) ($wfDocumentState['files_complete'] ?? $wfDocumentState['complete'] ?? false);
-    $wfApprovals = $wfSelected['approvals'] ?? collect();
-    $wfPermissions = $workflow['permissions'] ?? [];
-    $wfApprovalPermissions = $workflow['approval_permissions'] ?? [];
-    $wfIsAdmin = !empty($wfPermissions['is_admin']);
-    $wfStepCode = (string) ($workflow['selected_code'] ?? request('step', 'survey'));
-    $wfStatus = (string) ($wfSelected['status'] ?? 'not_assigned');
-    $wfStepData = [];
-    if ($wfRow && !empty($wfRow->data)) {
-        $decoded = json_decode((string) $wfRow->data, true);
-        $wfStepData = is_array($decoded) ? $decoded : [];
-    }
-    $wfMyAssignment = $wfAssignments->first(fn($assignment) => (int)$assignment->user_id === (int)auth()->id());
-    $stepMeta = [
-        'survey' => ['CÔNG TRÌNH - BƯỚC 1', 'KHẢO SÁT & PHƯƠNG ÁN', 'Chọn nhân sự thực hiện, lưu hồ sơ khảo sát/phương án và gửi duyệt.'],
-        'contract' => ['CÔNG TRÌNH - BƯỚC 2', 'HỢP ĐỒNG & PHÁP LÝ', 'Quản lý nhân sự phụ trách, hợp đồng, phụ lục và hồ sơ pháp lý trong cùng một bước.'],
-        'construction' => ['CÔNG TRÌNH - BƯỚC 4', 'THI CÔNG', 'Quản lý nhân sự thi công, kế hoạch, tiến độ và báo cáo thực tế tại công trình.'],
-        'acceptance' => ['CÔNG TRÌNH - BƯỚC 5', 'NGHIỆM THU', 'Hoàn thiện hồ sơ nghiệm thu, duyệt và chuyển công trình sang Bảo trì/Bảo hành.'],
-    ];
-    $meta = $stepMeta[$wfStepCode] ?? $stepMeta['survey'];
-    $primary = $wfAssignments->first(fn($row) => (string)$row->assignment_role === 'primary');
-    $collaborators = $wfAssignments->filter(fn($row) => (string)$row->assignment_role !== 'primary');
-    $approvalLabels = ['pending'=>'Chờ duyệt','approved'=>'Đã duyệt','revision'=>'Yêu cầu bổ sung'];
-    $wfApprovalDisplay = match ($wfStatus) {
-        'approved' => 'Đã duyệt',
-        'submitted' => 'Chờ duyệt',
-        'revision' => 'Yêu cầu bổ sung',
-        'assigned', 'in_progress' => 'Chưa gửi duyệt',
-        default => 'Chưa gửi duyệt',
-    };
-    $wordDocumentItems = collect($wfDocumentState['items'] ?? [])
-        ->filter(fn ($item) => empty($item['is_data_requirement']) && empty($item['is_system_requirement']))
-        ->values();
-    $wfDueAt = $wfSelected['due_at'] ?? null;
-    $wfOverdueDays = (int) ($wfSelected['overdue_days'] ?? 0);
-    $wfAssignDialogId = 'pword-assign-dialog-'.$site->id.'-'.$wfStepCode;
-    $wfSettingsDialogId = 'ewd-settings-dialog-'.$site->id.'-'.$wfStepCode;
-    $wfRevisionFiles = $wfDocuments->where('document_code', 'revision_feedback');
-    $wfRevisionApproval = $wfApprovals->first(fn($approval) => (string)$approval->status === 'revision');
-    $wfRevisionEvent = collect($workflow['events'] ?? [])->first(fn($event) => (string)($event->action ?? '') === 'step_revision_requested');
-    $wfRevisionPayload = !empty($wfRevisionEvent?->payload) ? json_decode((string)$wfRevisionEvent->payload, true) : [];
-    $wfRevisionRecipient = $wfAssignments->first(fn($assignment) => (int)$assignment->user_id === (int)($wfRevisionPayload['recipient_id'] ?? 0));
-@endphp
 
 <section class="pword-panel" id="workflow">
     @if(empty($workflow['available']))
@@ -127,34 +75,26 @@
 
         <section class="ewd-doc-section">
             <header class="ewd-doc-section-head">
-                <div><h3>HỒ SƠ {{ $wfStepCode === 'survey' ? 'KHẢO SÁT & PHƯƠNG ÁN' : ($wfStepCode === 'contract' ? 'HỢP ĐỒNG & PHÁP LÝ' : ($wfStepCode === 'construction' ? 'THI CÔNG' : 'NGHIỆM THU')) }}</h3><small>{{ $wordDocumentItems->count() }} danh mục · {{ count($wfMissingFiles) }} mục còn thiếu</small></div>
+                <div><h3>HỒ SƠ {{ $wfStepCode === 'survey' ? 'KHẢO SÁT & PHƯƠNG ÁN' : ($wfStepCode === 'contract' ? 'HỢP ĐỒNG & PHÁP LÝ' : ($wfStepCode === 'construction' ? 'THI CÔNG' : 'NGHIỆM THU')) }}</h3><small>{{ count($documentRows) }} danh mục · {{ count($wfMissingFiles) }} mục còn thiếu</small></div>
                 @if($wfIsAdmin)<button type="button" class="pword-btn light ewd-settings-button" data-pword-open-dialog="{{ $wfSettingsDialogId }}"><i class="bi bi-sliders"></i> Cài đặt hồ sơ</button>@endif
             </header>
             <div class="ewd-document-table">
                 <div class="ewd-document-row is-header"><span>Hồ sơ</span><span>Yêu cầu</span><span>Đã tải</span><span>Trạng thái</span><span>Thao tác</span></div>
-                @forelse($wordDocumentItems as $item)
-                    @php
-                        $itemDocuments = $wfDocuments->where('document_code', (string) $item['code']);
-                        $itemCount = (int) ($item['count'] ?? 0);
-                        $itemMinimum = (int) ($item['minimum'] ?? 1);
-                        $itemMaximum = !empty($item['maximum']) ? (int) $item['maximum'] : null;
-                        $itemMissing = !empty($item['required']) ? max(0, $itemMinimum - $itemCount) : 0;
-                        $itemCanUpload = !empty($wfPermissions['can_upload']) && ($itemMaximum === null || $itemCount < $itemMaximum);
-                    @endphp
-                    <div class="ewd-document-row {{ $itemMissing > 0 ? 'is-missing' : ($itemCount > 0 ? 'is-complete' : '') }}">
-                        <div class="ewd-document-name"><strong>{{ $item['label'] }}</strong><small>{{ !empty($item['extensions']) ? strtoupper(implode(', ', $item['extensions'])) : 'Mọi định dạng' }}</small></div>
-                        <div><span class="ewd-requirement {{ !empty($item['required']) ? 'is-required' : '' }}">{{ !empty($item['required']) ? 'Bắt buộc' : 'Tùy chọn' }}</span><small>{{ $itemMinimum }}{{ $itemMaximum ? '–'.$itemMaximum : '+' }} tệp</small></div>
-                        <div class="ewd-document-count"><strong>{{ $itemCount }}</strong><small>/ {{ $itemMinimum }}</small></div>
-                        <div><span class="ewd-document-status {{ $itemMissing > 0 ? 'is-pending' : ($itemCount > 0 ? 'is-done' : 'is-optional') }}">{{ $itemMissing > 0 ? 'Thiếu '.$itemMissing : ($itemCount > 0 ? 'Đã đủ' : 'Tùy chọn') }}</span></div>
+                @forelse($documentRows as $docRow)
+                    <div class="ewd-document-row {{ $docRow->missing > 0 ? 'is-missing' : ($docRow->count > 0 ? 'is-complete' : '') }}">
+                        <div class="ewd-document-name"><strong>{{ $docRow->requirement['label'] }}</strong><small>{{ !empty($docRow->requirement['extensions']) ? strtoupper(implode(', ', $docRow->requirement['extensions'])) : 'Mọi định dạng' }}</small></div>
+                        <div><span class="ewd-requirement {{ !empty($docRow->requirement['required']) ? 'is-required' : '' }}">{{ !empty($docRow->requirement['required']) ? 'Bắt buộc' : 'Tùy chọn' }}</span><small>{{ $docRow->minimum }}{{ $docRow->maximum ? '–'.$docRow->maximum : '+' }} tệp</small></div>
+                        <div class="ewd-document-count"><strong>{{ $docRow->count }}</strong><small>/ {{ $docRow->minimum }}</small></div>
+                        <div><span class="ewd-document-status {{ $docRow->missing > 0 ? 'is-pending' : ($docRow->count > 0 ? 'is-done' : 'is-optional') }}">{{ $docRow->missing > 0 ? 'Thiếu '.$docRow->missing : ($docRow->count > 0 ? 'Đã đủ' : 'Tùy chọn') }}</span></div>
                         <div class="ewd-document-actions">
-                            @if($itemCanUpload)
+                            @if($docRow->canUpload)
                                 <form method="POST" enctype="multipart/form-data" action="{{ route('projects-unified.workflow.documents.upload', [$site, $wfStepCode]) }}" data-pword-quick-upload>
-                                    @csrf<input type="hidden" name="document_code" value="{{ $item['code'] }}">
-                                    <label class="ewd-upload-button"><i class="bi bi-cloud-arrow-up"></i><span data-pword-upload-status>Tải lên</span><input type="file" name="file" required @if(!empty($item['extensions'])) accept="{{ collect($item['extensions'])->map(fn($extension) => '.'.ltrim((string)$extension, '.'))->implode(',') }}" @endif></label>
+                                    @csrf<input type="hidden" name="document_code" value="{{ $docRow->requirement['code'] }}">
+                                    <label class="ewd-upload-button"><i class="bi bi-cloud-arrow-up"></i><span data-pword-upload-status>Tải lên</span><input type="file" name="file" required @if(!empty($docRow->requirement['extensions'])) accept="{{ collect($docRow->requirement['extensions'])->map(fn($extension) => '.'.ltrim((string)$extension, '.'))->implode(',') }}" @endif></label>
                                 </form>
-                            @elseif($itemMaximum !== null && $itemCount >= $itemMaximum)<span class="ewd-limit-reached">Đã tối đa</span>@endif
-                            @if($itemDocuments->isNotEmpty())
-                                <details class="ewd-files-menu"><summary><i class="bi bi-folder2-open"></i> {{ $itemDocuments->count() }}</summary><div class="ewd-files-list">@foreach($itemDocuments as $document)<a href="{{ asset('storage/'.$document->path) }}" target="_blank" rel="noopener"><i class="bi bi-file-earmark-check"></i><span>{{ $document->original_name ?: $document->title }}<small>v{{ $document->version }} · {{ $document->uploader_name ?: 'Hệ thống' }}</small></span></a>@endforeach</div></details>
+                            @elseif($docRow->maximum !== null && $docRow->count >= $docRow->maximum)<span class="ewd-limit-reached">Đã tối đa</span>@endif
+                            @if($docRow->documents->isNotEmpty())
+                                <details class="ewd-files-menu"><summary><i class="bi bi-folder2-open"></i> {{ $docRow->documents->count() }}</summary><div class="ewd-files-list">@foreach($docRow->documents as $document)<a href="{{ asset('storage/'.$document->path) }}" target="_blank" rel="noopener"><i class="bi bi-file-earmark-check"></i><span>{{ $document->original_name ?: $document->title }}<small>v{{ $document->version }} · {{ $document->uploader_name ?: 'Hệ thống' }}</small></span></a>@endforeach</div></details>
                             @endif
                         </div>
                     </div>
@@ -226,16 +166,15 @@
                         <form method="POST" action="{{ route('projects-unified.workflow.approve', [$site,$wfStepCode]) }}">@csrf<input type="hidden" name="approval_type" value="{{ $approvalType }}"><button class="pword-btn primary" type="submit" @if($wfIsAdmin && !$wfFilesComplete) onclick="return confirm('Hồ sơ đang thiếu file bắt buộc. Bạn xác nhận duyệt ngoại lệ?')" @endif>{{ $wfIsAdmin && !$wfFilesComplete ? 'Duyệt ngoại lệ' : 'Duyệt' }}</button></form>
                     @endif
                     @if(($wfStatus === 'submitted' && !empty($wfApprovalPermissions[$approvalType])) || $wfIsAdmin)
-                        @php($wfRevisionDialogId = 'pword-revision-dialog-'.$site->id.'-'.$wfStepCode.'-'.$approvalType)
-                        <button class="pword-btn danger" type="button" data-pword-open-dialog="{{ $wfRevisionDialogId }}"><i class="bi bi-arrow-counterclockwise"></i> Trả hồ sơ cần sửa</button>
-                        <dialog class="pword-assign-dialog pword-revision-dialog" id="{{ $wfRevisionDialogId }}">
+                        <button class="pword-btn danger" type="button" data-pword-open-dialog="{{ $wfRevisionDialogPrefix.$approvalType }}"><i class="bi bi-arrow-counterclockwise"></i> Trả hồ sơ cần sửa</button>
+                        <dialog class="pword-assign-dialog pword-revision-dialog" id="{{ $wfRevisionDialogPrefix.$approvalType }}">
                             <div class="pword-assign-dialog-card">
                                 <header><div><small>ADMIN PHẢN HỒI HỒ SƠ</small><h3>Trả hồ sơ · yêu cầu chỉnh sửa</h3></div><button type="button" data-pword-close-dialog aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
                                 <form method="POST" enctype="multipart/form-data" action="{{ route('projects-unified.workflow.revise', [$site,$wfStepCode]) }}" class="pword-form grid">
                                     @csrf
                                     <input type="hidden" name="approval_type" value="{{ $approvalType }}">
                                     @if($wfStatus === 'approved')<div class="pword-assign-warning wide"><i class="bi bi-exclamation-triangle"></i> Bước đã duyệt sẽ được mở lại để nhân sự chỉnh sửa.</div>@endif
-                                    <label>Người trả hồ sơ<input type="text" value="{{ auth()->user()->name }}" disabled></label>
+                                    <label>Người trả hồ sơ<input type="text" value="{{ $wfCurrentUserName }}" disabled></label>
                                     <label>Người nhận xử lý
                                         <select name="recipient_id" required>
                                             <option value="">Chọn người cần sửa</option>

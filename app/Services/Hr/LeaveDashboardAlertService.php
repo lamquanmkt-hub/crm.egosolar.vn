@@ -6,11 +6,10 @@ namespace App\Services\Hr;
 
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Schema;
 
 final class LeaveDashboardAlertService
 {
@@ -26,7 +25,7 @@ final class LeaveDashboardAlertService
      */
     public function snapshot(?User $user): array
     {
-        if (! $user || ! Schema::hasTable('leave_requests')) {
+        if (! $user || ! SchemaCache::hasTable('leave_requests')) {
             return $this->emptyPayload();
         }
 
@@ -34,7 +33,7 @@ final class LeaveDashboardAlertService
 
         return Cache::remember(
             $key,
-            now()->addSeconds(60),
+            now()->addSeconds(12),
             fn (): array => $this->build($user)
         );
     }

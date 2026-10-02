@@ -7,11 +7,14 @@ use App\Models\Content\ContentCalendar;
 use App\Models\ContentFeedback;
 use App\Models\Marketing\MarketingKpiPayActual;
 use App\Models\User;
+use App\Services\Content\ContentCalendarAssigneeSync;
+use App\Support\SchemaCache;
+use App\View\Presenters\Content\ContentCalendarPresenter;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -19,6 +22,14 @@ use Illuminate\Support\Facades\Storage;
  */
 class ContentCalendarController extends Controller
 {
+    /**
+     * @param  ContentCalendarAssigneeSync  $assigneeSync  Ghi người phụ trách sang bảng quan hệ (chuẩn 1NF)
+     */
+    public function __construct(
+        private readonly ContentCalendarAssigneeSync $assigneeSync,
+        private readonly ContentCalendarPresenter $presenter,
+    ) {}
+
     /**
      * ✅ Chuẩn hoá nhóm content_type để tránh LIKE dính dấu/collation
      */
@@ -76,10 +87,7 @@ class ContentCalendarController extends Controller
             ->orderBy('id', 'desc')
             ->get();
 
-        $marketingUsers = $this->getMarketingUsers();
-        $marketingUserMap = $marketingUsers->keyBy('id');
-
-        return view('marketing.reports.content_calendar', compact('items', 'marketingUsers', 'marketingUserMap'));
+        return view('marketing.reports.content_calendar', $this->presenter->viewData($items, $this->getMarketingUsers()));
     }
 
     /**
@@ -138,6 +146,10 @@ class ContentCalendarController extends Controller
             'assignees' => count($assignees) ? json_encode($assignees, JSON_UNESCAPED_UNICODE) : null,
         ]);
 
+        // Ghi song song sang bảng quan hệ (chuẩn 1NF) — cột assignees cũ
+        // vẫn giữ để bản deploy cũ không vỡ.
+        $this->assigneeSync->sync((int) $item->id, $assignees);
+
         // ✅ Sync KPI payroll nếu có assignee
         if (! empty($assigneeUserId)) {
             $period = Carbon::parse($validated['publish_date'])->format('Y-m');
@@ -169,7 +181,7 @@ class ContentCalendarController extends Controller
      */
     public function storeFeedback(Request $request, $id)
     {
-        if (! Schema::hasTable('content_feedbacks')) {
+        if (! SchemaCache::hasTable('content_feedbacks')) {
             return back()->with('error', 'Chưa có bảng content_feedbacks. Hãy chạy migrate.');
         }
 
@@ -422,6 +434,14 @@ class ContentCalendarController extends Controller
             $item->update($updateData);
         }
 
+        // Đồng bộ bảng quan hệ người phụ trách khi danh sách có thay đổi.
+        if (array_key_exists('assignees', $updateData)) {
+            $this->assigneeSync->sync(
+                (int) $item->id,
+                $this->decodeAssignees($updateData['assignees']),
+            );
+        }
+
         // ✅ Auto sync KPI payroll theo tháng sau khi sửa
         $assigneeId = $item->assignee_user_id ?? null;
         if ($request->has('assignee_user_id')) {
@@ -488,6 +508,38 @@ class ContentCalendarController extends Controller
         ]);
 
         return back()->with('success', 'Đã upload file');
+    }
+
+    /**
+     * Xoá một file đính kèm của nội dung (xoá cả tệp vật lý lẫn bản ghi).
+     *
+     * Route `marketing.reports.content-calendar.files.delete` đã tồn tại và nút
+     * "Xóa file" vẫn hiển thị, nhưng method này chưa từng được viết — bấm vào là
+     * lỗi 500. Bổ sung 2026-08-05.
+     *
+     * Tìm file QUA quan hệ `$item->files()` chứ không tìm thẳng theo `fileId`,
+     * để không xoá được file của nội dung khác bằng cách sửa URL.
+     *
+     * @param  int|string  $id  ID nội dung
+     * @param  int|string  $fileId  ID file đính kèm
+     */
+    public function deleteFile($id, $fileId): RedirectResponse
+    {
+        $item = ContentCalendar::findOrFail($id);
+
+        $file = $item->files()->whereKey($fileId)->first();
+
+        if ($file === null) {
+            return back()->with('error', 'File không tồn tại hoặc không thuộc nội dung này');
+        }
+
+        if (! empty($file->file_path) && Storage::disk('public')->exists($file->file_path)) {
+            Storage::disk('public')->delete($file->file_path);
+        }
+
+        $file->delete();
+
+        return back()->with('success', 'Đã xoá file');
     }
 
     /**
@@ -843,6 +895,27 @@ class ContentCalendarController extends Controller
         $item->delete();
 
         return redirect()->back()->with('success', 'Đã xóa nội dung');
+    }
+
+    /**
+     * Đọc lại danh sách tên từ chuỗi JSON đã ghi vào cột `assignees`.
+     *
+     * @return list<string>
+     */
+    protected function decodeAssignees(?string $json): array
+    {
+        if ($json === null || trim($json) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($json, true);
+
+        return is_array($decoded)
+            ? array_values(array_filter(array_map(
+                static fn ($name): string => trim((string) $name),
+                $decoded,
+            )))
+            : [];
     }
 
     /**

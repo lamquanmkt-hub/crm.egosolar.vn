@@ -9,23 +9,29 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-  public function up(): void
-{
-    Schema::table('crm_orders', function (Blueprint $table) {
-        $table->string('shipping_status', 30)
-              ->default('not_shipped')
-              ->after('current_department')
-              ->comment('not_shipped | shipping | shipped | returned');
-    });
-}
+    public function up(): void
+    {
+        if (Schema::hasTable('crm_orders')) {
+            Schema::table('crm_orders', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_orders', 'shipping_status')) {
+                    $table->string('shipping_status', 30)
+                        ->default('not_shipped')
+                        ->after('current_department')
+                        ->comment('not_shipped | shipping | shipped | returned');
+                }
+            });
+        }
+    }
 
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::table('crm_orders', function (Blueprint $table) {
-            //
-        });
+        if (Schema::hasTable('crm_orders')) {
+            Schema::table('crm_orders', function (Blueprint $table) {
+                //
+            });
+        }
     }
 };

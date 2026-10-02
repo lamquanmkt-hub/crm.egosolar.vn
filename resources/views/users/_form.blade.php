@@ -1,59 +1,55 @@
-<form action="{{ $action }}" method="POST" class="mt-3">
+<form action="{{ $action }}" method="POST" class="tw:mt-4">
     @csrf
     @if($method === 'PUT')
         @method('PUT')
     @endif
 
-    <div class="mb-3">
+    <div class="tw:mb-4">
         <label>Name</label>
-        <input class="form-control"
-               type="text"
+        <x-ui.input type="text"
                name="name"
                value="{{ old('name', $user->name ?? '') }}"
-               required>
+               required />
     </div>
 
-    <div class="mb-3">
+    <div class="tw:mb-4">
         <label>Email</label>
-        <input class="form-control"
-               type="email"
+        <x-ui.input type="email"
                name="email"
                value="{{ old('email', $user->email ?? '') }}"
-               required>
+               required />
     </div>
 
-    <div class="mb-3">
+    <div class="tw:mb-4">
         <label>Password</label>
-        <input class="form-control"
-               type="password"
+        <x-ui.input type="password"
                name="password"
-                {{ $user ? '' : 'required' }}>
+               :required="! $user" />
         @if($user)
-            <small class="text-muted">(Để trống nếu không đổi mật khẩu)</small>
+            <small class="tw:text-[rgba(33,37,41,0.75)]">(Để trống nếu không đổi mật khẩu)</small>
         @endif
     </div>
 
-    <div class="mb-3">
+    <div class="tw:mb-4">
         <label>Confirm Password</label>
-        <input class="form-control"
-               type="password"
+        <x-ui.input type="password"
                name="password_confirmation"
-                {{ $user ? '' : 'required' }}>
+               :required="! $user" />
     </div>
 
     @role('admin')
-    <div class="mb-3">
+    <div class="tw:mb-4">
         <label>Roles</label>
-        <select name="roles[]" class="form-control" multiple>
+        <x-ui.input as="select" name="roles[]" multiple>
             @foreach(\Spatie\Permission\Models\Role::all() as $role)
                 <option value="{{ $role->name }}"
                         @if($user && $user->hasRole($role->name)) selected @endif>
                     {{ $role->name }}
                 </option>
             @endforeach
-        </select>
+        </x-ui.input>
     </div>
     @endrole
 
-    <button class="btn btn-success">Save</button>
+    <x-ui.button variant="success" type="submit">Save</x-ui.button>
 </form>

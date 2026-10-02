@@ -225,24 +225,24 @@
             <div class="quote-grid">
                 <div class="quote-field">
                     <label>Số báo giá</label>
-                    <input name="quote_no" value="{{ old('quote_no', $site->quote_no) }}" placeholder="BGCT-20260505-0001">
+                    <input name="quote_no" value="{{ old('quote_no', $quote->code) }}" placeholder="BGCT-20260505-0001">
                 </div>
 
                 <div class="quote-field">
                     <label>Ngày báo giá</label>
-                    <input type="date" name="quote_date" value="{{ old('quote_date', optional($site->quote_date)->format('Y-m-d') ?? date('Y-m-d')) }}">
+                    <input type="date" name="quote_date" value="{{ old('quote_date', optional($quote->issued_on)->format('Y-m-d') ?? date('Y-m-d')) }}">
                 </div>
 
                 <div class="quote-field">
                     <label>Hiệu lực đến</label>
-                    <input type="date" name="quote_valid_until" value="{{ old('quote_valid_until', optional($site->quote_valid_until)->format('Y-m-d') ?? date('Y-m-d', strtotime('+15 days'))) }}">
+                    <input type="date" name="quote_valid_until" value="{{ old('quote_valid_until', optional($quote->valid_until)->format('Y-m-d') ?? date('Y-m-d', strtotime('+15 days'))) }}">
                 </div>
 
                 <div class="quote-field">
                     <label>Trạng thái</label>
                     <select name="quote_status">
                         @foreach(['draft' => 'Nháp', 'sent' => 'Đã gửi khách', 'approved' => 'Khách duyệt', 'cancelled' => 'Huỷ'] as $key => $label)
-                            <option value="{{ $key }}" @selected(old('quote_status', $site->quote_status ?? 'draft') === $key)>{{ $label }}</option>
+                            <option value="{{ $key }}" @selected(old('quote_status', $quote->status ?? 'draft') === $key)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -265,19 +265,19 @@
 
                 <div class="quote-field">
                     <label>Email</label>
-                    <input name="quote_customer_email" value="{{ old('quote_customer_email', $site->quote_customer_email) }}">
+                    <input name="quote_customer_email" value="{{ old('quote_customer_email', $quote->customer_email) }}">
                 </div>
 
                 <div class="quote-field">
                     <label>Mã số thuế</label>
-                    <input name="quote_customer_tax_code" value="{{ old('quote_customer_tax_code', $site->quote_customer_tax_code) }}">
+                    <input name="quote_customer_tax_code" value="{{ old('quote_customer_tax_code', $quote->customer_tax_code) }}">
                 </div>
             </div>
 
             <div class="quote-grid-2" style="margin-top:14px;">
                 <div class="quote-field">
                     <label>Tên công ty xuất hoá đơn</label>
-                    <input name="quote_customer_company" value="{{ old('quote_customer_company', $site->quote_customer_company) }}">
+                    <input name="quote_customer_company" value="{{ old('quote_customer_company', $quote->customer_company) }}">
                 </div>
 
                 <div class="quote-field">
@@ -315,12 +315,12 @@
             <div class="quote-grid-2" style="margin-top:14px;">
                 <div class="quote-field">
                     <label>Cấu hình hệ thống</label>
-                    <textarea name="quote_config_summary">{{ old('quote_config_summary', $site->quote_config_summary) }}</textarea>
+                    <textarea name="quote_config_summary">{{ old('quote_config_summary', $quote->config_summary) }}</textarea>
                 </div>
 
                 <div class="quote-field">
                     <label>Ứng dụng / ghi chú kỹ thuật</label>
-                    <textarea name="quote_application_note">{{ old('quote_application_note', $site->quote_application_note) }}</textarea>
+                    <textarea name="quote_application_note">{{ old('quote_application_note', $quote->application_note) }}</textarea>
                 </div>
             </div>
         </div>
@@ -367,7 +367,7 @@
                                     <input class="js-qty" name="items[{{ $i }}][qty_decimal]" value="{{ $item->qty_decimal ?? $item->qty }}">
                                 </td>
                                 <td>
-                                    <input class="js-price" name="items[{{ $i }}][unit_price]" value="{{ $fmt($item->unit_price ?? 0) }}">
+                                    <input class="js-price" name="items[{{ $i }}][unit_price]" value="{{ $fmt($item->unit_price ?? 0) }}" step="any" inputmode="decimal">
                                 </td>
                                 <td>
                                     <input class="js-total" value="{{ $fmt($item->line_total ?? 0) }}" readonly>
@@ -401,7 +401,7 @@
                                     <td><input name="items[{{ $i }}][model]" value="{{ $d[3] }}"></td>
                                     <td><input name="items[{{ $i }}][unit]" value="{{ $d[4] }}"></td>
                                     <td><input class="js-qty" name="items[{{ $i }}][qty_decimal]" value="{{ $d[5] }}"></td>
-                                    <td><input class="js-price" name="items[{{ $i }}][unit_price]" value="{{ $fmt($d[6]) }}"></td>
+                                    <td><input class="js-price" name="items[{{ $i }}][unit_price]" value="{{ $fmt($d[6]) }}" step="any" inputmode="decimal"></td>
                                     <td><input class="js-total" value="0" readonly></td>
                                     <td><textarea name="items[{{ $i }}][specs_text]"></textarea></td>
                                     <td><button type="button" class="btn-danger" onclick="removeRow(this)">X</button></td>
@@ -423,12 +423,12 @@
             <div class="quote-grid">
                 <div class="quote-field">
                     <label>Chiết khấu</label>
-                    <input class="js-money" id="discount" name="quote_discount_amount" value="{{ old('quote_discount_amount', $fmt($site->quote_discount_amount ?? 0)) }}">
+                    <input class="js-money" id="discount" name="quote_discount_amount" value="{{ old('quote_discount_amount', $fmt($quote->discount_amount ?? 0)) }}">
                 </div>
 
                 <div class="quote-field">
                     <label>VAT %</label>
-                    <input id="vatPercent" name="quote_vat_percent" value="{{ old('quote_vat_percent', $site->quote_vat_percent ?? 0) }}">
+                    <input id="vatPercent" name="quote_vat_percent" value="{{ old('quote_vat_percent', $quote->vat_percent ?? 0) }}">
                 </div>
             </div>
 
@@ -476,22 +476,22 @@
             <div class="quote-grid-2">
                 <div class="quote-field">
                     <label>Phạm vi công việc</label>
-                    <textarea name="quote_scope">{{ old('quote_scope', $site->quote_scope ?? "Khảo sát, thiết kế kỹ thuật, cung cấp vật tư thiết bị, thi công lắp đặt, đo kiểm, cấu hình giám sát, nghiệm thu và bàn giao hệ thống.") }}</textarea>
+                    <textarea name="quote_scope">{{ old('quote_scope', $quote->scope ?? "Khảo sát, thiết kế kỹ thuật, cung cấp vật tư thiết bị, thi công lắp đặt, đo kiểm, cấu hình giám sát, nghiệm thu và bàn giao hệ thống.") }}</textarea>
                 </div>
 
                 <div class="quote-field">
                     <label>Điều kiện thương mại</label>
-                    <textarea name="quote_commercial_terms">{{ old('quote_commercial_terms', $site->quote_commercial_terms ?? "1. Thời gian hoàn thành dự án: 2-4 ngày tuỳ điều kiện mặt bằng.\n2. Hàng hoá mới 100%, đúng chủng loại và thông số kỹ thuật.\n3. Báo giá trọn gói, không tính phát sinh trừ khi có thay đổi thiết kế hoặc tăng công suất lắp đặt.") }}</textarea>
+                    <textarea name="quote_commercial_terms">{{ old('quote_commercial_terms', $quote->commercial_terms ?? "1. Thời gian hoàn thành dự án: 2-4 ngày tuỳ điều kiện mặt bằng.\n2. Hàng hoá mới 100%, đúng chủng loại và thông số kỹ thuật.\n3. Báo giá trọn gói, không tính phát sinh trừ khi có thay đổi thiết kế hoặc tăng công suất lắp đặt.") }}</textarea>
                 </div>
 
                 <div class="quote-field">
                     <label>Bảo hành</label>
-                    <textarea name="quote_warranty_terms">{{ old('quote_warranty_terms', $site->quote_warranty_terms ?? "Bảo hành toàn bộ công trình 24 tháng. Tấm pin, inverter, pin lưu trữ bảo hành theo chính sách của hãng sản xuất.") }}</textarea>
+                    <textarea name="quote_warranty_terms">{{ old('quote_warranty_terms', $quote->warranty_terms ?? "Bảo hành toàn bộ công trình 24 tháng. Tấm pin, inverter, pin lưu trữ bảo hành theo chính sách của hãng sản xuất.") }}</textarea>
                 </div>
 
                 <div class="quote-field">
                     <label>Vận hành & bảo trì O&M</label>
-                    <textarea name="quote_om_terms">{{ old('quote_om_terms', $site->quote_om_terms ?? "Miễn phí kiểm tra định kỳ 6 tháng/lần trong 24 tháng. Vệ sinh tấm pin tối đa 3 lần/năm. Theo dõi hệ thống qua phần mềm giám sát PV thông minh.") }}</textarea>
+                    <textarea name="quote_om_terms">{{ old('quote_om_terms', $quote->om_terms ?? "Miễn phí kiểm tra định kỳ 6 tháng/lần trong 24 tháng. Vệ sinh tấm pin tối đa 3 lần/năm. Theo dõi hệ thống qua phần mềm giám sát PV thông minh.") }}</textarea>
                 </div>
             </div>
         </div>
@@ -559,7 +559,7 @@
             <td><input name="items[${index}][model]" value=""></td>
             <td><input name="items[${index}][unit]" value=""></td>
             <td><input class="js-qty" name="items[${index}][qty_decimal]" value="1"></td>
-            <td><input class="js-price" name="items[${index}][unit_price]" value="0"></td>
+            <td><input class="js-price" name="items[${index}][unit_price]" value="0" step="any" inputmode="decimal"></td>
             <td><input class="js-total" value="0" readonly></td>
             <td><textarea name="items[${index}][specs_text]"></textarea></td>
             <td><button type="button" class="btn-danger" onclick="removeRow(this)">X</button></td>

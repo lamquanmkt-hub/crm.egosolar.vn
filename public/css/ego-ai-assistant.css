@@ -1,0 +1,321 @@
+.crm-ai-search-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    width: min(360px, 27vw);
+    min-width: 250px;
+    height: 40px;
+    padding: 0 10px;
+    border: 1px solid #dbe6ed;
+    border-radius: 11px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fbfd 100%);
+    color: #607286;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .045);
+    cursor: text;
+    transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.crm-ai-search-trigger:hover,
+.crm-ai-search-trigger[aria-expanded="true"] {
+    border-color: rgba(7, 134, 184, .45);
+    box-shadow: 0 7px 20px rgba(7, 134, 184, .11);
+    transform: translateY(-1px);
+}
+
+.crm-ai-search-trigger__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 25px;
+    height: 25px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #0786b8, #0f9d8a);
+    color: #fff;
+    font-size: 13px;
+}
+
+.crm-ai-search-trigger__text {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.crm-ai-search-trigger kbd {
+    flex: 0 0 auto;
+    padding: 3px 6px;
+    border: 1px solid #dce5eb;
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    background: #fff;
+    color: #7a8998;
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.crm-ai-mobile-toggle { display: none; }
+
+.crm-ai-panel {
+    width: min(590px, calc(100vw - 24px));
+    height: min(720px, calc(100vh - 86px));
+    max-height: calc(100vh - 86px);
+}
+
+.crm-ai-panel.is-open {
+    display: flex;
+    flex-direction: column;
+}
+
+.crm-ai-panel__header { flex: 0 0 auto; }
+.crm-ai-panel__identity { display: flex; align-items: center; gap: 10px; }
+.crm-ai-panel__logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0786b8, #0f9d8a);
+    color: #fff;
+    box-shadow: 0 7px 16px rgba(7, 134, 184, .2);
+}
+
+.crm-ai-panel__toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(150px, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 9px 12px;
+    border-bottom: 1px solid #e8eef2;
+    background: #fbfdfe;
+}
+
+.crm-ai-panel__toolbar label {
+    color: #758598;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.crm-ai-panel__toolbar select {
+    min-width: 0;
+    height: 32px;
+    padding: 0 30px 0 9px;
+    border: 1px solid #dce6ec;
+    border-radius: 8px;
+    background-color: #fff;
+    color: #294258;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.crm-ai-panel__company {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    overflow: hidden;
+    max-width: 190px;
+    color: #6b7c8e;
+    font-size: 10px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.crm-ai-panel__messages {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 16px 14px 12px;
+    background:
+        radial-gradient(circle at 0 0, rgba(7, 134, 184, .055), transparent 34%),
+        #f8fafc;
+    scrollbar-width: thin;
+}
+
+.crm-ai-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 13px;
+}
+
+.crm-ai-message--user { justify-content: flex-end; }
+.crm-ai-message__avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 29px;
+    height: 29px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #0786b8, #0f9d8a);
+    color: #fff;
+    font-size: 12px;
+}
+
+.crm-ai-message__bubble {
+    max-width: 84%;
+    padding: 10px 12px;
+    border: 1px solid #dfe8ee;
+    border-radius: 5px 14px 14px 14px;
+    background: #fff;
+    color: #263f54;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .04);
+    font-size: 12px;
+    line-height: 1.62;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.crm-ai-message__bubble strong { display: block; margin-bottom: 3px; color: #12334c; }
+.crm-ai-message__bubble p { margin: 0; }
+
+.crm-ai-message--user .crm-ai-message__bubble {
+    border-color: #0786b8;
+    border-radius: 14px 5px 14px 14px;
+    background: #0786b8;
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(7, 134, 184, .16);
+}
+
+.crm-ai-message__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 9px;
+}
+
+.crm-ai-message__actions a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 30px;
+    padding: 0 9px;
+    border: 1px solid #cfe1e9;
+    border-radius: 8px;
+    background: #f6fbfd;
+    color: #06759e;
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.crm-ai-message__actions a:hover { background: #eaf7fb; }
+
+.crm-ai-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin: 2px 0 10px 37px;
+}
+
+.crm-ai-suggestions button {
+    padding: 7px 9px;
+    border: 1px solid #d6e5eb;
+    border-radius: 9px;
+    background: #fff;
+    color: #456176;
+    font-size: 10px;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.crm-ai-suggestions button:hover { border-color: #79bfd5; color: #05769f; }
+
+.crm-ai-panel__status {
+    flex: 0 0 auto;
+    padding: 7px 13px;
+    border-top: 1px solid #e7eef2;
+    background: #f6fbfd;
+    color: #597083;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.crm-ai-panel__status.is-error { background: #fff4f4; color: #b42318; }
+
+.crm-ai-composer {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    flex: 0 0 auto;
+    margin: 10px 12px 5px;
+    padding: 7px 7px 7px 11px;
+    border: 1px solid #d9e5eb;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 7px 20px rgba(15, 23, 42, .055);
+}
+
+.crm-ai-composer:focus-within {
+    border-color: rgba(7, 134, 184, .55);
+    box-shadow: 0 0 0 3px rgba(7, 134, 184, .09), 0 7px 20px rgba(15, 23, 42, .055);
+}
+
+.crm-ai-composer textarea {
+    width: 100%;
+    max-height: 120px;
+    min-height: 32px;
+    resize: none;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #17354d;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.crm-ai-composer button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0786b8, #0f9d8a);
+    color: #fff;
+    cursor: pointer;
+}
+
+.crm-ai-composer button:disabled { opacity: .45; cursor: wait; }
+.crm-ai-panel__disclaimer { flex: 0 0 auto; padding: 0 12px 9px; color: #8a98a5; font-size: 9px; text-align: center; }
+
+.crm-ai-typing { display: inline-flex; align-items: center; gap: 4px; min-height: 16px; }
+.crm-ai-typing span { width: 5px; height: 5px; border-radius: 50%; background: #7e9aaa; animation: crmAiTyping 1s infinite ease-in-out; }
+.crm-ai-typing span:nth-child(2) { animation-delay: .14s; }
+.crm-ai-typing span:nth-child(3) { animation-delay: .28s; }
+@keyframes crmAiTyping { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-3px); opacity: 1; } }
+
+@media (max-width: 1450px) {
+    .crm-ai-search-trigger { width: min(310px, 25vw); min-width: 220px; }
+    .crm-ai-search-trigger kbd { display: none; }
+}
+
+@media (max-width: 1199.98px) {
+    .crm-ai-mobile-toggle { display: inline-flex; }
+}
+
+@media (max-width: 991.98px) {
+    .crm-ai-panel {
+        width: min(520px, calc(100vw - 10px));
+        height: auto;
+        max-height: none;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .crm-ai-panel__toolbar { grid-template-columns: auto minmax(0, 1fr); }
+    .crm-ai-panel__company { display: none; }
+    .crm-ai-panel__messages { padding: 13px 10px 10px; }
+    .crm-ai-message__bubble { max-width: 88%; }
+    .crm-ai-suggestions { margin-left: 0; }
+    .crm-ai-composer { margin-right: 8px; margin-left: 8px; }
+}

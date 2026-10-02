@@ -11,24 +11,26 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('crm_serial_unit_identifiers', function (Blueprint $table) {
-            $table->bigIncrements('id');
+        if (! Schema::hasTable('crm_serial_unit_identifiers')) {
+            Schema::create('crm_serial_unit_identifiers', function (Blueprint $table) {
+                $table->bigIncrements('id');
 
-            $table->foreignId('serial_unit_id')
-                ->constrained('crm_serial_units')
-                ->cascadeOnDelete();
+                $table->foreignId('serial_unit_id')
+                    ->constrained('crm_serial_units')
+                    ->cascadeOnDelete();
 
-            $table->foreignId('serial_identifier_id')
-                ->constrained('crm_serial_identifiers')
-                ->cascadeOnDelete();
+                $table->foreignId('serial_identifier_id')
+                    ->constrained('crm_serial_identifiers')
+                    ->cascadeOnDelete();
 
-            $table->boolean('is_primary')->default(true);
-            $table->timestamps();
+                $table->boolean('is_primary')->default(true);
+                $table->timestamps();
 
-            $table->unique(['serial_unit_id', 'serial_identifier_id'], 'crm_sui_unit_identifier_uk');
-            $table->index(['serial_identifier_id'], 'crm_sui_identifier_id_idx');
-            $table->index(['serial_unit_id', 'is_primary'], 'crm_sui_unit_primary_idx');
-        });
+                $table->unique(['serial_unit_id', 'serial_identifier_id'], 'crm_sui_unit_identifier_uk');
+                $table->index(['serial_identifier_id'], 'crm_sui_identifier_id_idx');
+                $table->index(['serial_unit_id', 'is_primary'], 'crm_sui_unit_primary_idx');
+            });
+        }
     }
 
     /**

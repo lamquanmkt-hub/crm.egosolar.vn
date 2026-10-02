@@ -8,27 +8,29 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('marketing_kpi_pay_actuals', function (Blueprint $table) {
-            $table->id();
+        if (! Schema::hasTable('marketing_kpi_pay_actuals')) {
+            Schema::create('marketing_kpi_pay_actuals', function (Blueprint $table) {
+                $table->id();
 
-            $table->string('period', 7); // YYYY-MM
-            $table->unsignedBigInteger('user_id');
+                $table->string('period', 7); // YYYY-MM
+                $table->unsignedBigInteger('user_id');
 
-            $table->unsignedInteger('actual_post')->default(0);
-            $table->unsignedInteger('actual_video_ai')->default(0);
-            $table->unsignedInteger('actual_video_review')->default(0);
+                $table->unsignedInteger('actual_post')->default(0);
+                $table->unsignedInteger('actual_video_ai')->default(0);
+                $table->unsignedInteger('actual_video_review')->default(0);
 
-            $table->json('trend_videos')->nullable(); // list video
-            $table->json('livestreams')->nullable();  // list live
+                $table->json('trend_videos')->nullable(); // list video
+                $table->json('livestreams')->nullable();  // list live
 
-            $table->boolean('is_fraud')->default(false);
-            $table->text('note')->nullable();
+                $table->boolean('is_fraud')->default(false);
+                $table->text('note')->nullable();
 
-            $table->timestamps();
+                $table->timestamps();
 
-            $table->unique(['period', 'user_id']);
-            $table->index(['user_id', 'period']);
-        });
+                $table->unique(['period', 'user_id']);
+                $table->index(['user_id', 'period']);
+            });
+        }
     }
 
     public function down(): void

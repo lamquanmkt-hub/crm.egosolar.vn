@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller trang tổng quan (dashboard) của module HR.
@@ -46,12 +46,12 @@ class DashboardController extends Controller
 
         $today = now()->toDateString();
 
-        $totalEmployees = Schema::hasColumn('users', 'is_active')
+        $totalEmployees = SchemaCache::hasColumn('users', 'is_active')
             ? User::where('is_active', 1)->count()
             : User::count();
 
         $pendingLeaves = 0;
-        if (class_exists(LeaveRequest::class) && Schema::hasTable('leave_requests')) {
+        if (class_exists(LeaveRequest::class) && SchemaCache::hasTable('leave_requests')) {
             $pendingLeaves = LeaveRequest::where('status', 'pending')
                 ->whereBetween('created_at', [$fromDate, $toDate])
                 ->count();
@@ -62,7 +62,7 @@ class DashboardController extends Controller
         $checkInRate = 0;
         $employeeAttendanceStats = collect();
 
-        if (class_exists(AttendanceRecord::class) && Schema::hasTable('attendance_records')) {
+        if (class_exists(AttendanceRecord::class) && SchemaCache::hasTable('attendance_records')) {
             $todayAttendance = AttendanceRecord::whereDate('work_date', $today)
                 ->whereNotNull('check_in_at')
                 ->count();

@@ -62,33 +62,33 @@
 
 <div class="pfx-page">
     @if(session('success'))
-        <div class="alert alert-success pfx-alert shadow-sm border-0">
+        <x-ui.alert variant="success" class="pfx-alert tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:border-0">
             <i class="bi bi-check-circle"></i> {{ session('success') }}
-        </div>
+        </x-ui.alert>
     @endif
 
     @if(session('error'))
-        <div class="alert alert-danger pfx-alert shadow-sm border-0">
+        <x-ui.alert variant="danger" class="pfx-alert tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:border-0">
             <i class="bi bi-exclamation-triangle"></i> {{ session('error') }}
-        </div>
+        </x-ui.alert>
     @endif
 
     @if ($errors->any())
-        <div class="alert alert-danger pfx-alert shadow-sm border-0">
-            <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle"></i> Vui lòng kiểm tra lại:</div>
-            <ul class="mb-0">
+        <x-ui.alert variant="danger" class="pfx-alert tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:border-0">
+            <div class="fw-bold tw:mb-1"><i class="bi bi-exclamation-triangle"></i> Vui lòng kiểm tra lại:</div>
+            <ul class="tw:mb-0">
                 @foreach ($errors->all() as $e)
                     <li>{{ $e }}</li>
                 @endforeach
             </ul>
-        </div>
+        </x-ui.alert>
     @endif
 
     <div class="pfx-hero pfx-reveal" id="pfxHero">
         <div class="pfx-hero-glow"></div>
 
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 position-relative">
-            <div class="d-flex align-items-center gap-3">
+        <div class="tw:flex flex-wrap tw:justify-between tw:items-center tw:gap-4 position-relative">
+            <div class="tw:flex tw:items-center tw:gap-4">
                 <div class="pfx-avatar">
                     @if($avatarUrl)
                         <img src="{{ $avatarUrl }}" alt="{{ $name }}">
@@ -99,18 +99,18 @@
                 </div>
 
                 <div>
-                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                        <h3 class="pfx-title mb-0">{{ $name }}</h3>
+                    <div class="tw:flex flex-wrap tw:items-center tw:gap-2 tw:mb-1">
+                        <h3 class="pfx-title tw:mb-0">{{ $name }}</h3>
                         <span class="pfx-pill">
                             <i class="bi bi-shield-check"></i> {{ $roleText }}
                         </span>
                     </div>
 
-                    <div class="pfx-muted mb-2">
+                    <div class="pfx-muted tw:mb-2">
                         <i class="bi bi-envelope"></i> {{ $email }}
                     </div>
 
-                    <div class="d-flex flex-wrap gap-2">
+                    <div class="tw:flex flex-wrap tw:gap-2">
                         <span class="pfx-chip"><i class="bi bi-circle-fill"></i> Online</span>
                         <span class="pfx-chip"><i class="bi bi-calendar-check"></i> {{ $memberSince }}</span>
                         <span class="pfx-chip"><i class="bi bi-clock-history"></i> {{ $lastSeen }}</span>
@@ -118,22 +118,22 @@
                 </div>
             </div>
 
-            <div class="d-flex flex-wrap gap-2">
-                <a href="{{ url('/profile/edit') }}" class="btn pfx-btn pfx-ripple">
+            <div class="tw:flex flex-wrap tw:gap-2">
+                <x-ui.button variant="none" size="none" class="pfx-btn pfx-ripple" href="{{ url('/profile/edit') }}">
                     <i class="bi bi-pencil-square"></i> Cập nhật hồ sơ
-                </a>
-                <a href="{{ url('/profile/edit') }}#password" class="btn pfx-btn-outline pfx-ripple">
+                </x-ui.button>
+                <x-ui.button variant="none" size="none" class="pfx-btn-outline pfx-ripple" href="{{ url('/profile/edit') }}#password">
                     <i class="bi bi-key"></i> Đổi mật khẩu
-                </a>
+                </x-ui.button>
             </div>
         </div>
     </div>
 
-    <div class="row g-3 mt-1">
-        <div class="col-xl-4">
-            <div class="pfx-card p-3 pfx-reveal">
-                <div class="text-center">
-                    <div class="pfx-avatar-lg mx-auto mb-3">
+    <div class="tw:row tw:g-3 tw:mt-1">
+        <div class="tw:min-[75rem]:col12-4">
+            <div class="pfx-card tw:p-4 pfx-reveal">
+                <div class="tw:text-center">
+                    <div class="pfx-avatar-lg mx-auto tw:mb-4">
                         @if($avatarUrl)
                             <img src="{{ $avatarUrl }}" alt="{{ $name }}">
                         @else
@@ -141,8 +141,8 @@
                         @endif
                     </div>
 
-                    <h4 class="pfx-subtitle mb-1">{{ $name }}</h4>
-                    <div class="pfx-muted mb-2">{{ $email }}</div>
+                    <h4 class="pfx-subtitle tw:mb-1">{{ $name }}</h4>
+                    <div class="pfx-muted tw:mb-2">{{ $email }}</div>
 
                     <span class="pfx-pill">
                         <i class="bi bi-person-badge"></i> {{ $roleText }}
@@ -154,28 +154,27 @@
                 <form method="POST" action="{{ route('users.profile.avatar') }}" enctype="multipart/form-data" class="pfx-upload">
                     @csrf
 
-                    <label class="pfx-section-label mb-2">
+                    <label class="pfx-section-label tw:mb-2">
                         <i class="bi bi-image"></i> Cập nhật avatar
                     </label>
 
-                    <input
+                    <x-ui.input
                         type="file"
                         name="avatar"
-                        class="form-control pfx-input"
+                        class="pfx-input"
                         accept="image/jpeg,image/png,image/webp"
-                        required
-                    >
+                        required />
 
-                    <div class="pfx-muted mt-2">JPG, PNG, WEBP. Tối đa 2MB.</div>
+                    <div class="pfx-muted tw:mt-2">JPG, PNG, WEBP. Tối đa 2MB.</div>
 
-                    <button type="submit" class="btn pfx-btn w-100 mt-3 pfx-ripple">
+                    <x-ui.button variant="none" size="none" class="pfx-btn tw:w-full tw:mt-4 pfx-ripple" type="submit">
                         <i class="bi bi-cloud-arrow-up"></i> Lưu avatar
-                    </button>
+                    </x-ui.button>
                 </form>
             </div>
 
-            <div class="pfx-card p-3 mt-3 pfx-reveal">
-                <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="pfx-card tw:p-4 tw:mt-4 pfx-reveal">
+                <div class="tw:flex tw:justify-between tw:items-center tw:mb-2">
                     <div>
                         <div class="pfx-section-title">Hoàn thiện hồ sơ</div>
                         <div class="pfx-muted">Mức độ đầy đủ thông tin hiện tại</div>
@@ -183,7 +182,7 @@
                     <div class="pfx-score" data-count="{{ $profilePercent }}">0%</div>
                 </div>
 
-                <div class="pfx-progress mb-3">
+                <div class="pfx-progress tw:mb-4">
                     <div class="pfx-progress-bar" data-progress="{{ $profilePercent }}"></div>
                 </div>
 
@@ -204,9 +203,9 @@
             </div>
         </div>
 
-        <div class="col-xl-8">
-            <div class="row g-3">
-                <div class="col-md-6">
+        <div class="tw:min-[75rem]:col12-8">
+            <div class="tw:row tw:g-3">
+                <div class="tw:md:col12-6">
                     <div class="pfx-info pfx-reveal">
                         <div class="pfx-icon"><i class="bi bi-person"></i></div>
                         <div>
@@ -216,7 +215,7 @@
                     </div>
                 </div>
 
-                <div class="col-md-6">
+                <div class="tw:md:col12-6">
                     <div class="pfx-info pfx-reveal">
                         <div class="pfx-icon"><i class="bi bi-envelope"></i></div>
                         <div>
@@ -226,7 +225,7 @@
                     </div>
                 </div>
 
-                <div class="col-md-6">
+                <div class="tw:md:col12-6">
                     <div class="pfx-info pfx-reveal">
                         <div class="pfx-icon"><i class="bi bi-shield-lock"></i></div>
                         <div>
@@ -236,7 +235,7 @@
                     </div>
                 </div>
 
-                <div class="col-md-6">
+                <div class="tw:md:col12-6">
                     <div class="pfx-info pfx-reveal">
                         <div class="pfx-icon"><i class="bi bi-calendar2-week"></i></div>
                         <div>
@@ -247,11 +246,11 @@
                 </div>
             </div>
 
-            <div class="pfx-card p-3 mt-3 pfx-reveal">
-                <div class="d-flex align-items-center gap-2 mb-3">
+            <div class="pfx-card tw:p-4 tw:mt-4 pfx-reveal">
+                <div class="tw:flex tw:items-center tw:gap-2 tw:mb-4">
                     <div class="pfx-icon sm"><i class="bi bi-person-vcard"></i></div>
                     <div>
-                        <h5 class="pfx-subtitle mb-0">Thông tin tài khoản</h5>
+                        <h5 class="pfx-subtitle tw:mb-0">Thông tin tài khoản</h5>
                         <div class="pfx-muted">Thông tin cơ bản và trạng thái tài khoản.</div>
                     </div>
                 </div>
@@ -264,7 +263,7 @@
 
                     <div class="pfx-mini">
                         <div class="pfx-label">Trạng thái</div>
-                        <div class="pfx-value text-success">
+                        <div class="pfx-value tw:text-[#198754]!">
                             <i class="bi bi-circle-fill"></i> Đang hoạt động
                         </div>
                     </div>
@@ -284,34 +283,34 @@
                 </div>
             </div>
 
-            <div class="row g-3 mt-0">
-                <div class="col-md-6">
-                    <div class="pfx-card p-3 h-100 pfx-reveal">
-                        <div class="d-flex align-items-center gap-2 mb-3">
+            <div class="tw:row tw:g-3 tw:mt-0">
+                <div class="tw:md:col12-6">
+                    <div class="pfx-card tw:p-4 tw:h-full pfx-reveal">
+                        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-4">
                             <div class="pfx-icon sm"><i class="bi bi-lock"></i></div>
                             <div>
-                                <h5 class="pfx-subtitle mb-0">Bảo mật</h5>
+                                <h5 class="pfx-subtitle tw:mb-0">Bảo mật</h5>
                                 <div class="pfx-muted">Quản lý mật khẩu tài khoản.</div>
                             </div>
                         </div>
 
-                        <div class="pfx-mini mb-3">
+                        <div class="pfx-mini tw:mb-4">
                             <div class="pfx-value">Mật khẩu</div>
                             <div class="pfx-muted">Nên đổi định kỳ để tăng bảo mật.</div>
                         </div>
 
-                        <a href="{{ url('/profile/edit') }}#password" class="btn pfx-btn-outline w-100 pfx-ripple">
+                        <x-ui.button variant="none" size="none" class="pfx-btn-outline tw:w-full pfx-ripple" href="{{ url('/profile/edit') }}#password">
                             <i class="bi bi-key"></i> Đổi mật khẩu
-                        </a>
+                        </x-ui.button>
                     </div>
                 </div>
 
-                <div class="col-md-6">
-                    <div class="pfx-card p-3 h-100 pfx-reveal">
-                        <div class="d-flex align-items-center gap-2 mb-3">
+                <div class="tw:md:col12-6">
+                    <div class="pfx-card tw:p-4 tw:h-full pfx-reveal">
+                        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-4">
                             <div class="pfx-icon sm"><i class="bi bi-lightning-charge"></i></div>
                             <div>
-                                <h5 class="pfx-subtitle mb-0">Thao tác nhanh</h5>
+                                <h5 class="pfx-subtitle tw:mb-0">Thao tác nhanh</h5>
                                 <div class="pfx-muted">Các hành động thường dùng.</div>
                             </div>
                         </div>
@@ -329,16 +328,16 @@
                 </div>
             </div>
 
-            <div class="pfx-card p-3 mt-3 pfx-reveal">
-                <div class="d-flex align-items-center gap-2 mb-3">
+            <div class="pfx-card tw:p-4 tw:mt-4 pfx-reveal">
+                <div class="tw:flex tw:items-center tw:gap-2 tw:mb-4">
                     <div class="pfx-icon sm"><i class="bi bi-shield-check"></i></div>
                     <div>
-                        <h5 class="pfx-subtitle mb-0">Quyền truy cập</h5>
+                        <h5 class="pfx-subtitle tw:mb-0">Quyền truy cập</h5>
                         <div class="pfx-muted">Vai trò hiện tại trong hệ thống.</div>
                     </div>
                 </div>
 
-                <div class="d-flex flex-wrap gap-2">
+                <div class="tw:flex flex-wrap tw:gap-2">
                     @forelse($roles as $r)
                         <span class="pfx-pill">
                             <i class="bi bi-check2-circle"></i> {{ ucfirst(str_replace('_', ' ', $r)) }}

@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('sales_quotations')) {
+        if (! Schema::hasTable('sales_quotations')) {
             Schema::create('sales_quotations', function (Blueprint $table) {
                 $table->id();
                 $table->string('quote_code', 50)->nullable()->unique();
@@ -58,7 +58,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('sales_quotation_items')) {
+        if (! Schema::hasTable('sales_quotation_items')) {
             Schema::create('sales_quotation_items', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('quotation_id');

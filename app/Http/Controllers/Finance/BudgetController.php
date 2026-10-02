@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Quản lý ngân sách tài chính theo tháng và so sánh với chi phí đã duyệt.
@@ -37,17 +37,17 @@ class BudgetController extends Controller
         $approvedExpenseCount = 0;
 
         if (
-            Schema::hasTable('payment_requests') &&
-            Schema::hasColumn('payment_requests', 'amount') &&
-            Schema::hasColumn('payment_requests', 'status')
+            SchemaCache::hasTable('payment_requests') &&
+            SchemaCache::hasColumn('payment_requests', 'amount') &&
+            SchemaCache::hasColumn('payment_requests', 'status')
         ) {
             $dateColumn = null;
 
-            if (Schema::hasColumn('payment_requests', 'accounting_approved_at')) {
+            if (SchemaCache::hasColumn('payment_requests', 'accounting_approved_at')) {
                 $dateColumn = 'accounting_approved_at';
-            } elseif (Schema::hasColumn('payment_requests', 'updated_at')) {
+            } elseif (SchemaCache::hasColumn('payment_requests', 'updated_at')) {
                 $dateColumn = 'updated_at';
-            } elseif (Schema::hasColumn('payment_requests', 'created_at')) {
+            } elseif (SchemaCache::hasColumn('payment_requests', 'created_at')) {
                 $dateColumn = 'created_at';
             }
 
@@ -115,7 +115,7 @@ class BudgetController extends Controller
         */
         $financeBudgets = collect();
 
-        if (Schema::hasTable('finance_budgets')) {
+        if (SchemaCache::hasTable('finance_budgets')) {
             $financeBudgets = DB::table('finance_budgets')
                 ->where('month', $monthStart)
                 ->orderBy('category')
@@ -195,14 +195,14 @@ class BudgetController extends Controller
         $pendingRequestsCount = 0;
 
         if (
-            Schema::hasTable('payment_requests') &&
-            Schema::hasColumn('payment_requests', 'amount') &&
-            Schema::hasColumn('payment_requests', 'status')
+            SchemaCache::hasTable('payment_requests') &&
+            SchemaCache::hasColumn('payment_requests', 'amount') &&
+            SchemaCache::hasColumn('payment_requests', 'status')
         ) {
             $pendingQuery = DB::table('payment_requests')
                 ->whereIn('status', ['pending', 'submitted', 'admin_approved']);
 
-            if (Schema::hasColumn('payment_requests', 'created_at')) {
+            if (SchemaCache::hasColumn('payment_requests', 'created_at')) {
                 $pendingQuery->whereDate('created_at', '>=', $monthStart)
                     ->whereDate('created_at', '<=', $monthEnd);
             }
@@ -233,7 +233,7 @@ class BudgetController extends Controller
 
         $recentBudgets = collect();
 
-        if (Schema::hasTable('finance_budgets')) {
+        if (SchemaCache::hasTable('finance_budgets')) {
             $recentBudgets = DB::table('finance_budgets')
                 ->orderByDesc('month')
                 ->orderByDesc('id')

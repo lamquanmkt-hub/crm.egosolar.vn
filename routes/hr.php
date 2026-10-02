@@ -1,23 +1,21 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Hr\DashboardController;
-use App\Http\Controllers\Hr\EmployeeController;
-use App\Http\Controllers\Hr\EmployeeExtraController;
-use App\Http\Controllers\Hr\DepartmentController;
-use App\Http\Controllers\Hr\PositionController;
-use App\Http\Controllers\Hr\LeaveRequestController;
 use App\Http\Controllers\Hr\AttendanceController;
 use App\Http\Controllers\Hr\AttendanceCorrectionController;
 use App\Http\Controllers\Hr\AttendanceSettingController;
-use App\Http\Controllers\Hr\OvertimeRequestController;
-use App\Http\Controllers\Hr\OfficeExpenseController;
-use App\Http\Controllers\Hr\HrDocumentController;
-use App\Http\Controllers\Hr\HcOperationController;
-use App\Http\Controllers\Hr\RecruitmentController;
 use App\Http\Controllers\Hr\CandidateProcessController;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Http\Controllers\Hr\DashboardController;
+use App\Http\Controllers\Hr\DepartmentController;
+use App\Http\Controllers\Hr\EmployeeController;
+use App\Http\Controllers\Hr\EmployeeExtraController;
+use App\Http\Controllers\Hr\HcOperationController;
+use App\Http\Controllers\Hr\HrDocumentController;
+use App\Http\Controllers\Hr\LeaveRequestController;
+use App\Http\Controllers\Hr\OfficeExpenseController;
+use App\Http\Controllers\Hr\OvertimeRequestController;
+use App\Http\Controllers\Hr\PositionController;
+use App\Http\Controllers\Hr\RecruitmentController;
+use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('nhan-su')->name('hr.')->group(function () {
 
@@ -53,7 +51,7 @@ Route::middleware(['auth'])->prefix('nhan-su')->name('hr.')->group(function () {
         Route::delete('de-nghi-nhan-viec/{id}', [RecruitmentController::class, 'destroyOffer'])->whereNumber('id')->name('offers.destroy');
 
         Route::get('tiep-nhan', [RecruitmentController::class, 'onboarding'])->name('onboarding');
-        Route::get('luu-ho-so', [RecruitmentController::class, 'archives'])->name('archives');
+        Route::get('ho-so-luu-tru', [RecruitmentController::class, 'archives'])->name('archives');
         Route::get('bao-cao', [RecruitmentController::class, 'reports'])->name('reports');
     });
 
@@ -64,8 +62,6 @@ Route::middleware(['auth'])->prefix('nhan-su')->name('hr.')->group(function () {
     Route::get('quy-trinh-nhan-su', function () {
         return redirect()->route('hr.recruitment.index');
     })->name('processes.redirect');
-
-
 
     Route::get('/', [DashboardController::class, 'index'])
         ->name('dashboard');
@@ -92,8 +88,6 @@ Route::middleware(['auth'])->prefix('nhan-su')->name('hr.')->group(function () {
         ->whereNumber('id')
         ->name('office-expenses.categories.destroy');
 
-
-
     /*
     |--------------------------------------------------------------------------
     | HC & Vận Hành / Hồ sơ nhân sự
@@ -101,8 +95,6 @@ Route::middleware(['auth'])->prefix('nhan-su')->name('hr.')->group(function () {
     */
     Route::get('hc-van-hanh', [HcOperationController::class, 'index'])
         ->name('operations.index');
-
-    
 
     /*
     |--------------------------------------------------------------------------
@@ -145,7 +137,6 @@ Route::middleware(['auth'])->prefix('nhan-su')->name('hr.')->group(function () {
         ->whereNumber('id')
         ->name('operations.tasks.destroy');
 
-
     Route::post('hc-van-hanh/maintenance', [HcOperationController::class, 'storeMaintenance'])
         ->name('operations.maintenance.store');
     Route::put('hc-van-hanh/maintenance/{id}', [HcOperationController::class, 'updateMaintenance'])
@@ -155,7 +146,16 @@ Route::middleware(['auth'])->prefix('nhan-su')->name('hr.')->group(function () {
         ->whereNumber('id')
         ->name('operations.maintenance.destroy');
 
-Route::post('hc-van-hanh/items', [HrDocumentController::class, 'storeOperationItem'])
+    Route::post('hc-van-hanh/incidents', [HcOperationController::class, 'storeIncident'])
+        ->name('operations.incidents.store');
+    Route::put('hc-van-hanh/incidents/{id}', [HcOperationController::class, 'updateIncident'])
+        ->whereNumber('id')
+        ->name('operations.incidents.update');
+    Route::delete('hc-van-hanh/incidents/{id}', [HcOperationController::class, 'destroyIncident'])
+        ->whereNumber('id')
+        ->name('operations.incidents.destroy');
+
+    Route::post('hc-van-hanh/items', [HrDocumentController::class, 'storeOperationItem'])
         ->name('operations.items.store');
 
     Route::put('hc-van-hanh/items/{item}', [HrDocumentController::class, 'updateOperationItem'])
@@ -246,8 +246,7 @@ Route::post('hc-van-hanh/items', [HrDocumentController::class, 'storeOperationIt
         ->whereNumber('folder')
         ->name('documents.folders.delete');
 
-
-    Route::middleware(['role:admin|accounting|hr|hr'])->group(function () {
+    Route::middleware(['role:admin|accounting|hr'])->group(function () {
         Route::resource('departments', DepartmentController::class)
             ->except(['show']);
 
@@ -255,28 +254,27 @@ Route::post('hc-van-hanh/items', [HrDocumentController::class, 'storeOperationIt
             ->except(['show']);
 
         Route::resource('employees', EmployeeController::class)
-            ->middleware(['role:admin|hr|accounting|ketoan|ke_toan']);
+            ->middleware(['role:admin|hr|accounting']);
 
         Route::put('employees/{employee}/extras', [EmployeeExtraController::class, 'update'])
             ->whereNumber('employee')
-            ->middleware(['role:admin|hr|accounting|ketoan|ke_toan'])
+            ->middleware(['role:admin|hr|accounting'])
             ->name('employees.extras.update');
 
         Route::post('employees/{employee}/files', [EmployeeExtraController::class, 'uploadFile'])
             ->whereNumber('employee')
-            ->middleware(['role:admin|hr|accounting|ketoan|ke_toan'])
+            ->middleware(['role:admin|hr|accounting'])
             ->name('employees.files.store');
 
         Route::get('employees/files/{file}/download', [EmployeeExtraController::class, 'downloadFile'])
             ->whereNumber('file')
-            ->middleware(['role:admin|hr|accounting|ketoan|ke_toan'])
+            ->middleware(['role:admin|hr|accounting'])
             ->name('employees.files.download');
 
         Route::delete('employees/files/{file}', [EmployeeExtraController::class, 'deleteFile'])
             ->whereNumber('file')
-            ->middleware(['role:admin|hr|accounting|ketoan|ke_toan'])
+            ->middleware(['role:admin|hr|accounting'])
             ->name('employees.files.delete');
-
 
     });
 
@@ -339,10 +337,10 @@ Route::post('hc-van-hanh/items', [HrDocumentController::class, 'storeOperationIt
     Route::get('cham-cong', [AttendanceController::class, 'index'])
         ->name('attendance.index');
 
-    Route::get('cham-cong/export-excel', [AttendanceController::class, 'exportExcel'])
+    Route::get('cham-cong/exports/excel', [AttendanceController::class, 'exportExcel'])
         ->name('attendance.export');
 
-    Route::get('cham-cong/export-pdf', [AttendanceController::class, 'exportPdf'])
+    Route::get('cham-cong/exports/pdf', [AttendanceController::class, 'exportPdf'])
         ->name('attendance.export-pdf');
 
     Route::get('cham-cong-cua-toi', [AttendanceController::class, 'myAttendance'])
@@ -355,12 +353,10 @@ Route::post('hc-van-hanh/items', [HrDocumentController::class, 'storeOperationIt
         ->name('attendance-corrections.store');
 
     Route::post('cham-cong/yeu-cau-sua/{correction}/approve', [AttendanceCorrectionController::class, 'approve'])
-        ->middleware(['role:hr'])
         ->whereNumber('correction')
         ->name('attendance-corrections.approve');
 
     Route::post('cham-cong/yeu-cau-sua/{correction}/reject', [AttendanceCorrectionController::class, 'reject'])
-        ->middleware(['role:hr'])
         ->whereNumber('correction')
         ->name('attendance-corrections.reject');
 
@@ -406,13 +402,12 @@ Route::post('hc-van-hanh/items', [HrDocumentController::class, 'storeOperationIt
     | Hướng dẫn chấm công
     |--------------------------------------------------------------------------
     */
-    Route::get('huong-dan-cham-cong/dien-thoai', function () {
-        return view('hr.attendance.guides.mobile');
-    })->name('attendance.guide.mobile');
+    // Trang tĩnh: Route::view() nói rõ "chỉ hiển thị view" hơn closure.
+    Route::view('huong-dan-cham-cong/dien-thoai', 'hr.attendance.guides.mobile')
+        ->name('attendance.guide.mobile');
 
-    Route::get('huong-dan-cham-cong/may-tinh', function () {
-        return view('hr.attendance.guides.desktop');
-    })->name('attendance.guide.desktop');
+    Route::view('huong-dan-cham-cong/may-tinh', 'hr.attendance.guides.desktop')
+        ->name('attendance.guide.desktop');
 
     /*
     |--------------------------------------------------------------------------
@@ -488,4 +483,5 @@ Route::post('hc-van-hanh/items', [HrDocumentController::class, 'storeOperationIt
         });
     });
     /* EGO_GIFT_MANAGEMENT_V1_ROUTES_END */
+
 });

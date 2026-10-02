@@ -93,7 +93,10 @@
 .ego-order .ego-topbar__right{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 
 /* ===== Buttons (xanh nhạt như bạn muốn, không đen/không xanh lá) ===== */
-.ego-order .btn{
+/* Bám cả .btn-ego/.btn-ghost: hai nút của orders/edit đã sang <x-ui.button>, không còn class .btn. */
+.ego-order .btn,
+.ego-order .btn-ego,
+.ego-order .btn-ghost{
   border-radius: 12px;
   font-weight: 500; /* bỏ 900 */
 }
@@ -197,11 +200,11 @@
   font-size: 13px !important;
   color: var(--muted) !important;
   font-weight: 400 !important;
-}
-
-/* ===== Inputs ===== */
+}/* ===== Inputs ===== */
 .ego-order .form-control,
 .ego-order .form-select,
+.ego-order .ego-input,
+/* ===== Inputs ===== */
 .ego-order .ego-input{
   border-radius: 12px !important;
   border: 1px solid var(--line) !important;
@@ -212,8 +215,8 @@
 
   padding: 9px 12px !important;
   height: 42px !important;
-}
-.ego-order textarea.form-control{
+}.ego-order textarea.form-control,
+.ego-order textarea.ego-input{
   height: auto !important;
   padding: 10px 12px !important;
 }
@@ -315,11 +318,12 @@
 }
 .ego-order .ego-table tbody tr:hover{
   background: rgba(2,132,199,.04);
-}
-
-/* Inputs inside table (gọn hơn 1 chút) */
+}/* Inputs inside table (gọn hơn 1 chút) */
 .ego-order .ego-table .form-control,
-.ego-order .ego-table .form-select{
+.ego-order .ego-table .form-select,
+/* Inputs inside table (gọn hơn 1 chút) */
+.ego-order .ego-table .ego-input,
+.ego-order .ego-table .ego-input{
   height: 40px !important;
   padding: 8px 10px !important;
   font-size: 14px !important;
@@ -435,7 +439,9 @@
 }
 /* ===== Small quality ===== */
 .ego-order .bi{ line-height: 1; }
-.ego-order .btn:active{ transform: translateY(0); }
+.ego-order .btn:active,
+.ego-order .btn-ego:active,
+.ego-order .btn-ghost:active{ transform: translateY(0); }
 /* ===== Product picker mới ===== */
 .ego-order .product-picker{
   position: relative;

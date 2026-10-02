@@ -2,25 +2,20 @@
 
 namespace App\Models\Projects;
 
-use App\Models\Concerns\LockedToEgoInternational;
 use App\Models\Payment;
 use App\Models\Payments\PaymentRequest;
 use App\Models\Receipt;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Site extends Model
 {
-    use LockedToEgoInternational;
-    use \App\Models\Concerns\HasUnifiedSalesVisibility;
     protected $table = 'sites';
 
     protected $fillable = [
         // Core
         'company_id',
         'created_by',
-        'request_source',
-        'sales_user_id',
-        'sales_order_id',
         'project_type',
         'project_code',
         'project_phase',
@@ -43,9 +38,6 @@ class Site extends Model
         // update
         'deployment_started_at',
         'completed_at',
-        'warranty_reminder_1_at',
-        'warranty_reminder_2_at',
-        'warranty_reminder_3_at',
         'solar_panel_qty',
         'solar_panel_wp',
         'battery_kwh',
@@ -87,9 +79,6 @@ class Site extends Model
         'system_kw_ac' => 'float',
         'deployment_started_at' => 'date',
         'completed_at' => 'date',
-        'warranty_reminder_1_at' => 'date',
-        'warranty_reminder_2_at' => 'date',
-        'warranty_reminder_3_at' => 'date',
         'solar_panel_qty' => 'integer',
         'solar_panel_wp' => 'float',
         'battery_kwh' => 'float',
@@ -103,6 +92,41 @@ class Site extends Model
         'progress_percent' => 'integer',
         'target_completion_at' => 'date',
     ];
+
+    /**
+     * Các bản báo giá của công trình (mới nhất trước).
+     *
+     * Thay cho 21 cột `quote_*` từng nằm ngay trong `sites` (tách 2026_09_04_110000,
+     * xoá cột cũ 2026_09_07_150000).
+     */
+    public function quotes()
+    {
+        return $this->hasMany(SiteQuote::class)->orderByDesc('version');
+    }
+
+    /** Bản báo giá version cao nhất — bản đang có hiệu lực của công trình. */
+    public function latestQuote(): HasOne
+    {
+        return $this->hasOne(SiteQuote::class)->ofMany('version', 'max');
+    }
+
+    /** Tên công ty khách trên bản báo giá mới nhất; chưa báo giá → null. */
+    public function quoteCustomerCompany(): ?string
+    {
+        return $this->latestQuote?->customer_company;
+    }
+
+    /** Tổng tiền bản báo giá mới nhất; chưa báo giá → 0. */
+    public function quoteGrandTotal(): float
+    {
+        return (float) ($this->latestQuote?->grand_total ?? 0);
+    }
+
+    /** Các mốc nhắc bảo hành, thay cho nhóm lặp `warranty_reminder_1/2/3_at`. */
+    public function warrantyReminders()
+    {
+        return $this->hasMany(SiteWarrantyReminder::class)->orderBy('sequence');
+    }
 
     public function plannedMaterials()
     {

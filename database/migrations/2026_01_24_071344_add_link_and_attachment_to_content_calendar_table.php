@@ -10,20 +10,28 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    Schema::table('content_calendars', function (Blueprint $table) {
-        $table->string('link')->nullable();
-        $table->string('attachment_path')->nullable();
-    });
-}
+    {
+        if (Schema::hasTable('content_calendars')) {
+            Schema::table('content_calendars', function (Blueprint $table) {
+                if (! Schema::hasColumn('content_calendars', 'link')) {
+                    $table->string('link')->nullable();
+                }
+                if (! Schema::hasColumn('content_calendars', 'attachment_path')) {
+                    $table->string('attachment_path')->nullable();
+                }
+            });
+        }
+    }
 
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::table('content_calendar', function (Blueprint $table) {
-            //
-        });
+        if (Schema::hasTable('content_calendar')) {
+            Schema::table('content_calendar', function (Blueprint $table) {
+                //
+            });
+        }
     }
 };

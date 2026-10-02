@@ -35,7 +35,7 @@ return [
         ],
     ],
     'callio' => [
-    'base_url' => env('CALLIO_BASE_URL', 'https://clientapi.phonenet.io'),
-    'token' => env('CALLIO_TOKEN'),
-],
+        'base_url' => env('CALLIO_BASE_URL', 'https://clientapi.phonenet.io'),
+        'token' => env('CALLIO_TOKEN'),
+    ],
 ];

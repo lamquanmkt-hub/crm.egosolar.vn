@@ -14,7 +14,6 @@ use App\Enums\ShippingStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OrderRequest;
 use App\Models\Core\Company;
-use App\Models\Core\Warehouse;
 use App\Models\CRM\Orders\Order;
 use App\Models\CRM\Orders\OrderEditHistory;
 use App\Models\CRM\Orders\OrderNotification;
@@ -22,11 +21,17 @@ use App\Models\Inventory\Pricing\PriceTier;
 use App\Models\Payments\Payment;
 use App\Models\Payments\PaymentMethod;
 use App\Models\User;
+use App\Services\Order\OrderDetailViewService;
 use App\Services\Order\OrderExcelExporter;
+use App\Services\Order\OrderItemSyncService;
 use App\Services\Order\OrderProductPickerService;
 use App\Services\Order\OrderSerialWarrantyService;
 use App\Services\Order\OrderStockGuard;
 use App\Traits\HandleException;
+use App\View\Presenters\Order\MyOrdersPresenter;
+use App\View\Presenters\Order\OrderApprovalPresenter;
+use App\View\Presenters\Order\OrderDetailPresenter;
+use App\View\Presenters\Order\OrderListPresenter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +40,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -58,6 +62,11 @@ class OrderController extends Controller
         protected OrderStockGuard $stockGuard,
         protected OrderSerialWarrantyService $serialWarrantyService,
         protected OrderExcelExporter $orderExcelExporter,
+        protected OrderDetailViewService $orderDetailView,
+        protected OrderItemSyncService $orderItemSync,
+        protected OrderApprovalPresenter $approvalPresenter,
+        protected OrderDetailPresenter $detailPresenter,
+        protected OrderListPresenter $listPresenter,
     ) {}
 
     // =========================================================================
@@ -69,8 +78,7 @@ class OrderController extends Controller
      */
     public function index(Request $request): View
     {
-        // Không nhận company_id từ URL; trang Đơn hàng chỉ dùng Công ty Quốc Tế EGO.
-        $filters = $request->except('company_id');
+        $filters = $request->all();
 
         $orders = $this->orderService->getOrdersByUserRole(Auth::user(), $filters);
 
@@ -91,18 +99,15 @@ class OrderController extends Controller
         */
         $orderSummary = $this->orderService->getOrderIndexSummary(Auth::user(), $filters);
 
-        $warehouseQuery = Warehouse::query()->where('company_id', 2);
-        if (Schema::hasColumn('crm_warehouses', 'is_sales_selectable')) {
-            $warehouseQuery->where(function ($builder) {
-                $builder->where('is_sales_selectable', 1)->orWhereNull('is_sales_selectable');
-            });
-        } else {
-            $warehouseQuery->where('name', 'not like', '[KÝ GỬI]%');
-        }
-        $warehouses = $warehouseQuery->orderBy('name')->get();
+        $companies = Company::query()
+            ->where(function ($q) {
+                $q->where('is_active', 1)
+                    ->orWhereNull('is_active');
+            })
+            ->orderBy('name')
+            ->get();
 
         $creatorIds = DB::table('crm_orders')
-            ->where('company_id', 2)
             ->whereNotNull('created_by')
             ->distinct()
             ->pluck('created_by');
@@ -113,10 +118,10 @@ class OrderController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('orders.index', compact(
+        return view('orders.index', $this->listPresenter->viewData($orders, $orderSummary, $filters, Auth::user()) + compact(
             'orders',
             'orderSummary',
-            'warehouses',
+            'companies',
             'creators'
         ));
     }
@@ -124,6 +129,28 @@ class OrderController extends Controller
     /**
      * Form tạo đơn hàng mới.
      */
+    /**
+     * Bảng điều khiển đơn hàng của chính nhân viên sales đang đăng nhập.
+     *
+     * KHÔI PHỤC 2026-09-02. Method này từng tồn tại (OrderController.phpbk:455 và
+     * .phpbk2:256) rồi biến mất trong lần khôi phục routes/web.php ngày 2026-05-06.
+     * Route `/my/dashboard` trỏ tới nó nên trang trả 500, và ngày 2026-08-05 route bị
+     * gỡ luôn — trong khi view orders/my-orders.blade.php (260 dòng) và cả 3 method
+     * OrderService mà nó cần vẫn còn nguyên. Chỉ mất đúng thân method này.
+     */
+    public function myOrders(MyOrdersPresenter $presenter): View
+    {
+        $userId = Auth::id();
+
+        $statistics = $this->orderService->getSalesStatistics($userId);
+        $recentOrders = $this->orderService->getRecentOrdersBySales($userId, 10);
+
+        return view('orders.my-orders', array_merge([
+            'statistics' => $statistics,
+            'pendingNotifications' => $this->orderService->getPendingNotifications($userId),
+        ], $presenter->viewData($statistics, $recentOrders)));
+    }
+
     public function create(): View
     {
         $this->authorize('create', Order::class);
@@ -172,7 +199,7 @@ class OrderController extends Controller
     /**
      * Chi tiết đơn hàng.
      */
-    public function show(string $id): View
+    public function show(Request $request, string $id): View
     {
         $order = $this->orderService->findWithDetails($id);
 
@@ -193,7 +220,7 @@ class OrderController extends Controller
             'debt',
             'returns.items.product',
             'returns.items.orderItem',
-            'returns.items.serials.serialUnit.identifiers',
+            'returns.items.serials.serialUnit.identifiers.serialIdentifier',
             'returns.attachments',
             'returns.approvals.approver',
             'returns.histories.user',
@@ -203,151 +230,6 @@ class OrderController extends Controller
         ]);
 
         $itemIds = $order->items->pluck('id')->map(fn ($value) => (int) $value)->all();
-        $returnAvailable = [];
-        $returnSerialsByItem = [];
-
-        foreach ($order->items as $item) {
-            $used = Schema::hasTable('order_return_items')
-                ? (int) DB::table('order_return_items as ri')
-                    ->join('order_returns as r', 'r.id', '=', 'ri.order_return_id')
-                    ->where('ri.order_item_id', $item->id)
-                    ->whereNotIn('r.status', ['rejected', 'cancelled'])
-                    ->sum('ri.accepted_quantity')
-                : 0;
-
-            $pending = Schema::hasTable('order_return_items')
-                ? (int) DB::table('order_return_items as ri')
-                    ->join('order_returns as r', 'r.id', '=', 'ri.order_return_id')
-                    ->where('ri.order_item_id', $item->id)
-                    ->whereNotIn('r.status', ['completed', 'rejected', 'cancelled'])
-                    ->sum('ri.requested_quantity')
-                : 0;
-
-            $returnAvailable[$item->id] = max(0, (int) $item->quantity - $used - $pending);
-
-            $returnSerialsByItem[$item->id] = collect();
-            if (
-                Schema::hasTable('crm_order_item_serial_units') &&
-                Schema::hasTable('crm_serial_units')
-            ) {
-                $serialQuery = DB::table('crm_order_item_serial_units as oi')
-                    ->join('crm_serial_units as su', 'su.id', '=', 'oi.serial_unit_id')
-                    ->where('oi.order_item_id', $item->id);
-
-                if (Schema::hasTable('crm_serial_unit_identifiers')) {
-                    $serialQuery->leftJoin('crm_serial_unit_identifiers as sui', 'sui.serial_unit_id', '=', 'su.id');
-                }
-                if (Schema::hasTable('crm_serial_identifiers')) {
-                    $serialQuery->leftJoin('crm_serial_identifiers as si', 'si.id', '=', 'sui.serial_identifier_id');
-                }
-                if (Schema::hasTable('crm_serial_unit_states')) {
-                    $serialQuery->leftJoin('crm_serial_unit_states as st', 'st.serial_unit_id', '=', 'su.id');
-                }
-
-                $returnSerialsByItem[$item->id] = $serialQuery
-                    ->select(
-                        'su.id',
-                        DB::raw("COALESCE(MAX(si.code), CONCAT('#', su.id)) as code"),
-                        DB::raw("COALESCE(MAX(st.state), 'unknown') as state")
-                    )
-                    ->groupBy('su.id')
-                    ->get();
-            }
-        }
-
-        $returnWarehouses = Schema::hasTable('crm_warehouses')
-            ? DB::table('crm_warehouses')
-                ->when($order->company_id, fn ($query) => $query->where('company_id', $order->company_id))
-                ->orderBy('name')
-                ->get()
-            : collect();
-
-        $stockAllocations = collect();
-        if (Schema::hasTable('crm_order_item_stock_allocations')) {
-            $allocationQuery = DB::table('crm_order_item_stock_allocations as allocation')
-                ->where('allocation.order_id', $order->id);
-
-            if (Schema::hasTable('crm_product_stock_lots')) {
-                $allocationQuery->leftJoin('crm_product_stock_lots as lot', 'lot.id', '=', 'allocation.stock_lot_id');
-            }
-            if (Schema::hasTable('crm_product_catalog')) {
-                $allocationQuery->leftJoin('crm_product_catalog as product', 'product.id', '=', 'allocation.product_id');
-            }
-            if (Schema::hasTable('crm_warehouses')) {
-                $allocationQuery->leftJoin('crm_warehouses as warehouse', 'warehouse.id', '=', 'allocation.warehouse_id');
-            }
-
-            $stockAllocations = $allocationQuery
-                ->select(
-                    'allocation.*',
-                    DB::raw('lot.lot_code as lot_code'),
-                    DB::raw('product.name as product_name'),
-                    DB::raw('warehouse.name as warehouse_name')
-                )
-                ->orderBy('allocation.id')
-                ->get();
-        }
-
-        $orderSerials = collect();
-        if ($itemIds && Schema::hasTable('crm_order_item_serial_units') && Schema::hasTable('crm_serial_units')) {
-            $serialQuery = DB::table('crm_order_item_serial_units as link')
-                ->join('crm_serial_units as unit', 'unit.id', '=', 'link.serial_unit_id')
-                ->whereIn('link.order_item_id', $itemIds)
-                ->leftJoin('crm_order_items as item', 'item.id', '=', 'link.order_item_id');
-
-            if (Schema::hasTable('crm_product_catalog')) {
-                $serialQuery->leftJoin('crm_product_catalog as product', 'product.id', '=', 'unit.product_id');
-            }
-            if (Schema::hasTable('crm_warehouses')) {
-                $serialQuery->leftJoin('crm_warehouses as warehouse', 'warehouse.id', '=', 'unit.warehouse_id');
-            }
-            if (Schema::hasTable('crm_serial_unit_identifiers')) {
-                $serialQuery->leftJoin('crm_serial_unit_identifiers as sui', 'sui.serial_unit_id', '=', 'unit.id');
-            }
-            if (Schema::hasTable('crm_serial_identifiers')) {
-                $serialQuery->leftJoin('crm_serial_identifiers as identifier', 'identifier.id', '=', 'sui.serial_identifier_id');
-            }
-            if (Schema::hasTable('crm_serial_unit_states')) {
-                $serialQuery->leftJoin('crm_serial_unit_states as state', 'state.serial_unit_id', '=', 'unit.id');
-            }
-
-            $orderSerials = $serialQuery
-                ->select(
-                    'link.order_item_id',
-                    'unit.id as serial_unit_id',
-                    'unit.product_id',
-                    DB::raw("COALESCE(MAX(product.name), MAX(item.product_name), CONCAT('SP #', unit.product_id)) as product_name"),
-                    DB::raw("COALESCE(MAX(identifier.code), CONCAT('#', unit.id)) as serial_code"),
-                    DB::raw("COALESCE(MAX(state.state), 'unknown') as state"),
-                    DB::raw('MAX(warehouse.name) as warehouse_name')
-                )
-                ->groupBy('link.order_item_id', 'unit.id', 'unit.product_id')
-                ->orderBy('link.order_item_id')
-                ->get();
-        }
-
-        $stockMovements = collect();
-        if (Schema::hasTable('crm_stock_movements')) {
-            $movementQuery = DB::table('crm_stock_movements as movement')
-                ->where(function ($query) use ($order) {
-                    $query->where('movement.reference_id', $order->id)
-                        ->orWhere('movement.reason', 'like', '%'.$order->order_code.'%');
-                });
-
-            if (Schema::hasTable('crm_product_catalog')) {
-                $movementQuery->leftJoin('crm_product_catalog as product', 'product.id', '=', 'movement.product_id');
-            }
-
-            $stockMovements = $movementQuery
-                ->select('movement.*', DB::raw('product.name as product_name'))
-                ->latest('movement.id')
-                ->limit(100)
-                ->get();
-        }
-
-        $orderDocuments = Schema::hasTable('crm_order_documents')
-            ? DB::table('crm_order_documents')->where('order_id', $order->id)->latest('id')->get()
-            : collect();
 
         $documentTypes = [
             'payment_request' => 'ĐNTT',
@@ -363,176 +245,33 @@ class OrderController extends Controller
             'other' => 'Khác',
         ];
 
+        $currentApprovalLevel = $this->orderService->getCurrentApprovalLevel($order);
+        $returnAvailable = $this->orderDetailView->returnableQuantitiesByItem($order->items);
 
-        /* EGO_ORDER_STOCK_SHORTAGE_DETAIL_START */
-        $orderStockLines = collect();
-
-        $shortageSummary = [
-            'has_shortage' => false,
-            'total_lines' => 0,
-            'shortage_lines' => 0,
-            'out_of_stock_lines' => 0,
-            'missing_qty' => 0,
-        ];
-
-        if (
-            Schema::hasTable('crm_order_items')
-            && Schema::hasTable('crm_product_catalog')
-            && Schema::hasTable('crm_warehouses')
-        ) {
-            $orderStockLines = DB::table('crm_order_items as item')
-                ->leftJoin(
-                    'crm_product_catalog as product',
-                    'product.id',
-                    '=',
-                    'item.product_id'
-                )
-                ->leftJoin(
-                    'crm_warehouses as warehouse',
-                    'warehouse.id',
-                    '=',
-                    'item.warehouse_id'
-                )
-                ->where('item.order_id', $order->id)
-                ->select(
-                    'item.id',
-                    'item.product_id',
-                    'item.warehouse_id',
-                    'item.quantity',
-                    DB::raw("
-                        COALESCE(
-                            product.name,
-                            item.product_name,
-                            CONCAT('Sản phẩm #', item.product_id)
-                        ) as product_name
-                    "),
-                    DB::raw("COALESCE(product.sku, '') as sku"),
-                    DB::raw("
-                        COALESCE(
-                            warehouse.name,
-                            CONCAT('Kho #', item.warehouse_id)
-                        ) as warehouse_name
-                    ")
-                )
-                ->orderBy('item.id')
-                ->get()
-                ->map(function ($item) {
-                    $productId = (int) ($item->product_id ?? 0);
-                    $warehouseId = (int) ($item->warehouse_id ?? 0);
-                    $requiredQty = max(
-                        0,
-                        (int) ($item->quantity ?? 0)
-                    );
-
-                    $availableQty = 0;
-
-                    if ($productId > 0 && $warehouseId > 0) {
-                        $availableQty =
-                            $this->stockGuard->currentWarehouseStock(
-                                $productId,
-                                $warehouseId,
-                                false
-                            );
-                    }
-
-                    $missingQty = max(
-                        0,
-                        $requiredQty - $availableQty
-                    );
-
-                    $status = 'ok';
-                    $statusLabel = 'Đủ hàng';
-
-                    if ($warehouseId <= 0) {
-                        $status = 'no_warehouse';
-                        $statusLabel = 'Chưa chọn kho';
-                    } elseif ($availableQty <= 0 && $requiredQty > 0) {
-                        $status = 'out_of_stock';
-                        $statusLabel = 'Hết hàng';
-                    } elseif ($missingQty > 0) {
-                        $status = 'insufficient';
-                        $statusLabel = 'Thiếu hàng';
-                    }
-
-                    return (object) [
-                        'id' => (int) ($item->id ?? 0),
-                        'product_id' => $productId,
-                        'warehouse_id' => $warehouseId,
-
-                        'product_name' =>
-                            (string) ($item->product_name ?? ''),
-
-                        'sku' =>
-                            (string) ($item->sku ?? ''),
-
-                        'warehouse_name' =>
-                            (string) ($item->warehouse_name ?? ''),
-
-                        'required_qty' => $requiredQty,
-                        'available_qty' => $availableQty,
-                        'missing_qty' => $missingQty,
-
-                        'status' => $status,
-                        'status_label' => $statusLabel,
-                    ];
-                });
-
-            $shortageItems = $orderStockLines
-                ->filter(function ($row) {
-                    return in_array(
-                        $row->status,
-                        [
-                            'no_warehouse',
-                            'out_of_stock',
-                            'insufficient',
-                        ],
-                        true
-                    );
-                })
-                ->values();
-
-            $shortageSummary = [
-                'has_shortage' =>
-                    $shortageItems->isNotEmpty(),
-
-                'total_lines' =>
-                    $orderStockLines->count(),
-
-                'shortage_lines' =>
-                    $shortageItems->count(),
-
-                'out_of_stock_lines' =>
-                    $shortageItems
-                        ->where('status', 'out_of_stock')
-                        ->count(),
-
-                'missing_qty' =>
-                    (int) $shortageItems->sum('missing_qty'),
-            ];
-        } else {
-            $shortageItems = collect();
-        }
-        /* EGO_ORDER_STOCK_SHORTAGE_DETAIL_END */
-
-        return view('orders.show', [
+        return view('orders.show', array_merge([
             'order' => $order,
             'timeline' => $this->orderService->getOrderTimeline($id),
             'notifications' => $this->orderService->getOrderNotifications($id),
             'paymentMethods' => PaymentMethod::where('is_active', true)->get(),
             'editHistories' => OrderEditHistory::where('order_id', $order->id)->latest()->get(),
-            'currentApprovalLevel' => $this->orderService->getCurrentApprovalLevel($order),
+            'currentApprovalLevel' => $currentApprovalLevel,
             'returnAvailable' => $returnAvailable,
-            'returnSerialsByItem' => $returnSerialsByItem,
-            'returnWarehouses' => $returnWarehouses,
-            'stockAllocations' => $stockAllocations,
-            'orderSerials' => $orderSerials,
-            'stockMovements' => $stockMovements,
-            'orderDocuments' => $orderDocuments,
+            'returnSerialsByItem' => $this->orderDetailView->serialsByOrderItem($itemIds),
+            'returnWarehouses' => $this->orderDetailView->returnWarehouses(
+                $order->company_id !== null ? (int) $order->company_id : null
+            ),
+            'stockAllocations' => $this->orderDetailView->stockAllocations((int) $order->id),
+            'orderSerials' => $this->orderDetailView->orderSerials($itemIds),
+            'stockMovements' => $this->orderDetailView->stockMovements($order),
+            'orderDocuments' => $this->orderDetailView->documents((int) $order->id),
             'documentTypes' => $documentTypes,
-            'orderStockLines' => $orderStockLines,
-            'shortageItems' => $shortageItems,
-            'shortageSummary' => $shortageSummary,
-        ]);
+        ], $this->detailPresenter->viewData(
+            $order,
+            $request->user(),
+            $returnAvailable,
+            $currentApprovalLevel,
+            $request->query('tab'),
+        )));
     }
 
     /**
@@ -582,7 +321,7 @@ class OrderController extends Controller
 
             $this->orderService->updateOrder($id, $data);
 
-            $this->egoSyncOrderItemsAndTotalFromRequest($request, (int) $id);
+            $this->orderItemSync->sync((int) $id, (array) $request->input('items', []));
 
             $freshOrder = $this->orderService->findWithDetails($id);
             $newSnapshot = $this->snapshotOrderData($freshOrder);
@@ -671,10 +410,10 @@ class OrderController extends Controller
 
         $this->authorize('approve', $order);
 
-        return view('orders.approval-form', [
-            'order' => $order,
-            'currentLevel' => $this->orderService->getCurrentApprovalLevel($order),
-        ]);
+        return view('orders.approval-form', $this->approvalPresenter->viewData(
+            $order,
+            $this->orderService->getCurrentApprovalLevel($order),
+        ));
     }
 
     /**
@@ -1426,349 +1165,4 @@ class OrderController extends Controller
         return Pdf::loadView('orders.pdf', compact('order', 'paid', 'remain', 'company'))
             ->setPaper('a4', 'portrait');
     }
-
-    /* EGO_ORDER_TOTAL_SYNC_START */
-    /**
-     * Chuyển chuỗi tiền tệ định dạng Việt Nam (vd: "1.234.567 đ") về số float.
-     */
-    private function egoParseMoney($value): float
-    {
-        if (is_int($value) || is_float($value)) {
-            return (float) $value;
-        }
-
-        $value = trim((string) $value);
-
-        if ($value === '') {
-            return 0.0;
-        }
-
-        $value = str_replace(["\xc2\xa0", ' ', 'VND', 'vnd', 'VNĐ', 'vnđ', 'đ', 'd'], '', $value);
-        $value = preg_replace('/[^0-9,\.\-]/', '', $value);
-
-        if ($value === '' || $value === '-') {
-            return 0.0;
-        }
-
-        $hasComma = strpos($value, ',') !== false;
-        $hasDot = strpos($value, '.') !== false;
-
-        if ($hasComma && $hasDot) {
-            if (strrpos($value, ',') > strrpos($value, '.')) {
-                $value = str_replace('.', '', $value);
-                $value = str_replace(',', '.', $value);
-            } else {
-                $value = str_replace(',', '', $value);
-            }
-        } elseif ($hasComma) {
-            if (preg_match('/,\d{3}$/', $value)) {
-                $value = str_replace(',', '', $value);
-            } else {
-                $value = str_replace(',', '.', $value);
-            }
-        } elseif ($hasDot) {
-            if (preg_match('/\.\d{3}(\.\d{3})*$/', $value)) {
-                $value = str_replace('.', '', $value);
-            }
-        }
-
-        return is_numeric($value) ? (float) $value : 0.0;
-    }
-
-    /**
-     * Đồng bộ các dòng hàng và tổng tiền của đơn từ dữ liệu request (tự resolve VAT, quy đổi giá trước/sau VAT).
-     */
-    private function egoSyncOrderItemsAndTotalFromRequest(Request $request, int $orderId): void
-    {
-        $items = $request->input('items', []);
-
-        if (! is_array($items) || count($items) === 0) {
-            return;
-        }
-
-        $schema = Schema::class;
-
-        $orderTable = $schema::hasTable('crm_orders') ? 'crm_orders' : ($schema::hasTable('orders') ? 'orders' : null);
-        $itemTable = $schema::hasTable('crm_order_items') ? 'crm_order_items' : ($schema::hasTable('order_items') ? 'order_items' : null);
-
-        if (! $orderTable || ! $itemTable) {
-            return;
-        }
-
-        $currentItems = DB::table($itemTable)
-            ->where('order_id', $orderId)
-            ->get()
-            ->keyBy('id');
-
-        $usedItemIds = [];
-        $totalAmount = 0.0;
-        $totalDiscount = 0.0;
-        $totalTaxAmount = 0.0;
-        $productVatCache = [];
-
-        foreach ($items as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
-            $itemId = (int) ($row['id'] ?? 0);
-            $warehouseId = (int) ($row['warehouse_id'] ?? 0);
-            $productId = (int) ($row['product_id'] ?? 0);
-            $priceTierId = ! empty($row['price_tier_id']) ? (int) $row['price_tier_id'] : null;
-
-            $quantity = (int) $this->egoParseMoney($row['quantity'] ?? 1);
-            if ($quantity < 1) {
-                $quantity = 1;
-            }
-
-            $unitPrice = $this->egoParseMoney($row['unit_price'] ?? 0);
-            $discountPercent = $this->egoParseMoney($row['discount_percent'] ?? 0);
-            $discountAmount = $this->egoParseMoney($row['discount_amount'] ?? 0);
-
-            if ($discountPercent < 0) {
-                $discountPercent = 0;
-            }
-
-            if ($discountPercent > 100) {
-                $discountPercent = 100;
-            }
-
-            if ($discountAmount < 0) {
-                $discountAmount = 0;
-            }
-
-            $vatPercent = $this->egoParseMoney($row['vat_percent'] ?? 0);
-
-            if ($vatPercent <= 0 && $productId > 0) {
-                $cacheKey = $productId.':'.(int) ($priceTierId ?? 0);
-
-                if (! array_key_exists($cacheKey, $productVatCache)) {
-                    $productVatCache[$cacheKey] = $this->pricingService->resolveVatPercentForOrderItem($productId, $priceTierId);
-                }
-
-                $vatPercent = (float) ($productVatCache[$cacheKey] ?? 0);
-
-                if ($vatPercent <= 0 && $productId > 0 && $schema::hasTable('crm_product_prices')) {
-                    $vatPercent = (float) DB::table('crm_product_prices')
-                        ->where('product_id', $productId)
-                        ->where('vat_percent', '>', 0)
-                        ->orderBy('price_tier_id')
-                        ->value('vat_percent');
-                }
-            }
-
-            if ($vatPercent < 0) {
-                $vatPercent = 0;
-            }
-
-            if ($vatPercent > 100) {
-                $vatPercent = 100;
-            }
-
-            // EGO FIX: Khi tạo đơn, form có thể gửi giá TRƯỚC VAT từ bảng giá đại lý.
-            // Bảng crm_order_items.unit_price đang được màn chi tiết đơn hiểu là giá SAU VAT.
-            // Vì vậy nếu unit_price khớp giá trước VAT trong crm_product_prices thì đổi sang giá sau VAT.
-            if ($productId > 0 && $priceTierId && $schema::hasTable('crm_product_prices')) {
-                $priceColsForVatFix = $schema::getColumnListing('crm_product_prices');
-
-                if (
-                    in_array('product_id', $priceColsForVatFix, true)
-                    && in_array('price_tier_id', $priceColsForVatFix, true)
-                    && in_array('price', $priceColsForVatFix, true)
-                ) {
-                    $tierPriceRowForVatFix = DB::table('crm_product_prices')
-                        ->where('product_id', $productId)
-                        ->where('price_tier_id', $priceTierId)
-                        ->first();
-
-                    if ($tierPriceRowForVatFix) {
-                        $tierPriceBeforeVatForVatFix = (float) ($tierPriceRowForVatFix->price ?? 0);
-
-                        $tierVatForVatFix = 0.0;
-                        foreach (['vat_percent', 'vat', 'tax_percent'] as $vatColumnForVatFix) {
-                            if (in_array($vatColumnForVatFix, $priceColsForVatFix, true)) {
-                                $tierVatForVatFix = (float) ($tierPriceRowForVatFix->{$vatColumnForVatFix} ?? 0);
-                                if ($tierVatForVatFix > 0) {
-                                    break;
-                                }
-                            }
-                        }
-
-                        if ($vatPercent <= 0 && $tierVatForVatFix > 0) {
-                            $vatPercent = min(100, max(0, $tierVatForVatFix));
-                        }
-
-                        if ($tierPriceBeforeVatForVatFix > 0 && $vatPercent > 0) {
-                            $tierPriceAfterVatForVatFix = round($tierPriceBeforeVatForVatFix * (1 + $vatPercent / 100), 0);
-
-                            // Nếu form gửi đúng giá trước VAT, đổi sang giá sau VAT để lưu đơn.
-                            if (abs($unitPrice - $tierPriceBeforeVatForVatFix) <= 1) {
-                                $unitPrice = $tierPriceAfterVatForVatFix;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // EGO FINAL FIX CREATE ORDER PRICE/VAT:
-            // Form có thể gửi unit_price là giá TRƯỚC VAT từ crm_product_prices.
-            // Màn chi tiết đơn hàng đang hiểu crm_order_items.unit_price là giá SAU VAT.
-            // Vì vậy trước khi tính line_total/lưu DB, nếu unit_price khớp giá trước VAT
-            // thì đổi sang giá sau VAT và set VAT theo tầng giá.
-            if ($productId > 0 && $priceTierId && $schema::hasTable('crm_product_prices')) {
-                $priceColsForEgoVatFix = $schema::getColumnListing('crm_product_prices');
-
-                if (
-                    in_array('product_id', $priceColsForEgoVatFix, true)
-                    && in_array('price_tier_id', $priceColsForEgoVatFix, true)
-                    && in_array('price', $priceColsForEgoVatFix, true)
-                ) {
-                    $tierPriceRowForEgoVatFix = DB::table('crm_product_prices')
-                        ->where('product_id', $productId)
-                        ->where('price_tier_id', $priceTierId)
-                        ->first();
-
-                    if ($tierPriceRowForEgoVatFix) {
-                        $tierPriceBeforeVatForEgoVatFix = (float) ($tierPriceRowForEgoVatFix->price ?? 0);
-
-                        $tierVatForEgoVatFix = 0.0;
-                        foreach (['vat_percent', 'vat', 'tax_percent'] as $egoVatColumn) {
-                            if (in_array($egoVatColumn, $priceColsForEgoVatFix, true)) {
-                                $tierVatForEgoVatFix = (float) ($tierPriceRowForEgoVatFix->{$egoVatColumn} ?? 0);
-                                if ($tierVatForEgoVatFix > 0) {
-                                    break;
-                                }
-                            }
-                        }
-
-                        if ($vatPercent <= 0 && $tierVatForEgoVatFix > 0) {
-                            $vatPercent = min(100, max(0, $tierVatForEgoVatFix));
-                        }
-
-                        if ($tierPriceBeforeVatForEgoVatFix > 0 && $vatPercent > 0) {
-                            $tierPriceAfterVatForEgoVatFix = round($tierPriceBeforeVatForEgoVatFix * (1 + $vatPercent / 100), 0);
-
-                            // Nếu form gửi 18.000.000 cho Đại lý 3, đổi thành 19.440.000.
-                            if (abs($unitPrice - $tierPriceBeforeVatForEgoVatFix) <= 1) {
-                                $unitPrice = $tierPriceAfterVatForEgoVatFix;
-                            }
-                        }
-                    }
-                }
-            }
-
-            $lineSubtotal = $unitPrice * $quantity;
-            // discount_amount trên form là số tiền giảm trên MỖI sản phẩm.
-            // Đồng bộ backend với order-form.js:
-            // có giảm tiền/SP thì ưu tiên; nếu không mới dùng giảm %.
-            $lineDiscount = $discountAmount > 0
-                ? min($lineSubtotal, $discountAmount * $quantity)
-                : min($lineSubtotal, $lineSubtotal * $discountPercent / 100);
-            if ($lineDiscount > $lineSubtotal) {
-                $lineDiscount = $lineSubtotal;
-            }
-
-            $lineTotal = max(0, $lineSubtotal - $lineDiscount);
-
-            if ($vatPercent > 0 && $lineTotal > 0) {
-                $lineBeforeVat = $lineTotal / (1 + ($vatPercent / 100));
-                $totalTaxAmount += max(0, $lineTotal - $lineBeforeVat);
-            }
-
-            if ($unitPrice <= 0 && $lineTotal > 0 && $quantity > 0) {
-                $unitPrice = round($lineTotal / $quantity, 2);
-            }
-
-            if ($productId <= 0 || $warehouseId <= 0 || $unitPrice <= 0) {
-                continue;
-            }
-
-            $payload = [];
-
-            $set = function (string $column, $value) use (&$payload, $itemTable, $schema) {
-                if ($schema::hasColumn($itemTable, $column)) {
-                    $payload[$column] = $value;
-                }
-            };
-
-            $set('warehouse_id', $warehouseId);
-            $set('product_id', $productId);
-            $set('price_tier_id', $priceTierId);
-            $set('quantity', $quantity);
-            $set('unit_price', $unitPrice);
-            $set('vat_percent', $vatPercent);
-            $set('discount_percent', $discountPercent);
-            $set('discount_amount', $discountAmount);
-
-            if ($schema::hasColumn($itemTable, 'updated_at')) {
-                $payload['updated_at'] = now();
-            }
-
-            if ($itemId > 0 && $currentItems->has($itemId)) {
-                DB::table($itemTable)
-                    ->where('id', $itemId)
-                    ->where('order_id', $orderId)
-                    ->update($payload);
-
-                $usedItemIds[] = $itemId;
-            } else {
-                $matched = $currentItems->first(function ($it) use ($productId, $warehouseId, $usedItemIds) {
-                    return ! in_array((int) $it->id, $usedItemIds, true)
-                        && (int) ($it->product_id ?? 0) === $productId
-                        && (int) ($it->warehouse_id ?? 0) === $warehouseId;
-                });
-
-                if ($matched) {
-                    DB::table($itemTable)
-                        ->where('id', $matched->id)
-                        ->where('order_id', $orderId)
-                        ->update($payload);
-
-                    $usedItemIds[] = (int) $matched->id;
-                } else {
-                    $payload['order_id'] = $orderId;
-
-                    if ($schema::hasColumn($itemTable, 'created_at')) {
-                        $payload['created_at'] = now();
-                    }
-
-                    $newId = DB::table($itemTable)->insertGetId($payload);
-                    $usedItemIds[] = (int) $newId;
-                }
-            }
-
-            $totalAmount += $lineTotal;
-            $totalDiscount += $lineDiscount;
-        }
-
-        if ($totalAmount <= 0) {
-            return;
-        }
-
-        $orderPayload = [];
-
-        if ($schema::hasColumn($orderTable, 'total_amount')) {
-            $orderPayload['total_amount'] = $totalAmount;
-        }
-
-        if ($schema::hasColumn($orderTable, 'discount_amount')) {
-            $orderPayload['discount_amount'] = $totalDiscount;
-        }
-
-        if ($schema::hasColumn($orderTable, 'tax_amount')) {
-            $orderPayload['tax_amount'] = round($totalTaxAmount, 2);
-        }
-
-        if ($schema::hasColumn($orderTable, 'updated_at')) {
-            $orderPayload['updated_at'] = now();
-        }
-
-        if (! empty($orderPayload)) {
-            DB::table($orderTable)
-                ->where('id', $orderId)
-                ->update($orderPayload);
-        }
-    }
-    /* EGO_ORDER_TOTAL_SYNC_END */
-
 }

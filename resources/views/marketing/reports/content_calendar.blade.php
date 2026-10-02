@@ -3,155 +3,44 @@
 @section('title', 'Lịch biên tập nội dung')
 
 @section('content')
-@php
-    use Illuminate\Support\Str;
+@use('Illuminate\Support\Str')
 
-    $statusColors = [
-        'draft'     => 'secondary',
-        'scheduled' => 'warning',
-        'posted'    => 'success',
-        'submitted' => 'info',
-        'approved'  => 'primary',
-        'rejected'  => 'danger',
-    ];
-
-    $statusLabels = [
-        'draft'     => 'Nháp',
-        'scheduled' => 'Lên lịch',
-        'posted'    => 'Đã đăng',
-        'submitted' => 'Chờ duyệt',
-        'approved'  => 'Đã duyệt',
-        'rejected'  => 'Từ chối',
-    ];
-
-    $itemsCol   = collect($items);
-
-    // ===== Helpers: platform & assignees =====
-    $parsePlatform = function($platformRaw){
-        $raw = trim((string)$platformRaw);
-        if($raw === '') return ['type' => '', 'account' => '', 'raw' => ''];
-
-        // format: "facebook|EGO Solar - Page A"
-        if(Str::contains($raw, '|')){
-            [$type, $account] = array_pad(explode('|', $raw, 2), 2, '');
-            return [
-                'type' => Str::lower(trim($type)),
-                'account' => trim($account),
-                'raw' => $raw,
-            ];
-        }
-
-        // fallback: old format "facebook"
-        return [
-            'type' => Str::lower($raw),
-            'account' => '',
-            'raw' => $raw,
-        ];
-    };
-
-    $parseAssignees = function($item){
-        // ưu tiên assignees (array/json) nếu có, fallback assignee string "A, B"
-        $arr = [];
-        try{
-            if(isset($item->assignees)){
-                if(is_array($item->assignees)){
-                    $arr = $item->assignees;
-                }elseif(is_string($item->assignees)){
-                    $decoded = json_decode($item->assignees, true);
-                    if(is_array($decoded)) $arr = $decoded;
-                }
-            }
-        }catch(\Throwable $e){}
-
-        if(empty($arr)){
-            $str = (string)($item->assignee ?? '');
-            $arr = array_values(array_filter(array_map('trim', preg_split('/,|;|\|/', $str))));
-        }
-
-        // unique (case-insensitive)
-        $seen = [];
-        $out = [];
-        foreach($arr as $n){
-            $n = trim((string)$n);
-            if($n === '') continue;
-            $key = mb_strtolower($n);
-            if(isset($seen[$key])) continue;
-            $seen[$key] = true;
-            $out[] = $n;
-        }
-        return $out;
-    };
-
-    $platforms  = $itemsCol->pluck('platform')->filter()->map(fn($p) => $parsePlatform($p)['type'])->filter()->unique()->sort()->values();
-    $statuses   = $itemsCol->pluck('status')->filter()->unique()->sort()->values();
-
-    $countAll   = $itemsCol->count();
-    $countDraft = $itemsCol->where('status','draft')->count();
-    $countSch   = $itemsCol->where('status','scheduled')->count();
-    $countPost  = $itemsCol->where('status','posted')->count();
-
-    $groupByDate = $itemsCol->sortBy('publish_date')->groupBy(function($i){
-        return \Carbon\Carbon::parse($i->publish_date)->format('Y-m-d');
-    });
-
-    $groupByStatus = $itemsCol->groupBy('status');
-
-    $platformIcon = function($type){
-        $type = Str::lower((string)$type);
-        return match($type){
-            'facebook' => 'bi-facebook',
-            'tiktok'   => 'bi-tiktok',
-            'youtube'  => 'bi-youtube',
-            'website'  => 'bi-globe2',
-            default    => 'bi-share',
-        };
-    };
-
-    $platformLabel = function($type){
-        $type = Str::lower((string)$type);
-        return match($type){
-            'facebook' => 'Facebook',
-            'tiktok'   => 'TikTok',
-            'youtube'  => 'YouTube',
-            'website'  => 'Website',
-            default    => Str::ucfirst($type),
-        };
-    };
-@endphp
-
-<div class="container-fluid px-4 content-calendar-page">
+{{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+     thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+     quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+<div class="container-fluid tw:px-6 content-calendar-page tw:py-4">
 
     {{-- HEADER + CONTROLS --}}
-    <div class="cc-head mb-3 mt-3">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div class="cc-head tw:mb-4 tw:mt-4">
+        <div class="d-flex flex-wrap tw:justify-between tw:items-start tw:gap-4">
             <div>
-                <h3 class="mb-1 cc-head-title">Lịch biên tập nội dung</h3>
-                <p class="mb-0 cc-head-sub">Quản lý kế hoạch nội dung marketing theo ngày</p>
+                <h3 class="tw:mb-1 cc-head-title">Lịch biên tập nội dung</h3>
+                <p class="tw:mb-0 cc-head-sub">Quản lý kế hoạch nội dung marketing theo ngày</p>
             </div>
 
-            <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <div class="d-flex tw:items-center tw:gap-2 flex-wrap tw:justify-end">
                 <div class="btn-group cc-view-switch" role="group" aria-label="View switch">
-                    <button type="button" class="btn btn-outline-secondary cc-view-btn active" data-cc-view="list">
+                    <x-ui.button variant="outline-secondary" type="button" class="cc-view-btn active" data-cc-view="list">
                         <i class="bi bi-list-ul"></i> Danh sách
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary cc-view-btn" data-cc-view="calendar">
+                    </x-ui.button>
+                    <x-ui.button variant="outline-secondary" type="button" class="cc-view-btn" data-cc-view="calendar">
                         <i class="bi bi-calendar3"></i> Lịch
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary cc-view-btn" data-cc-view="kanban">
+                    </x-ui.button>
+                    <x-ui.button variant="outline-secondary" type="button" class="cc-view-btn" data-cc-view="kanban">
                         <i class="bi bi-columns-gap"></i> Kanban
-                    </button>
+                    </x-ui.button>
                 </div>
 
-                <button class="btn btn-ego" data-bs-toggle="modal" data-bs-target="#contentCreateModal">
+                <x-ui.button variant="none" size="none" class="btn-ego" data-bs-toggle="modal" data-bs-target="#contentCreateModal">
                     <i class="bi bi-plus-circle"></i> Thêm nội dung
-                </button>
+                </x-ui.button>
             </div>
         </div>
 
         {{-- STATS + FILTER BAR --}}
-        <div class="cc-toolbar mt-3">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <div class="cc-stats d-flex flex-wrap gap-2">
+        <div class="cc-toolbar tw:mt-4">
+            <div class="d-flex flex-wrap tw:items-center tw:justify-between tw:gap-2">
+                <div class="cc-stats d-flex flex-wrap tw:gap-2">
                     <span class="cc-chip">
                         <span class="cc-chip-dot"></span> Tổng: <strong id="ccCountAll">{{ $countAll }}</strong>
                     </span>
@@ -166,76 +55,76 @@
                     </span>
                 </div>
 
-                <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="d-flex tw:items-center tw:gap-2 flex-wrap">
                     <span class="text-muted small d-none d-md-inline">Mẹo: dùng “Tuần này” để lọc nhanh.</span>
                 </div>
             </div>
 
-            <div class="cc-filters mt-2">
-                <div class="row g-2 align-items-end">
-                    <div class="col-12 col-md-3 col-lg-2">
+            <div class="cc-filters tw:mt-2">
+                <div class="tw:row tw:g-2 tw:items-end">
+                    <div class="tw:col12-12 tw:md:col12-3 tw:min-[62rem]:col12-2">
                         <label class="cc-label">Từ ngày</label>
-                        <input type="date" class="form-control cc-input" id="ccFrom">
+                        <x-ui.input class="cc-input" type="date" id="ccFrom" />
                     </div>
 
-                    <div class="col-12 col-md-3 col-lg-2">
+                    <div class="tw:col12-12 tw:md:col12-3 tw:min-[62rem]:col12-2">
                         <label class="cc-label">Đến ngày</label>
-                        <input type="date" class="form-control cc-input" id="ccTo">
+                        <x-ui.input class="cc-input" type="date" id="ccTo" />
                     </div>
 
-                    <div class="col-6 col-md-3 col-lg-2">
+                    <div class="tw:col12-6 tw:md:col12-3 tw:min-[62rem]:col12-2">
                         <label class="cc-label">Nền tảng</label>
-                        <select class="form-select cc-input" id="ccPlatform">
+                        <x-ui.select class="cc-input" id="ccPlatform">
                             <option value="">Tất cả</option>
-                            @foreach($platforms as $p)
-                                <option value="{{ Str::lower($p) }}">{{ $platformLabel($p) }}</option>
+                            @foreach($platformOptions as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.select>
                     </div>
 
-                    <div class="col-6 col-md-3 col-lg-2">
+                    <div class="tw:col12-6 tw:md:col12-3 tw:min-[62rem]:col12-2">
                         <label class="cc-label">Trạng thái</label>
-                        <select class="form-select cc-input" id="ccStatus">
+                        <x-ui.select class="cc-input" id="ccStatus">
                             <option value="">Tất cả</option>
-                            @foreach($statuses as $s)
-                                <option value="{{ $s }}">{{ $statusLabels[$s] ?? Str::ucfirst($s) }}</option>
+                            @foreach($statusOptions as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.select>
                     </div>
 
-                    <div class="col-12 col-md-6 col-lg-2">
+                    <div class="tw:col12-12 tw:md:col12-6 tw:min-[62rem]:col12-2">
                         <label class="cc-label">Phụ trách</label>
-                        <select class="form-select cc-input" id="ccAssignee">
+                        <x-ui.select class="cc-input" id="ccAssignee">
                             <option value="">Tất cả</option>
                             @foreach(($marketingUsers ?? []) as $u)
                                 <option value="{{ $u->id }}"
-    {{ (isset($item) && $item->assignee_user_id == $u->id) ? 'selected' : '' }}>
+    {{ (isset($item) && $item->assigneeUserId == $u->id) ? 'selected' : '' }}>
     {{ $u->name }}
 </option>
                             @endforeach
-                        </select>
+                        </x-ui.select>
                     </div>
 
-                    <div class="col-12 col-md-6 col-lg-3">
+                    <div class="tw:col12-12 tw:md:col12-6 tw:min-[62rem]:col12-3">
                         <label class="cc-label">Tìm kiếm</label>
                         <div class="input-group">
                             <span class="input-group-text cc-ig">
                                 <i class="bi bi-search"></i>
                             </span>
-                            <input type="text" class="form-control cc-input" id="ccSearch" placeholder="Tiêu đề, mô tả, link, phụ trách...">
-                            <button class="btn btn-outline-secondary cc-clear" type="button" id="ccClear" title="Xóa lọc">
+                            <x-ui.input class="cc-input" type="text" id="ccSearch" placeholder="Tiêu đề, mô tả, link, phụ trách..." />
+                            <x-ui.button :border-base="false" variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] tw:font-normal tw:relative tw:z-[2] cc-clear" type="button" id="ccClear" title="Xóa lọc">
                                 <i class="bi bi-x-lg"></i>
-                            </button>
+                            </x-ui.button>
                         </div>
                     </div>
 
-                    <div class="col-12 col-lg-4">
+                    <div class="tw:col12-12 tw:min-[62rem]:col12-4">
     <label class="cc-label">Lọc nhanh</label>
-    <div class="d-flex flex-wrap gap-2">
-        <button type="button" class="btn btn-outline-secondary cc-btn-quick" id="ccQuickThisWeek">Tuần này</button>
-        <button type="button" class="btn btn-outline-secondary cc-btn-quick" id="ccQuickLastWeek">Tuần trước</button>
-        <button type="button" class="btn btn-outline-secondary cc-btn-quick" id="ccQuickThisMonth">Tháng này</button>
-        <button type="button" class="btn btn-outline-secondary cc-btn-quick" id="ccQuickLastMonth">Tháng trước</button>
+    <div class="d-flex flex-wrap tw:gap-2">
+        <x-ui.button :border-base="false" variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] cc-btn-quick" type="button" id="ccQuickThisWeek">Tuần này</x-ui.button>
+        <x-ui.button :border-base="false" variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] cc-btn-quick" type="button" id="ccQuickLastWeek">Tuần trước</x-ui.button>
+        <x-ui.button :border-base="false" variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] cc-btn-quick" type="button" id="ccQuickThisMonth">Tháng này</x-ui.button>
+        <x-ui.button :border-base="false" variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] cc-btn-quick" type="button" id="ccQuickLastMonth">Tháng trước</x-ui.button>
     </div>
 </div>
                 </div>
@@ -244,49 +133,49 @@
     </div>
 
     {{-- MAIN LAYOUT --}}
-    <div class="row g-3 mt-3 cc-layout">
-        <div class="col-12 col-lg-9">
+    <div class="tw:row tw:g-3 tw:mt-4 cc-layout">
+        <div class="tw:col12-12 tw:min-[62rem]:col12-9">
 
             {{-- DASHBOARD TUẦN --}}
-            <div class="card cc-card mb-3" id="ccWeeklyWrap">
-                <div class="card-body p-3">
-                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+            <x-ui.card class="cc-card tw:mb-4" id="ccWeeklyWrap">
+                <x-ui.card-body class="tw:p-4">
+                    <div class="d-flex flex-wrap tw:items-start tw:justify-between tw:gap-2">
                         <div>
                             <div class="fw-semibold" style="font-size:16px;">Dashboard tuần</div>
                             <div class="text-muted small">
-                                Tự động lấy theo bộ lọc bên dưới • Tuần: <span class="badge text-bg-light border" id="ccDashRange">—</span>
+                                Tự động lấy theo bộ lọc bên dưới • Tuần: <span class="badge tw:text-[#000000] tw:bg-[#f8f9fa] border" id="ccDashRange">—</span>
                             </div>
                         </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="ccDashRefresh">
+                        <div class="d-flex tw:items-center tw:gap-2">
+                            <x-ui.button variant="outline-primary" size="sm" type="button" id="ccDashRefresh">
                                 <i class="bi bi-arrow-repeat"></i> Làm mới
-                            </button>
+                            </x-ui.button>
                         </div>
                     </div>
 
-                    <div class="row g-2 mt-2">
-                        <div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Reach</div><div class="cc-kpi-num" id="ccKpiReach">0</div></div></div>
-                        <div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Views</div><div class="cc-kpi-num" id="ccKpiViews">0</div></div></div>
-                        <div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Engagement</div><div class="cc-kpi-num" id="ccKpiEng">0</div></div></div>
-                        <div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Leads</div><div class="cc-kpi-num" id="ccKpiLeads">0</div></div></div>
-                        <div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Bài viết</div><div class="cc-kpi-num" id="ccKpiPost">0</div></div></div>
-<div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Video AI</div><div class="cc-kpi-num" id="ccKpiVideoAI">0</div></div></div>
-<div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Video Review</div><div class="cc-kpi-num" id="ccKpiVideoReview">0</div></div></div>
-<div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Livestream</div><div class="cc-kpi-num" id="ccKpiLive">0</div></div></div>
-                        <div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Bài có số liệu</div><div class="cc-kpi-num" id="ccKpiHave">0</div></div></div>
-                        <div class="col-6 col-md-4 col-xl-2"><div class="cc-kpi-tile"><div class="text-muted small">Chưa nhập</div><div class="cc-kpi-num text-danger" id="ccKpiMissing">0</div></div></div>
+                    <div class="tw:row tw:g-2 tw:mt-2">
+                        <div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Reach</div><div class="cc-kpi-num" id="ccKpiReach">0</div></div></div>
+                        <div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Views</div><div class="cc-kpi-num" id="ccKpiViews">0</div></div></div>
+                        <div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Engagement</div><div class="cc-kpi-num" id="ccKpiEng">0</div></div></div>
+                        <div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Leads</div><div class="cc-kpi-num" id="ccKpiLeads">0</div></div></div>
+                        <div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Bài viết</div><div class="cc-kpi-num" id="ccKpiPost">0</div></div></div>
+<div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Video AI</div><div class="cc-kpi-num" id="ccKpiVideoAI">0</div></div></div>
+<div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Video Review</div><div class="cc-kpi-num" id="ccKpiVideoReview">0</div></div></div>
+<div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Livestream</div><div class="cc-kpi-num" id="ccKpiLive">0</div></div></div>
+                        <div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Bài có số liệu</div><div class="cc-kpi-num" id="ccKpiHave">0</div></div></div>
+                        <div class="tw:col12-6 tw:md:col12-4 tw:min-[75rem]:col12-2"><div class="cc-kpi-tile"><div class="text-muted small">Chưa nhập</div><div class="cc-kpi-num tw:text-[#dc3545]" id="ccKpiMissing">0</div></div></div>
                     </div>
 
-                    <div class="row g-2 mt-2">
-                        <div class="col-12 col-lg-5">
-                            <div class="cc-panel h-100">
+                    <div class="tw:row tw:g-2 tw:mt-2">
+                        <div class="tw:col12-12 tw:min-[62rem]:col12-5">
+                            <div class="cc-panel tw:h-full">
                                 <div class="cc-panel-hd">
                                     <div class="fw-semibold"><i class="bi bi-trophy-fill text-warning me-1"></i> Ranking nhân viên</div>
                                     <div class="text-muted small">Top theo Leads → Reach</div>
                                 </div>
-                                <div class="cc-panel-bd p-0">
+                                <div class="cc-panel-bd tw:p-0">
                                     <div class="table-responsive">
-                                        <table class="table table-sm mb-0">
+                                        <table class="table table-sm tw:mb-0">
                                             <thead class="table-light">
                                                 <tr>
                                                     <th>Nhân viên</th>
@@ -296,7 +185,7 @@
                                                 </tr>
                                             </thead>
                                             <tbody id="ccRankBody">
-                                                <tr><td colspan="4" class="text-muted small p-3">Chưa có dữ liệu</td></tr>
+                                                <tr><td colspan="4" class="text-muted small tw:p-4">Chưa có dữ liệu</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -304,10 +193,10 @@
                             </div>
                         </div>
 
-                        <div class="col-12 col-lg-7">
-                            <div class="cc-panel h-100">
+                        <div class="tw:col12-12 tw:min-[62rem]:col12-7">
+                            <div class="cc-panel tw:h-full">
                                 <div class="cc-panel-hd">
-                                    <div class="fw-semibold"><i class="bi bi-fire text-danger me-1"></i> Top content tuần</div>
+                                    <div class="fw-semibold"><i class="bi bi-fire tw:text-[#dc3545] me-1"></i> Top content tuần</div>
                                     <div class="text-muted small">Ưu tiên Engagement rate</div>
                                 </div>
                                 <div class="cc-panel-bd" id="ccTopContent">
@@ -316,18 +205,18 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
 
             {{-- VIEWS --}}
             <div class="cc-views">
 
                 {{-- LIST VIEW --}}
                 <div class="cc-view" id="ccView-list">
-                    <div class="card cc-card">
-                        <div class="card-body p-0">
+                    <x-ui.card class="cc-card">
+                        <x-ui.card-body class="tw:p-0">
                             <div class="table-responsive cc-table-wrap">
-                                <table class="table table-hover mb-0 align-middle cc-table">
+                                <table class="table table-hover tw:mb-0 align-middle cc-table">
                                     <thead>
                                         <tr>
                                             <th class="cc-col-date">Ngày</th>
@@ -340,50 +229,24 @@
 
                                     <tbody id="ccListBody">
                                     @forelse($items as $item)
-                                        @php
-                                            $publishYmd = \Carbon\Carbon::parse($item->publish_date)->format('Y-m-d');
-                                            $publishDMY = \Carbon\Carbon::parse($item->publish_date)->format('d/m/Y');
-
-                                            $plat = $parsePlatform($item->platform);
-                                            $platType = $plat['type'];
-                                            $platAcc  = $plat['account'];
-
-                                            $assignees = $parseAssignees($item);
-                                            $assigneeFromUser = null;
-                                            if(!empty($item->assignee_user_id) && isset($marketingUserMap) && $marketingUserMap->get($item->assignee_user_id)){
-                                                $assigneeFromUser = $marketingUserMap->get($item->assignee_user_id)->name;
-                                            }
-                                            $assigneesText = $assigneeFromUser ?: implode(' ', $assignees);
-
-                                            $linkHost = '';
-                                            if(!empty($item->link)){
-                                                try{
-                                                    $u = parse_url($item->link);
-                                                    $linkHost = $u['host'] ?? '';
-                                                    $linkHost = preg_replace('/^www\./','',$linkHost);
-                                                }catch(\Throwable $e){
-                                                    $linkHost = '';
-                                                }
-                                            }
-                                        @endphp
 
                                         <tr class="cc-row"
                                             data-cc-item
-                                            data-date="{{ $publishYmd }}"
-                                            data-platform="{{ Str::lower($platType) }}"
+                                            data-date="{{ $item->publishYmd }}"
+                                            data-platform="{{ $item->platformType }}"
                                             data-status="{{ $item->status }}"
-                                            data-assignee-id="{{ $item->assignee_user_id ?? '' }}"
-                                            data-title="{{ Str::lower($item->title.' '.($item->description ?? '').' '.($item->link ?? '').' '.$assigneesText) }}"
+                                            data-assignee-id="{{ $item->assigneeUserId ?? '' }}"
+                                            data-title="{{ $item->searchText }}"
                                         >
                                             <td class="cc-date">
                                                 <div class="cc-date-wrap">
-                                                    <div class="cc-date-main">{{ $publishDMY }}</div>
+                                                    <div class="cc-date-main">{{ $item->publishDmy }}</div>
                                                     <div class="cc-date-sub">
                                                         <span class="badge cc-badge-platform">
-                                                            <i class="bi {{ $platformIcon($platType) }}"></i>
-                                                            {{ $platformLabel($platType) }}
-                                                            @if(!empty($platAcc))
-                                                                <span class="cc-plat-acc">• {{ Str::limit($platAcc, 22) }}</span>
+                                                            <i class="bi {{ $item->platformIcon }}"></i>
+                                                            {{ $item->platformLabel }}
+                                                            @if(!empty($item->platformAccount))
+                                                                <span class="cc-plat-acc">• {{ Str::limit($item->platformAccount, 22) }}</span>
                                                             @endif
                                                         </span>
                                                     </div>
@@ -393,19 +256,19 @@
                                             <td class="cc-main">
                                                 <div class="cc-title">{{ $item->title }}</div>
 
-                                                <div class="cc-meta mt-2">
+                                                <div class="cc-meta tw:mt-2">
                                                     <span class="cc-pill">
-                                                        <i class="bi bi-tag"></i> {{ $item->content_type }}
+                                                        <i class="bi bi-tag"></i> {{ $item->contentType }}
                                                     </span>
 
                                                     <span class="cc-pill">
                                                         <i class="bi bi-bullseye"></i>
-                                                        {{ $item->campaign_id ? ('Campaign #'.$item->campaign_id) : 'Không chiến dịch' }}
+                                                        {{ $item->campaignText }}
                                                     </span>
 
-                                                    @if($item->files && $item->files->count())
+                                                    @if($item->filesCount)
                                                         <span class="cc-pill">
-                                                            <i class="bi bi-paperclip"></i> {{ $item->files->count() }} file
+                                                            <i class="bi bi-paperclip"></i> {{ $item->filesCount }} file
                                                         </span>
                                                     @endif
 
@@ -418,45 +281,41 @@
                                                 </div>
 
                                                 @if(!empty($item->link))
-                                                    <div class="cc-linkbar mt-2">
+                                                    <div class="cc-linkbar tw:mt-2">
                                                         <span class="cc-linkhost">
-                                                            <i class="bi bi-link-45deg"></i> {{ $linkHost ?: 'Link' }}
+                                                            <i class="bi bi-link-45deg"></i> {{ $item->linkHost ?: 'Link' }}
                                                         </span>
-                                                        <button type="button"
-                                                                class="btn btn-sm btn-outline-secondary cc-mini-btn"
-                                                                data-cc-copy="{{ $item->link }}"
+                                                        <x-ui.button :border-base="false" variant="outline-secondary" size="none" class="tw:px-2 tw:py-1 tw:text-[14px]/[21px] cc-mini-btn" type="button" data-cc-copy="{{ $item->link }}"
                                                                 title="Copy link">
                                                             <i class="bi bi-clipboard"></i>
-                                                        </button>
-                                                        <a href="{{ $item->link }}" target="_blank" rel="noopener"
-                                                           class="btn btn-sm btn-outline-secondary cc-mini-btn" title="Mở link">
+                                                        </x-ui.button>
+                                                        <x-ui.button :border-base="false" variant="outline-secondary" size="none" class="tw:px-2 tw:py-1 tw:text-[14px]/[21px] cc-mini-btn" :href="$item->link" target="_blank" rel="noopener" title="Mở link">
                                                             <i class="bi bi-box-arrow-up-right"></i>
-                                                        </a>
+                                                        </x-ui.button>
                                                     </div>
                                                 @endif
                                             </td>
 
                                             <td class="cc-assignee-cell">
-                                                @if(count($assignees))
+                                                @if(count($item->assignees))
                                                     <div class="cc-people">
                                                         <div class="cc-avatars">
-                                                            @foreach(array_slice($assignees, 0, 3) as $n)
-                                                                @php $ini = Str::upper(mb_substr(trim($n), 0, 1)); @endphp
-                                                                <span class="cc-avatar" title="{{ $n }}">{{ $ini }}</span>
+                                                            @foreach(array_slice($item->assignees, 0, 3) as $n)
+                                                                <span class="cc-avatar" title="{{ $n }}">{{ $item->assigneeInitials[$n] }}</span>
                                                             @endforeach
 
-                                                            @if(count($assignees) > 3)
-                                                                <span class="cc-avatar cc-avatar-more" title="{{ implode(', ', $assignees) }}">
-                                                                    +{{ count($assignees) - 3 }}
+                                                            @if(count($item->assignees) > 3)
+                                                                <span class="cc-avatar cc-avatar-more" title="{{ implode(', ', $item->assignees) }}">
+                                                                    +{{ count($item->assignees) - 3 }}
                                                                 </span>
                                                             @endif
                                                         </div>
 
                                                         <div class="cc-people-text">
                                                             <div class="cc-people-main">
-                                                                {{ Str::limit(implode(', ', array_slice($assignees, 0, 2)), 26) }}
-                                                                @if(count($assignees) > 2)
-                                                                    <span class="cc-people-more">+{{ count($assignees) - 2 }}</span>
+                                                                {{ Str::limit(implode(', ', array_slice($item->assignees, 0, 2)), 26) }}
+                                                                @if(count($item->assignees) > 2)
+                                                                    <span class="cc-people-more">+{{ count($item->assignees) - 2 }}</span>
                                                                 @endif
                                                             </div>
                                                             <div class="cc-people-sub text-muted">Assignees</div>
@@ -468,17 +327,16 @@
                                             </td>
 
                                             <td>
-                                                <span class="badge bg-{{ $statusColors[$item->status] ?? 'secondary' }} cc-badge-status">
-                                                    {{ $statusLabels[$item->status] ?? strtoupper($item->status) }}
+                                                <span class="badge bg-{{ $item->statusColor }} cc-badge-status">
+                                                    {{ $item->statusLabel }}
                                                 </span>
                                             </td>
 
                                             <td class="text-end">
                                                 <div class="dropdown">
-                                                    <button class="btn btn-outline-secondary cc-menu-btn dropdown-toggle"
-                                                            type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <x-ui.button :border-base="false" variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] cc-menu-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                                         <i class="bi bi-three-dots"></i>
-                                                    </button>
+                                                    </x-ui.button>
 
                                                     <ul class="dropdown-menu dropdown-menu-end cc-menu">
                                                         <li>
@@ -496,7 +354,7 @@
         type="button"
         data-item-id="{{ $item->id }}"
         data-item-title="{{ e($item->title) }}"
-        data-content-type="{{ e($item->content_type) }}">
+        data-content-type="{{ e($item->contentType) }}">
                                                                 <i class="bi bi-bar-chart"></i> Nhập số liệu tuần
                                                             </button>
                                                         </li>
@@ -507,7 +365,7 @@
                                                                   onsubmit="return confirm('Xóa nội dung này nhé?');">
                                                                 @csrf
                                                                 @method('DELETE')
-                                                                <button type="submit" class="dropdown-item text-danger">
+                                                                <button type="submit" class="dropdown-item tw:text-[#dc3545]">
                                                                     <i class="bi bi-trash"></i> Xóa
                                                                 </button>
                                                             </form>
@@ -518,7 +376,7 @@
                                         </tr>
                                     @empty
                                         <tr id="ccEmptyRow">
-                                            <td colspan="5" class="text-center text-muted py-4">Chưa có nội dung nào</td>
+                                            <td colspan="5" class="tw:text-center text-muted tw:py-6">Chưa có nội dung nào</td>
                                         </tr>
                                     @endforelse
                                     </tbody>
@@ -530,70 +388,61 @@
                                     <div class="cc-empty-icon"><i class="bi bi-inbox"></i></div>
                                     <div class="fw-semibold">Không có kết quả</div>
                                     <div class="text-muted small">Hãy thử đổi bộ lọc hoặc từ khóa tìm kiếm.</div>
-                                    <button class="btn btn-outline-secondary mt-3" type="button" id="ccReset2">Xóa lọc</button>
+                                    <x-ui.button variant="outline-secondary" class="tw:mt-4" type="button" id="ccReset2">Xóa lọc</x-ui.button>
                                 </div>
                             </div>
 
-                        </div>
-                    </div>
+                        </x-ui.card-body>
+                    </x-ui.card>
                 </div>
 
                 {{-- CALENDAR VIEW (Agenda modern) --}}
                 <div class="cc-view d-none" id="ccView-calendar">
-                    <div class="card cc-card">
-                        <div class="card-body">
+                    <x-ui.card class="cc-card">
+                        <x-ui.card-body>
                             <div class="cc-agenda">
-                                @if($groupByDate->count())
-                                    @foreach($groupByDate as $ymd => $dayItems)
-                                        @php
-                                            $d = \Carbon\Carbon::parse($ymd);
-                                            $label = $d->translatedFormat('d/m/Y (l)');
-                                        @endphp
+                                @if(count($days))
+                                    @foreach($days as $day)
                                         <div class="cc-day">
                                             <div class="cc-day-head">
-                                                <div class="cc-day-title">{{ $label }}</div>
-                                                <div class="cc-day-count">{{ $dayItems->count() }} mục</div>
+                                                <div class="cc-day-title">{{ $day['label'] }}</div>
+                                                <div class="cc-day-count">{{ count($day['items']) }} mục</div>
                                             </div>
 
                                             <div class="cc-day-body">
-                                                @foreach($dayItems as $item)
-                                                    @php
-                                                        $plat = $parsePlatform($item->platform);
-                                                        $assignees = $parseAssignees($item);
-                                                        $assigneesText = implode(' ', $assignees);
-                                                    @endphp
+                                                @foreach($day['items'] as $item)
 
                                                     <div class="cc-card-item"
                                                          data-cc-item
-                                                         data-date="{{ $ymd }}"
-                                                         data-platform="{{ Str::lower($plat['type']) }}"
+                                                         data-date="{{ $item->publishYmd }}"
+                                                         data-platform="{{ $item->platformType }}"
                                                          data-status="{{ $item->status }}"
-                                                         data-assignee-id="{{ $item->assignee_user_id ?? '' }}"
-                                                         data-title="{{ Str::lower($item->title.' '.($item->description ?? '').' '.($item->link ?? '').' '.$assigneesText) }}"
+                                                         data-assignee-id="{{ $item->assigneeUserId ?? '' }}"
+                                                         data-title="{{ $item->searchText }}"
                                                     >
                                                         <div class="cc-card-item-top">
                                                             <div class="cc-card-item-title">{{ $item->title }}</div>
-                                                            <span class="badge bg-{{ $statusColors[$item->status] ?? 'secondary' }} cc-badge-status">
-                                                                {{ $statusLabels[$item->status] ?? strtoupper($item->status) }}
+                                                            <span class="badge bg-{{ $item->statusColor }} cc-badge-status">
+                                                                {{ $item->statusLabel }}
                                                             </span>
                                                         </div>
 
                                                         <div class="cc-card-item-meta">
                                                             <span class="cc-pill">
-                                                                <i class="bi {{ $platformIcon($plat['type']) }}"></i>
-                                                                {{ $platformLabel($plat['type']) }}
-                                                                @if(!empty($plat['account']))
-                                                                    <span class="cc-plat-acc">• {{ Str::limit($plat['account'], 18) }}</span>
+                                                                <i class="bi {{ $item->platformIcon }}"></i>
+                                                                {{ $item->platformLabel }}
+                                                                @if(!empty($item->platformAccount))
+                                                                    <span class="cc-plat-acc">• {{ Str::limit($item->platformAccount, 18) }}</span>
                                                                 @endif
                                                             </span>
 
                                                             <span class="cc-pill">
-                                                                <i class="bi bi-tag"></i> {{ $item->content_type }}
+                                                                <i class="bi bi-tag"></i> {{ $item->contentType }}
                                                             </span>
 
-                                                            @if(count($assignees))
+                                                            @if(count($item->assignees))
                                                                 <span class="cc-pill">
-                                                                    <i class="bi bi-people"></i> {{ Str::limit(implode(', ', $assignees), 28) }}
+                                                                    <i class="bi bi-people"></i> {{ Str::limit(implode(', ', $item->assignees), 28) }}
                                                                 </span>
                                                             @endif
                                                         </div>
@@ -605,15 +454,14 @@
                                                         @endif
 
                                                         <div class="cc-card-item-actions">
-                                                            <a class="btn btn-sm btn-outline-secondary" href="{{ route('marketing.reports.content-calendar.show', $item->id) }}"><i class="bi bi-eye"></i></a>
-                                                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#editModal-{{ $item->id }}"><i class="bi bi-pencil"></i></button>
-                                                            <button class="btn btn-sm btn-outline-secondary jsWeeklyMetricsBtn" type="button"
-        data-item-id="{{ $item->id }}"
+                                                            <x-ui.button variant="outline-secondary" size="sm" href="{{ route('marketing.reports.content-calendar.show', $item->id) }}"><i class="bi bi-eye"></i></x-ui.button>
+                                                            <x-ui.button variant="outline-secondary" size="sm" type="button" data-bs-toggle="modal" data-bs-target="#editModal-{{ $item->id }}"><i class="bi bi-pencil"></i></x-ui.button>
+                                                            <x-ui.button variant="outline-secondary" size="sm" class="jsWeeklyMetricsBtn" type="button" data-item-id="{{ $item->id }}"
         data-item-title="{{ e($item->title) }}"
-        data-content-type="{{ e($item->content_type) }}"><i class="bi bi-bar-chart"></i></button>
+        data-content-type="{{ e($item->contentType) }}"><i class="bi bi-bar-chart"></i></x-ui.button>
                                                             @if(!empty($item->link))
-                                                                <button type="button" class="btn btn-sm btn-outline-secondary" data-cc-copy="{{ $item->link }}" title="Copy link"><i class="bi bi-clipboard"></i></button>
-                                                                <a href="{{ $item->link }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Mở link"><i class="bi bi-box-arrow-up-right"></i></a>
+                                                                <x-ui.button variant="outline-secondary" size="sm" type="button" data-cc-copy="{{ $item->link }}" title="Copy link"><i class="bi bi-clipboard"></i></x-ui.button>
+                                                                <x-ui.button variant="outline-secondary" size="none" class="tw:px-2 tw:py-1 tw:text-[14px]/[21px] tw:rounded-[12px] tw:font-normal" :href="$item->link" target="_blank" rel="noopener" title="Mở link"><i class="bi bi-box-arrow-up-right"></i></x-ui.button>
                                                             @endif
                                                         </div>
                                                     </div>
@@ -622,7 +470,7 @@
                                         </div>
                                     @endforeach
                                 @else
-                                    <div class="text-center text-muted py-5">Chưa có nội dung nào</div>
+                                    <div class="tw:text-center text-muted py-5">Chưa có nội dung nào</div>
                                 @endif
                             </div>
 
@@ -631,75 +479,57 @@
                                     <div class="cc-empty-icon"><i class="bi bi-inbox"></i></div>
                                     <div class="fw-semibold">Không có kết quả</div>
                                     <div class="text-muted small">Hãy thử đổi bộ lọc hoặc từ khóa tìm kiếm.</div>
-                                    <button class="btn btn-outline-secondary mt-3" type="button" id="ccReset3">Xóa lọc</button>
+                                    <x-ui.button variant="outline-secondary" class="tw:mt-4" type="button" id="ccReset3">Xóa lọc</x-ui.button>
                                 </div>
                             </div>
 
-                        </div>
-                    </div>
+                        </x-ui.card-body>
+                    </x-ui.card>
                 </div>
 
                 {{-- KANBAN VIEW --}}
                 <div class="cc-view d-none" id="ccView-kanban">
                     <div class="cc-kanban">
-                        @php
-                            $kanbanCols = [
-                                'draft'     => 'Nháp',
-                                'scheduled' => 'Lên lịch',
-                                'posted'    => 'Đã đăng',
-                                'submitted' => 'Chờ duyệt',
-                                'approved'  => 'Đã duyệt',
-                                'rejected'  => 'Từ chối',
-                            ];
-                        @endphp
 
-                        @foreach($kanbanCols as $key => $label)
-                            @php $colItems = collect($groupByStatus->get($key, []))->sortBy('publish_date'); @endphp
+                        @foreach($kanbanColumns as $column)
 
                             <div class="cc-kanban-col">
                                 <div class="cc-kanban-head">
                                     <div class="cc-kanban-title">
-                                        <span class="cc-kanban-dot cc-dot-{{ $key }}"></span>
-                                        {{ $label }}
+                                        <span class="cc-kanban-dot cc-dot-{{ $column['key'] }}"></span>
+                                        {{ $column['label'] }}
                                     </div>
-                                    <div class="cc-kanban-count">{{ $colItems->count() }}</div>
+                                    <div class="cc-kanban-count">{{ count($column['items']) }}</div>
                                 </div>
 
                                 <div class="cc-kanban-body">
-                                    @foreach($colItems as $item)
-                                        @php
-                                            $ymd = \Carbon\Carbon::parse($item->publish_date)->format('Y-m-d');
-                                            $dmy = \Carbon\Carbon::parse($item->publish_date)->format('d/m');
-                                            $plat = $parsePlatform($item->platform);
-                                            $assignees = $parseAssignees($item);
-                                            $assigneesText = implode(' ', $assignees);
-                                        @endphp
+                                    @foreach($column['items'] as $item)
 
                                         <div class="cc-kanban-card"
                                              data-cc-item
-                                             data-date="{{ $ymd }}"
-                                             data-platform="{{ Str::lower($plat['type']) }}"
+                                             data-date="{{ $item->publishYmd }}"
+                                             data-platform="{{ $item->platformType }}"
                                              data-status="{{ $item->status }}"
-                                             data-assignee-id="{{ $item->assignee_user_id ?? '' }}"
-                                             data-title="{{ Str::lower($item->title.' '.($item->description ?? '').' '.($item->link ?? '').' '.$assigneesText) }}"
+                                             data-assignee-id="{{ $item->assigneeUserId ?? '' }}"
+                                             data-title="{{ $item->searchText }}"
                                         >
                                             <div class="cc-kanban-card-top">
                                                 <div class="cc-kanban-card-title">{{ $item->title }}</div>
-                                                <div class="cc-kanban-card-date">{{ $dmy }}</div>
+                                                <div class="cc-kanban-card-date">{{ $item->publishDm }}</div>
                                             </div>
 
                                             <div class="cc-kanban-card-meta">
                                                 <span class="cc-pill">
-                                                    <i class="bi {{ $platformIcon($plat['type']) }}"></i> {{ $platformLabel($plat['type']) }}
-                                                    @if(!empty($plat['account']))
-                                                        <span class="cc-plat-acc">• {{ Str::limit($plat['account'], 14) }}</span>
+                                                    <i class="bi {{ $item->platformIcon }}"></i> {{ $item->platformLabel }}
+                                                    @if(!empty($item->platformAccount))
+                                                        <span class="cc-plat-acc">• {{ Str::limit($item->platformAccount, 14) }}</span>
                                                     @endif
                                                 </span>
 
-                                                <span class="cc-pill"><i class="bi bi-tag"></i> {{ $item->content_type }}</span>
+                                                <span class="cc-pill"><i class="bi bi-tag"></i> {{ $item->contentType }}</span>
 
-                                                @if(count($assignees))
-                                                    <span class="cc-pill"><i class="bi bi-people"></i> {{ Str::limit(implode(', ', $assignees), 22) }}</span>
+                                                @if(count($item->assignees))
+                                                    <span class="cc-pill"><i class="bi bi-people"></i> {{ Str::limit(implode(', ', $item->assignees), 22) }}</span>
                                                 @endif
                                             </div>
 
@@ -710,21 +540,20 @@
                                             @endif
 
                                             <div class="cc-kanban-card-actions">
-                                                <a class="btn btn-sm btn-outline-secondary" href="{{ route('marketing.reports.content-calendar.show', $item->id) }}"><i class="bi bi-eye"></i></a>
-                                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#editModal-{{ $item->id }}"><i class="bi bi-pencil"></i></button>
-                                               <button class="btn btn-sm btn-outline-secondary jsWeeklyMetricsBtn" type="button"
-        data-item-id="{{ $item->id }}"
+                                                <x-ui.button variant="outline-secondary" size="sm" href="{{ route('marketing.reports.content-calendar.show', $item->id) }}"><i class="bi bi-eye"></i></x-ui.button>
+                                                <x-ui.button variant="outline-secondary" size="sm" type="button" data-bs-toggle="modal" data-bs-target="#editModal-{{ $item->id }}"><i class="bi bi-pencil"></i></x-ui.button>
+                                               <x-ui.button variant="outline-secondary" size="sm" class="jsWeeklyMetricsBtn" type="button" data-item-id="{{ $item->id }}"
         data-item-title="{{ e($item->title) }}"
-        data-content-type="{{ e($item->content_type) }}"><i class="bi bi-bar-chart"></i></button>
+        data-content-type="{{ e($item->contentType) }}"><i class="bi bi-bar-chart"></i></x-ui.button>
                                                 @if(!empty($item->link))
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cc-copy="{{ $item->link }}" title="Copy link"><i class="bi bi-clipboard"></i></button>
-                                                    <a href="{{ $item->link }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Mở link"><i class="bi bi-box-arrow-up-right"></i></a>
+                                                    <x-ui.button variant="outline-secondary" size="sm" type="button" data-cc-copy="{{ $item->link }}" title="Copy link"><i class="bi bi-clipboard"></i></x-ui.button>
+                                                    <x-ui.button variant="outline-secondary" size="none" class="tw:px-2 tw:py-1 tw:text-[14px]/[21px] tw:rounded-[12px] tw:font-normal" :href="$item->link" target="_blank" rel="noopener" title="Mở link"><i class="bi bi-box-arrow-up-right"></i></x-ui.button>
                                                 @endif
                                             </div>
                                         </div>
                                     @endforeach
 
-                                    @if($colItems->isEmpty())
+                                    @if(count($column['items']) === 0)
                                         <div class="cc-kanban-empty text-muted small">Trống</div>
                                     @endif
                                 </div>
@@ -737,7 +566,7 @@
                             <div class="cc-empty-icon"><i class="bi bi-inbox"></i></div>
                             <div class="fw-semibold">Không có kết quả</div>
                             <div class="text-muted small">Hãy thử đổi bộ lọc hoặc từ khóa tìm kiếm.</div>
-                            <button class="btn btn-outline-secondary mt-3" type="button" id="ccReset4">Xóa lọc</button>
+                            <x-ui.button variant="outline-secondary" class="tw:mt-4" type="button" id="ccReset4">Xóa lọc</x-ui.button>
                         </div>
                     </div>
                 </div>
@@ -746,11 +575,11 @@
         </div>
 
         {{-- SIDEBAR --}}
-        <div class="col-12 col-lg-3">
+        <div class="tw:col12-12 tw:min-[62rem]:col12-3">
             <div class="cc-side">
                 <div class="cc-side-sticky">
 
-                    <div class="cc-panel h-100">
+                    <div class="cc-panel tw:h-full">
                         <div class="cc-panel-hd">
                             <div class="fw-semibold"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Cảnh báo</div>
                             <div class="text-muted small">Bài trong tuần nhưng chưa nhập số liệu</div>
@@ -760,30 +589,30 @@
                         </div>
                     </div>
 
-                    <div class="card cc-card mt-3">
-                        <div class="card-body p-3">
-                            <div class="fw-semibold mb-1"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> Gợi ý nhanh</div>
+                    <x-ui.card class="cc-card tw:mt-4">
+                        <x-ui.card-body class="tw:p-4">
+                            <div class="fw-semibold tw:mb-1"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> Gợi ý nhanh</div>
                             <div class="text-muted small">
                                 • Dùng <strong>Tuần này</strong> để xem lịch hiện tại.<br>
                                 • Nhấn <strong>...</strong> ở mỗi dòng để sửa/xóa/copy link.<br>
                                 • Chuyển <strong>Danh sách / Lịch / Kanban</strong> để theo dõi theo cách bạn muốn.
                             </div>
-                        </div>
-                    </div>
+                        </x-ui.card-body>
+                    </x-ui.card>
 
-                    <div class="card cc-card mt-3">
-                        <div class="card-body p-3">
-                            <div class="fw-semibold mb-2"><i class="bi bi-info-circle-fill text-primary me-1"></i> Quy ước trạng thái</div>
-                            <div class="d-flex flex-wrap gap-2">
-                                <span class="badge rounded-pill text-bg-secondary">Nháp</span>
-                                <span class="badge rounded-pill text-bg-warning">Lên lịch</span>
-                                <span class="badge rounded-pill text-bg-success">Đã đăng</span>
-                                <span class="badge rounded-pill text-bg-info">Chờ duyệt</span>
-                                <span class="badge rounded-pill text-bg-primary">Đã duyệt</span>
-                                <span class="badge rounded-pill text-bg-danger">Từ chối</span>
+                    <x-ui.card class="cc-card tw:mt-4">
+                        <x-ui.card-body class="tw:p-4">
+                            <div class="fw-semibold tw:mb-2"><i class="bi bi-info-circle-fill tw:text-[#0d6efd] me-1"></i> Quy ước trạng thái</div>
+                            <div class="d-flex flex-wrap tw:gap-2">
+                                <span class="badge rounded-pill tw:text-[#ffffff] tw:bg-[#6c757d]">Nháp</span>
+                                <span class="badge rounded-pill tw:text-[#000000] tw:bg-[#ffc107]">Lên lịch</span>
+                                <span class="badge rounded-pill tw:text-[#ffffff] tw:bg-[#198754]">Đã đăng</span>
+                                <span class="badge rounded-pill tw:text-[#000000] tw:bg-[#0dcaf0]">Chờ duyệt</span>
+                                <span class="badge rounded-pill tw:text-[#ffffff] tw:bg-[#0d6efd]">Đã duyệt</span>
+                                <span class="badge rounded-pill tw:text-[#ffffff] tw:bg-[#dc3545]">Từ chối</span>
                             </div>
-                        </div>
-                    </div>
+                        </x-ui.card-body>
+                    </x-ui.card>
 
                 </div>
             </div>
@@ -797,82 +626,80 @@
         <div class="modal-content cc-modal">
             <div class="modal-header">
                 <h5 class="modal-title fw-semibold">Thêm nội dung</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <x-ui.close-button in="modal" type="button" data-bs-dismiss="modal" />
             </div>
 
             <form method="POST" action="{{ route('marketing.reports.content-calendar.store') }}" enctype="multipart/form-data">
                 @csrf
 
                 <div class="modal-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Ngày đăng</label>
-                            <input type="date" name="publish_date" class="form-control cc-input"
-                                   value="{{ now()->format('Y-m-d') }}" required>
+                    <div class="tw:row tw:g-3">
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Ngày đăng</x-ui.label>
+                            <x-ui.input class="cc-input" type="date" name="publish_date" value="{{ now()->format('Y-m-d') }}" required />
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Nền tảng</label>
-                            <div class="row g-2 align-items-center" data-platform-builder>
-                                <div class="col-5">
-                                    <select class="form-select cc-input cc-platform-type" required>
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Nền tảng</x-ui.label>
+                            <div class="tw:row tw:g-2 tw:items-center" data-platform-builder>
+                                <div class="tw:col12-5">
+                                    <x-ui.select class="cc-input cc-platform-type" required>
                                         <option value="facebook">Facebook</option>
                                         <option value="tiktok">TikTok</option>
                                         <option value="website">Website</option>
                                         <option value="youtube">YouTube</option>
-                                    </select>
+                                    </x-ui.select>
                                 </div>
-                                <div class="col-7">
-                                    <input type="text" class="form-control cc-input cc-platform-account"
-                                           placeholder="Tên trang/tài khoản (nếu có)">
+                                <div class="tw:col12-7">
+                                    <x-ui.input class="cc-input cc-platform-account" type="text" placeholder="Tên trang/tài khoản (nếu có)" />
                                 </div>
                                 <input type="hidden" name="platform" class="cc-platform-final" value="facebook">
                             </div>
                             <div class="form-text">VD: facebook|EGO Solar - Page A</div>
                         </div>
 
-                        <div class="col-12">
-                            <label class="form-label">Tiêu đề</label>
-                            <input type="text" name="title" class="form-control cc-input" placeholder="VD: Giới thiệu inverter 6kW" required>
+                        <div class="tw:col12-12">
+                            <x-ui.label>Tiêu đề</x-ui.label>
+                            <x-ui.input class="cc-input" type="text" name="title" placeholder="VD: Giới thiệu inverter 6kW" required />
                         </div>
 
-                        <div class="col-12">
-                            <label class="form-label">Mô tả ngắn</label>
-                            <textarea name="description" class="form-control cc-input" rows="3" placeholder="Mô tả ngắn..."></textarea>
+                        <div class="tw:col12-12">
+                            <x-ui.label>Mô tả ngắn</x-ui.label>
+                            <x-ui.input as="textarea" class="cc-input" name="description" rows="3" placeholder="Mô tả ngắn..."></x-ui.input>
                         </div>
 
-                        <div class="col-md-6">
-    <label class="form-label">Loại nội dung</label>
-    <select name="content_type" class="form-control cc-input" required>
+                        <div class="tw:md:col12-6">
+    <x-ui.label>Loại nội dung</x-ui.label>
+    <x-ui.input as="select" class="cc-input" name="content_type" required>
         <option value="">-- Chọn loại nội dung --</option>
         <option value="Bài viết">Bài viết</option>
         <option value="Video AI">Video AI</option>
         <option value="Video Review">Video Review</option>
         <option value="Livestream">Livestream</option>
         <option value="Trend Video">Trend Video</option>
-    </select>
+    </x-ui.input>
 </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Trạng thái</label>
-                            <select name="status" class="form-select cc-input" required>
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Trạng thái</x-ui.label>
+                            <x-ui.select class="cc-input" name="status" required>
                                 @foreach($statusLabels as $key => $lb)
                                     <option value="{{ $key }}">{{ $lb }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Phụ trách</label>
-                            <select name="assignee_user_id" class="form-select cc-input">
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Phụ trách</x-ui.label>
+                            <x-ui.select class="cc-input" name="assignee_user_id">
                                 <option value="">— Chọn nhân viên marketing —</option>
                                 @foreach(($marketingUsers ?? []) as $u)
                                     <option value="{{ $u->id }}"
-    {{ (isset($item) && $item->assignee_user_id == $u->id) ? 'selected' : '' }}>
+    {{ (isset($item) && $item->assigneeUserId == $u->id) ? 'selected' : '' }}>
     {{ $u->name }}
 </option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                             <div class="form-text">Chọn từ danh sách để lưu đúng người (KPI/Lương).</div>
 
                             {{-- legacy hidden --}}
@@ -880,23 +707,23 @@
                             <input type="hidden" name="assignees[]" value="">
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Link</label>
-                            <input type="url" name="link" class="form-control cc-input" placeholder="https://...">
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Link</x-ui.label>
+                            <x-ui.input class="cc-input" type="url" name="link" placeholder="https://..." />
                         </div>
 
-                        <div class="col-12">
-                            <label class="form-label">File đính kèm</label>
-                            <input type="file" name="attachment" class="form-control cc-input">
+                        <div class="tw:col12-12">
+                            <x-ui.label>File đính kèm</x-ui.label>
+                            <x-ui.input class="cc-input" type="file" name="attachment" />
                         </div>
                     </div>
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary cc-btn" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-ego cc-btn">
+                    <x-ui.button variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] cc-btn" type="button" data-bs-dismiss="modal">Hủy</x-ui.button>
+                    <x-ui.button variant="none" size="none" class="btn-ego cc-btn" type="submit">
                         <i class="bi bi-check2-circle"></i> Tạo nội dung
-                    </button>
+                    </x-ui.button>
                 </div>
             </form>
         </div>
@@ -905,9 +732,6 @@
 
 {{-- MODALS EDIT + UPLOAD --}}
 @foreach($items as $item)
-    @php
-        $plat = $parsePlatform($item->platform);
-    @endphp
 
     {{-- MODAL EDIT --}}
     <div class="modal fade" id="editModal-{{ $item->id }}" tabindex="-1" aria-hidden="true">
@@ -915,7 +739,7 @@
             <div class="modal-content cc-modal">
                 <div class="modal-header">
                     <h5 class="modal-title fw-semibold">Sửa lịch nội dung</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <x-ui.close-button in="modal" type="button" data-bs-dismiss="modal" />
                 </div>
 
                 <form method="POST" action="{{ route('marketing.reports.content-calendar.update', $item->id) }}" enctype="multipart/form-data">
@@ -923,79 +747,72 @@
                     @method('PUT')
 
                     <div class="modal-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Ngày đăng</label>
-                                <input type="date"
-                                       name="publish_date"
-                                       class="form-control cc-input"
-                                       value="{{ \Carbon\Carbon::parse($item->publish_date)->format('Y-m-d') }}"
-                                       required>
+                        <div class="tw:row tw:g-3">
+                            <div class="tw:md:col12-6">
+                                <x-ui.label>Ngày đăng</x-ui.label>
+                                <x-ui.input class="cc-input" type="date" name="publish_date" value="{{ $item->publishYmd }}" required />
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label">Nền tảng</label>
-                                <div class="row g-2 align-items-center" data-platform-builder>
-                                    <div class="col-5">
-                                        <select class="form-select cc-input cc-platform-type" required>
-                                            <option value="facebook" {{ $plat['type']==='facebook'?'selected':'' }}>Facebook</option>
-                                            <option value="tiktok" {{ $plat['type']==='tiktok'?'selected':'' }}>TikTok</option>
-                                            <option value="website" {{ $plat['type']==='website'?'selected':'' }}>Website</option>
-                                            <option value="youtube" {{ $plat['type']==='youtube'?'selected':'' }}>YouTube</option>
-                                        </select>
+                            <div class="tw:md:col12-6">
+                                <x-ui.label>Nền tảng</x-ui.label>
+                                <div class="tw:row tw:g-2 tw:items-center" data-platform-builder>
+                                    <div class="tw:col12-5">
+                                        <x-ui.select class="cc-input cc-platform-type" required>
+                                            <option value="facebook" {{ $item->platformType==='facebook'?'selected':'' }}>Facebook</option>
+                                            <option value="tiktok" {{ $item->platformType==='tiktok'?'selected':'' }}>TikTok</option>
+                                            <option value="website" {{ $item->platformType==='website'?'selected':'' }}>Website</option>
+                                            <option value="youtube" {{ $item->platformType==='youtube'?'selected':'' }}>YouTube</option>
+                                        </x-ui.select>
                                     </div>
-                                    <div class="col-7">
-                                        <input type="text"
-                                               class="form-control cc-input cc-platform-account"
-                                               placeholder="Tên trang/tài khoản (nếu có)"
-                                               value="{{ $plat['account'] ?? '' }}">
+                                    <div class="tw:col12-7">
+                                        <x-ui.input class="cc-input cc-platform-account" type="text" placeholder="Tên trang/tài khoản (nếu có)" value="{{ $item->platformAccount ?? '' }}" />
                                     </div>
                                     <input type="hidden" name="platform" class="cc-platform-final" value="{{ $item->platform }}">
                                 </div>
                                 <div class="form-text">VD: facebook|EGO Solar - Page A</div>
                             </div>
 
-                            <div class="col-12">
-                                <label class="form-label">Tiêu đề</label>
-                                <input type="text" name="title" class="form-control cc-input" value="{{ $item->title }}" required>
+                            <div class="tw:col12-12">
+                                <x-ui.label>Tiêu đề</x-ui.label>
+                                <x-ui.input class="cc-input" type="text" name="title" value="{{ $item->title }}" required />
                             </div>
 
-                            <div class="col-12">
-                                <label class="form-label">Mô tả ngắn</label>
-                                <textarea name="description" class="form-control cc-input" rows="3" placeholder="Mô tả ngắn...">{{ $item->description ?? '' }}</textarea>
+                            <div class="tw:col12-12">
+                                <x-ui.label>Mô tả ngắn</x-ui.label>
+                                <x-ui.input as="textarea" class="cc-input" name="description" rows="3" placeholder="Mô tả ngắn...">{{ $item->description ?? '' }}</x-ui.input>
                             </div>
 
-                           <div class="col-md-6">
-    <label class="form-label">Loại nội dung</label>
-    <select name="content_type" class="form-control cc-input" required>
+                           <div class="tw:md:col12-6">
+    <x-ui.label>Loại nội dung</x-ui.label>
+    <x-ui.input as="select" class="cc-input" name="content_type" required>
         <option value="">-- Chọn loại nội dung --</option>
         <option value="Bài viết">Bài viết</option>
         <option value="Video AI">Video AI</option>
         <option value="Video Review">Video Review</option>
         <option value="Livestream">Livestream</option>
         <option value="Trend Video">Trend Video</option>
-    </select>
+    </x-ui.input>
 </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label">Trạng thái</label>
-                                <select name="status" class="form-select cc-input" required>
+                            <div class="tw:md:col12-6">
+                                <x-ui.label>Trạng thái</x-ui.label>
+                                <x-ui.select class="cc-input" name="status" required>
                                     @foreach($statusLabels as $key => $lb)
                                         <option value="{{ $key }}" {{ $item->status===$key?'selected':'' }}>{{ $lb }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label">Phụ trách</label>
-                                <select name="assignee_user_id" class="form-select cc-input">
+                            <div class="tw:md:col12-6">
+                                <x-ui.label>Phụ trách</x-ui.label>
+                                <x-ui.select class="cc-input" name="assignee_user_id">
                                     <option value="">— Chọn nhân viên marketing —</option>
                                     @foreach(($marketingUsers ?? []) as $u)
-                                        <option value="{{ $u->id }}" {{ (int)($item->assignee_user_id ?? 0) === (int)$u->id ? 'selected' : '' }}>
+                                        <option value="{{ $u->id }}" {{ (int)($item->assigneeUserId ?? 0) === (int)$u->id ? 'selected' : '' }}>
                                             {{ $u->name }}
                                         </option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                                 <div class="form-text">Chọn từ danh sách để lưu đúng người phụ trách.</div>
 
                                 {{-- legacy hidden (nếu backend cũ còn đọc các field này) --}}
@@ -1003,21 +820,21 @@
                                 <input type="hidden" name="assignees[]" value="">
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label">Link</label>
-                                <input type="url" name="link" class="form-control cc-input" value="{{ $item->link ?? '' }}" placeholder="https://...">
+                            <div class="tw:md:col12-6">
+                                <x-ui.label>Link</x-ui.label>
+                                <x-ui.input class="cc-input" type="url" name="link" value="{{ $item->link ?? '' }}" placeholder="https://..." />
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label">File đính kèm</label>
-                                <input type="file" name="attachment" class="form-control cc-input">
+                            <div class="tw:md:col12-6">
+                                <x-ui.label>File đính kèm</x-ui.label>
+                                <x-ui.input class="cc-input" type="file" name="attachment" />
                             </div>
                         </div>
                     </div>
 
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary cc-btn" data-bs-dismiss="modal">Hủy</button>
-                        <button type="submit" class="btn btn-ego cc-btn"><i class="bi bi-check2-circle"></i> Lưu</button>
+                        <x-ui.button variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] cc-btn" type="button" data-bs-dismiss="modal">Hủy</x-ui.button>
+                        <x-ui.button variant="none" size="none" class="btn-ego cc-btn" type="submit"><i class="bi bi-check2-circle"></i> Lưu</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -1031,74 +848,74 @@
         <div class="modal-content cc-modal">
             <div class="modal-header">
                 <div>
-                    <h5 class="modal-title fw-semibold mb-0">Nhập số liệu tuần</h5>
+                    <h5 class="modal-title fw-semibold tw:mb-0">Nhập số liệu tuần</h5>
                     <div class="text-muted small" id="wmTitle">—</div>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <x-ui.close-button in="modal" type="button" data-bs-dismiss="modal" />
             </div>
 
             <div class="modal-body">
                 <input type="hidden" id="wmItemId" value="">
 
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Tuần bắt đầu (Thứ 2)</label>
-                        <input type="date" class="form-control cc-input" id="wmWeekStart">
+                <div class="tw:row tw:g-3">
+                    <div class="tw:md:col12-4">
+                        <x-ui.label>Tuần bắt đầu (Thứ 2)</x-ui.label>
+                        <x-ui.input class="cc-input" type="date" id="wmWeekStart" />
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label">Reach</label>
-                        <input type="number" min="0" class="form-control cc-input" id="wmReach" value="0">
+                    <div class="tw:md:col12-4">
+                        <x-ui.label>Reach</x-ui.label>
+                        <x-ui.input class="cc-input" type="number" min="0" id="wmReach" value="0" />
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label">Views</label>
-                        <input type="number" min="0" class="form-control cc-input" id="wmViews" value="0">
+                    <div class="tw:md:col12-4">
+                        <x-ui.label>Views</x-ui.label>
+                        <x-ui.input class="cc-input" type="number" min="0" id="wmViews" value="0" />
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label">Likes</label>
-                        <input type="number" min="0" class="form-control cc-input" id="wmLikes" value="0">
+                    <div class="tw:md:col12-4">
+                        <x-ui.label>Likes</x-ui.label>
+                        <x-ui.input class="cc-input" type="number" min="0" id="wmLikes" value="0" />
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label">Comments</label>
-                        <input type="number" min="0" class="form-control cc-input" id="wmComments" value="0">
+                    <div class="tw:md:col12-4">
+                        <x-ui.label>Comments</x-ui.label>
+                        <x-ui.input class="cc-input" type="number" min="0" id="wmComments" value="0" />
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label">Shares</label>
-                        <input type="number" min="0" class="form-control cc-input" id="wmShares" value="0">
+                    <div class="tw:md:col12-4">
+                        <x-ui.label>Shares</x-ui.label>
+                        <x-ui.input class="cc-input" type="number" min="0" id="wmShares" value="0" />
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label">Leads</label>
-                        <input type="number" min="0" class="form-control cc-input" id="wmLeads" value="0">
+                    <div class="tw:md:col12-4">
+                        <x-ui.label>Leads</x-ui.label>
+                        <x-ui.input class="cc-input" type="number" min="0" id="wmLeads" value="0" />
                     </div>
-                    <div class="col-md-4" id="wmDurationWrap" style="display:none;">
-    <label class="form-label">Phút (Livestream)</label>
-    <input type="number" min="0" class="form-control cc-input" id="wmDuration" value="0">
+                    <div class="tw:md:col12-4" id="wmDurationWrap" style="display:none;">
+    <x-ui.label>Phút (Livestream)</x-ui.label>
+    <x-ui.input class="cc-input" type="number" min="0" id="wmDuration" value="0" />
 </div>
-                    <div class="col-12">
-                        <label class="form-label">Ghi chú</label>
-                        <textarea class="form-control cc-input" id="wmNote" rows="3" placeholder="Ví dụ: số liệu lấy từ Facebook Insights / TikTok Analytics..."></textarea>
+                    <div class="tw:col12-12">
+                        <x-ui.label>Ghi chú</x-ui.label>
+                        <x-ui.input as="textarea" class="cc-input" id="wmNote" rows="3" placeholder="Ví dụ: số liệu lấy từ Facebook Insights / TikTok Analytics..."></x-ui.input>
                     </div>
 
-                    <div class="col-12">
-                        <div class="alert alert-light border mb-0">
+                    <div class="tw:col12-12">
+                        <x-ui.alert variant="light" class="tw:border tw:border-[#dee2e6] tw:mb-0">
                             <div class="small text-muted">
                                 Gợi ý: Mỗi cuối tuần nhập 1 lần cho từng bài/video. Dashboard phía trên sẽ tự tổng hợp theo tuần.
                             </div>
-                        </div>
+                        </x-ui.alert>
                     </div>
                 </div>
             </div>
 
             <div class="modal-footer">
-                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
-                <button class="btn btn-primary" type="button" id="wmSaveBtn">
+                <x-ui.button variant="outline-secondary" data-bs-dismiss="modal">Đóng</x-ui.button>
+                <x-ui.button variant="primary" type="button" id="wmSaveBtn">
                     <i class="bi bi-save"></i> Lưu số liệu tuần
-                </button>
+                </x-ui.button>
             </div>
         </div>
     </div>
@@ -1180,12 +997,28 @@ body{
 }
 
 /* View switch */
-.cc-view-switch .btn{
+/* Hình học của nhóm nút: Bootstrap lo phần này qua `.btn-group > .btn`. Bỏ class
+   `.btn` là mất position/flex/chồng viền — đo được ở khổ 390px: nút hết giãn đều
+   và mép viền tách ra. Khai lại đúng giá trị Bootstrap đang dùng. */
+.cc-view-switch .cc-view-btn{
+  position: relative;
+  flex: 1 1 auto;
   border-radius: 14px !important;
   font-weight: 600;
   border-color: rgba(15,23,42,.12);
 }
-.cc-view-switch .btn.active{
+.cc-view-switch .cc-view-btn + .cc-view-btn{
+  margin-left: calc(-1 * var(--bs-border-width, 1px));
+}
+.cc-view-switch .cc-view-btn:hover,
+.cc-view-switch .cc-view-btn:focus,
+.cc-view-switch .cc-view-btn.active{
+  z-index: 1;
+}
+/* `.active` là CLASS do JS bật tắt, KHÔNG phải pseudo-class `:active`. Component
+   không sinh trạng thái này, nên luật của trang phải tự lo — bỏ đi thì nút đang
+   chọn mất hẳn nền đậm mà ảnh tĩnh vẫn trông bình thường ở nút không active. */
+.cc-view-switch .cc-view-btn.active{
   background: rgba(15,23,42,.92);
   border-color: rgba(15,23,42,.92);
   color: #fff;
@@ -1248,12 +1081,24 @@ body{
 }
 
 /* Inputs */
-.cc-input{
+/*
+ * Viết lặp class để nâng độ cụ thể lên 0-2-0.
+ *
+ * Khối <style> của trang nằm TRƯỚC app.css trong tài liệu (đo được: style ở
+ * ~20.7k, app.css ở ~25.4k). Khi ô nhập còn `.form-control` thì đối thủ là
+ * Bootstrap trên CDN — nằm rất sớm — nên `.cc-input` thắng nhờ đứng sau. Chuyển
+ * sang <x-ui.*> thì đối thủ thành utility Tailwind trong app.css: cùng 0-1-0
+ * nhưng đứng SAU, và `.cc-input` thua — bo góc 14px -> 6px, viền
+ * rgba(15,23,42,.10) -> #dee2e6 (đo được 25/54 phần tử lệch).
+ *
+ * Nhân đôi class nâng được độ cụ thể mà không cần `!important` (dự án cấm).
+ */
+.cc-input.cc-input{
   border-radius: 14px;
   border: 1px solid rgba(15,23,42,.10);
   font-weight: 450;
 }
-.cc-input:focus{
+.cc-input.cc-input:focus{
   border-color: rgba(14,165,166,.35);
   box-shadow: 0 0 0 .25rem rgba(14,165,166,.15);
 }
@@ -1266,6 +1111,7 @@ body{
   border-radius: 0 14px 14px 0 !important;
   border: 1px solid rgba(15,23,42,.10);
 }
+.cc-filters .cc-btn-quick.active{background:rgba(15,23,42,.92);border-color:rgba(15,23,42,.92);color:#fff}
 .cc-btn-quick{
   border-radius: 14px;
   font-weight: 600;
@@ -1531,7 +1377,7 @@ body{
   gap: 8px;
   flex-wrap: wrap;
 }
-.cc-card-item-actions .btn{ border-radius: 12px; }
+
 
 /* Kanban */
 .cc-kanban{
@@ -1611,7 +1457,11 @@ body{
 .cc-kanban-card-meta{ margin-top: 10px; display:flex; flex-wrap:wrap; gap: 8px; }
 .cc-kanban-card-desc{ margin-top: 8px; font-size: 13px; }
 .cc-kanban-card-actions{ margin-top: 10px; display:flex; gap: 8px; flex-wrap: wrap; }
-.cc-kanban-card-actions .btn{ border-radius: 12px; }
+/* Bám thẻ đã render chứ không bám `.btn`: các nút này đã chuyển sang x-ui.button nên
+   không còn class `.btn`, và luật cũ lặng lẽ hết tác dụng — 4/5 nút tụt về bo 4px.
+   Không lộ ra lúc đo vì thẻ kanban chỉ render khi CÓ dữ liệu. */
+.cc-kanban-card-actions > a,
+.cc-kanban-card-actions > button{ border-radius: 12px; }
 .cc-kanban-empty{
   border: 1px dashed rgba(15,23,42,.18);
   border-radius: 16px;
@@ -2002,10 +1852,17 @@ document.addEventListener('DOMContentLoaded', function () {
     setRange(first, last);
   }
 
-  quickThisWeek  && quickThisWeek.addEventListener('click', rangeThisWeek);
-  quickLastWeek  && quickLastWeek.addEventListener('click', rangeLastWeek);
-  quickThisMonth && quickThisMonth.addEventListener('click', rangeThisMonth);
-  quickLastMonth && quickLastMonth.addEventListener('click', rangeLastMonth);
+  // Đánh dấu nút lọc nhanh đang chọn. Trước 2026-09-03 nhóm này KHÔNG có trạng thái
+  // nào: bấm xong không biết mình đang lọc theo mốc nào.
+  const quickBtns = [quickThisWeek, quickLastWeek, quickThisMonth, quickLastMonth].filter(Boolean);
+  const markQuickActive = (btn) => quickBtns.forEach(b => b.classList.toggle('active', b === btn));
+
+  const bindQuick = (btn, fn) => btn && btn.addEventListener('click', () => { fn(); markQuickActive(btn); });
+
+  bindQuick(quickThisWeek,  rangeThisWeek);
+  bindQuick(quickLastWeek,  rangeLastWeek);
+  bindQuick(quickThisMonth, rangeThisMonth);
+  bindQuick(quickLastMonth, rangeLastMonth);
 
   // =========================
   // Copy link
@@ -2232,7 +2089,7 @@ async function dashboardApi(){
     const body = document.getElementById('ccRankBody');
     if(!body) return;
     if(!list || !list.length){
-      body.innerHTML = `<tr><td colspan="4" class="text-muted small p-3">Chưa có dữ liệu</td></tr>`;
+      body.innerHTML = `<tr><td colspan="4" class="text-muted small tw:p-4">Chưa có dữ liệu</td></tr>`;
       return;
     }
     const map = @json(($marketingUsers ?? collect())->keyBy('id')->map->name);
@@ -2258,9 +2115,9 @@ async function dashboardApi(){
     wrap.innerHTML = list.map(r=>{
       const denom = Math.max(1, Math.max(Number(r.reach||0), Number(r.views||0)));
       const rate = (Number(r.engagement||0) / denom * 100).toFixed(2);
-      return `<div class="d-flex justify-content-between align-items-start gap-2 py-2 border-bottom">
+      return `<div class="d-flex tw:justify-between tw:items-start tw:gap-2 tw:py-2 border-bottom">
         <div style="min-width:0">
-          <div class="fw-semibold text-truncate">${escapeHtml(r.title)}</div>
+          <div class="fw-semibold tw:truncate">${escapeHtml(r.title)}</div>
           <div class="text-muted small">${escapeHtml(r.platform || '')} • ${escapeHtml(r.publish_date || '')} • ER ${rate}%</div>
         </div>
         <div class="text-end">
@@ -2281,10 +2138,10 @@ async function dashboardApi(){
     const map = @json(($marketingUsers ?? collect())->keyBy('id')->map->name);
     wrap.innerHTML = list.map(r=>{
       const name = map[String(r.assignee_user_id)] || (r.assignee_user_id ? ('#'+r.assignee_user_id) : 'Chưa gán');
-      return `<div class="d-flex align-items-start gap-2 py-2 border-bottom">
+      return `<div class="d-flex tw:items-start tw:gap-2 tw:py-2 border-bottom">
         <div class="text-warning"><i class="bi bi-exclamation-triangle-fill"></i></div>
         <div style="min-width:0">
-          <div class="fw-semibold text-truncate">${escapeHtml(r.title)}</div>
+          <div class="fw-semibold tw:truncate">${escapeHtml(r.title)}</div>
           <div class="text-muted small">${escapeHtml(r.publish_date)} • ${escapeHtml(name)} • ${escapeHtml(r.platform || '')}</div>
         </div>
       </div>`;

@@ -77,8 +77,11 @@
         font-size: 12px;
     }
 
-    .payroll-page .form-control,
-    .payroll-page .form-select {
+    /* Đổi tên từ `.form-control, .form-select` khi chuyển sang component.
+       Là bộ chọn NHÓM hai dòng — đổi mỗi dòng dưới thì dòng trên treo lơ
+       lửng và 2 ô lọc mất bo góc 14px, viền #dbe4f0, cỡ chữ 13px,
+       min-height 42px (đã đo được đúng như vậy). */
+    .payroll-page .payroll-input {
         border-radius: 14px;
         border-color: #dbe4f0;
         font-size: 13px;
@@ -509,25 +512,18 @@
         $currentMonthLabel = $salaryMonthStart->format('Y-m');
     }
 
-    $salaryMonthEnd = (clone $salaryMonthStart)->endOfMonth();
-
-    $globalLatePenaltyPerTime = 0;
-
-    try {
-        if (class_exists(\App\Models\AttendanceSetting::class)) {
-            $globalAttendanceSetting = \App\Models\AttendanceSetting::first();
-            $globalLatePenaltyPerTime = (float) ($globalAttendanceSetting->late_penalty_per_time ?? 0);
-        }
-    } catch (\Throwable $e) {
-        $globalLatePenaltyPerTime = 0;
-    }
+    // Mức phạt đi trễ dùng chung: FinanceDashboardController::salary() đã đọc sẵn
+    // từ AttendanceSetting và truyền vào. Đọc lại ở đây chỉ tốn thêm một câu
+    // truy vấn cho cùng một con số. Chốt tên riêng vì $latePenaltyPerTime bị
+    // gán đè theo từng nhân viên bên trong vòng lặp phía dưới.
+    $globalLatePenaltyPerTime = (float) ($latePenaltyPerTime ?? 0);
 @endphp
 
 <div class="payroll-page">
     <div class="payroll-hero">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div class="d-flex tw:justify-between tw:items-start flex-wrap tw:gap-4">
             <div>
-                <div class="payroll-pill mb-2">
+                <div class="payroll-pill tw:mb-2">
                     <i class="bi bi-stars"></i>
                     Finance Payroll
                 </div>
@@ -537,12 +533,18 @@
                 </p>
             </div>
 
-            <div class="d-flex flex-wrap gap-2">
+            <div class="d-flex flex-wrap tw:gap-2">
                 <a href="{{ route('finance.salary.my', ['month' => $currentMonthLabel]) }}" class="payroll-btn payroll-btn-light">
                     <i class="bi bi-person-badge"></i>
                     Lương của tôi
                 </a>
 
+                @role('admin')
+                <a href="{{ route('finance.salary.settings') }}" class="payroll-btn payroll-btn-light">
+                    <i class="bi bi-sliders"></i>
+                    Cấu hình phiếu lương
+                </a>
+                @endrole
 
                 <a href="{{ route('finance.salary.export.excel', request()->query()) }}" class="payroll-btn payroll-btn-success">
                     <i class="bi bi-file-earmark-excel"></i>
@@ -558,43 +560,43 @@
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm rounded-4">
+        <x-ui.alert variant="success" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[1rem]">
             {{ session('success') }}
-        </div>
+        </x-ui.alert>
     @endif
 
     @if(session('error'))
-        <div class="alert alert-danger border-0 shadow-sm rounded-4">
+        <x-ui.alert variant="danger" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[1rem]">
             {{ session('error') }}
-        </div>
+        </x-ui.alert>
     @endif
 
     <div class="payroll-card filter-card">
         <form method="GET" action="{{ route('finance.salary') }}">
-            <div class="row g-3 align-items-end">
-                <div class="col-xl-3 col-md-6">
+            <div class="tw:row tw:g-3 tw:items-end">
+                <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                     <label class="filter-label">Kỳ lương</label>
-                    <input type="month" name="month" value="{{ $currentMonthLabel }}" class="form-control">
+                    <x-ui.input type="month" name="month" value="{{ $currentMonthLabel }}" class="payroll-input" />
                 </div>
 
-                <div class="col-xl-3 col-md-6">
+                <div class="tw:min-[75rem]:col12-3 tw:md:col12-6">
                     <label class="filter-label">Phòng ban</label>
-                    <select name="department_id" class="form-select">
+                    <x-ui.select name="department_id" class="payroll-input">
                         <option value="">Tất cả phòng ban</option>
                         @foreach($departments as $department)
                             <option value="{{ $department->id }}" {{ request('department_id') == $department->id ? 'selected' : '' }}>
                                 {{ $department->name }}
                             </option>
                         @endforeach
-                    </select>
+                    </x-ui.select>
                 </div>
 
-                <div class="col-xl-4 col-md-8">
+                <div class="tw:min-[75rem]:col12-4 tw:md:col12-8">
                     <label class="filter-label">Tìm nhân viên</label>
-                    <input type="text" name="keyword" value="{{ request('keyword') }}" class="form-control" placeholder="Nhập tên nhân viên...">
+                    <x-ui.input type="text" name="keyword" value="{{ request('keyword') }}" class="payroll-input" placeholder="Nhập tên nhân viên..." />
                 </div>
 
-                <div class="col-xl-2 col-md-4 d-grid">
+                <div class="tw:min-[75rem]:col12-2 tw:md:col12-4 d-grid">
                     <button type="submit" class="payroll-btn payroll-btn-primary">
                         <i class="bi bi-funnel"></i>
                         Lọc dữ liệu
@@ -605,6 +607,7 @@
     </div>
 
     <form method="POST" action="{{ route('finance.salary.save') }}" id="salaryForm">
+        @method('PUT')
         @csrf
         <input type="hidden" name="month" value="{{ $currentMonthLabel }}">
 
@@ -629,7 +632,7 @@
 
             <div class="payroll-card summary-card">
                 <div class="label">Tổng thực lĩnh</div>
-                <div class="value text-success" id="sumNet">0đ</div>
+                <div class="value tw:text-[#198754]!" id="sumNet">0đ</div>
                 <div class="hint">Tự cập nhật khi nhập chi tiết</div>
             </div>
         </div>
@@ -641,7 +644,7 @@
                     <p>Lương tháng được tính theo công thức: lương tháng / ngày công chuẩn × ngày công thực tế.</p>
                 </div>
 
-                <div class="d-flex gap-2 flex-wrap">
+                <div class="d-flex tw:gap-2 flex-wrap">
                     <span class="status-pill">
                         <i class="bi bi-lightning-charge"></i>
                         Tự tính thực lĩnh
@@ -700,21 +703,12 @@
                         $advance = (float) old("rows.$index.advance", $employee->advance ?? 0);
 
                         $latePenaltyPerTime = (float) ($employee->late_penalty_per_time ?? $globalLatePenaltyPerTime ?? 0);
+                        // Controller đã gộp số lần đi trễ của cả tháng bằng một câu
+                        // GROUP BY ($lateCountMap). Nhánh dự phòng cũ chạy lại đúng câu
+                        // COUNT đó cho từng nhân viên có late_count = 0 — cùng bộ lọc,
+                        // cùng khoảng ngày, nên luôn trả về 0: đo được 13 câu truy vấn
+                        // thừa cho 13 nhân viên.
                         $lateCount = (int) ($employee->late_count ?? 0);
-
-                        if ($lateCount <= 0) {
-                            try {
-                                if (class_exists(\App\Models\AttendanceRecord::class)) {
-                                    $lateCount = \App\Models\AttendanceRecord::query()
-                                        ->where('user_id', $employee->id)
-                                        ->whereBetween('work_date', [$salaryMonthStart->toDateString(), $salaryMonthEnd->toDateString()])
-                                        ->where('late_minutes', '>', 0)
-                                        ->count();
-                                }
-                            } catch (\Throwable $e) {
-                                $lateCount = 0;
-                            }
-                        }
 
                         $latePenalty = (float) ($employee->late_penalty_total ?? 0);
 
@@ -849,7 +843,7 @@
                     </div>
                 @empty
                     <div class="empty-state">
-                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        <i class="bi bi-inbox fs-1 tw:block tw:mb-2"></i>
                         Chưa có nhân viên nào theo bộ lọc hiện tại.
                     </div>
                 @endforelse
@@ -859,13 +853,13 @@
         @if($employees->count())
             <div class="payroll-card sticky-save-bar">
                 <div>
-                    <div class="fw-bold">Sẵn sàng lưu bảng lương</div>
-                    <div class="text-muted small">
+                    <div class="tw:font-bold">Sẵn sàng lưu bảng lương</div>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] small">
                         Lương đã được tính theo ngày công thực tế. Tiền đi trễ đã được cộng vào khấu trừ.
                     </div>
                 </div>
 
-                <div class="d-flex gap-2 flex-wrap">
+                <div class="d-flex tw:gap-2 flex-wrap">
                     <a href="{{ route('finance.salary', ['month' => $currentMonthLabel]) }}" class="payroll-btn payroll-btn-light">
                         <i class="bi bi-arrow-clockwise"></i>
                         Tải lại
@@ -885,41 +879,41 @@
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header-pro">
-                <div class="d-flex justify-content-between align-items-start gap-3">
+                <div class="d-flex tw:justify-between tw:items-start tw:gap-4">
                     <div>
                         <h5 id="modalEmployeeName">Nhập chi tiết lương</h5>
                         <div class="sub" id="modalEmployeeSub">Cập nhật ngày công, thu nhập, khấu trừ và ghi chú.</div>
                     </div>
 
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    <x-ui.close-button white type="button" data-bs-dismiss="modal" aria-label="Đóng" />
                 </div>
             </div>
 
-            <div class="modal-body p-3 p-md-4">
+            <div class="modal-body tw:p-4">
                 <input type="hidden" id="modalRowIndex">
 
-                <div class="row g-3">
-                    <div class="col-lg-4">
+                <div class="tw:row tw:g-3">
+                    <div class="tw:min-[62rem]:col12-4">
                         <div class="modal-section">
                             <div class="modal-section-title">
                                 <i class="bi bi-calendar-check"></i>
                                 Ngày công & lương cơ bản
                             </div>
 
-                            <div class="row g-3">
-                                <div class="col-6">
+                            <div class="tw:row tw:g-3">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Ngày công chuẩn</label>
-                                    <input type="number" min="0" step="0.5" id="m_standard_days" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="0.5" id="m_standard_days" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Ngày công thực tế</label>
-                                    <input type="number" min="0" step="0.5" id="m_working_days" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="0.5" id="m_working_days" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-12">
+                                <div class="tw:col12-12">
                                     <label class="filter-label">Lương tháng</label>
-                                    <input type="number" min="0" step="any" id="m_basic_salary" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_basic_salary" class="payroll-input salary-modal-calc" />
                                 </div>
                             </div>
 
@@ -932,111 +926,111 @@
                         </div>
                     </div>
 
-                    <div class="col-lg-4">
+                    <div class="tw:min-[62rem]:col12-4">
                         <div class="modal-section">
                             <div class="modal-section-title income">
                                 <i class="bi bi-plus-circle"></i>
                                 Thu nhập / phụ cấp
                             </div>
 
-                            <div class="row g-3">
-                                <div class="col-6">
+                            <div class="tw:row tw:g-3">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Công tác phí</label>
-                                    <input type="number" min="0" step="any" id="m_business_trip" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_business_trip" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Tiền ăn</label>
-                                    <input type="number" min="0" step="any" id="m_meal" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_meal" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Điện thoại</label>
-                                    <input type="number" min="0" step="any" id="m_phone" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_phone" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Nhà ở</label>
-                                    <input type="number" min="0" step="any" id="m_housing" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_housing" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Xăng xe</label>
-                                    <input type="number" min="0" step="any" id="m_fuel" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_fuel" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Nuôi con nhỏ</label>
-                                    <input type="number" min="0" step="any" id="m_child" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_child" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Công tác tỉnh</label>
-                                    <input type="number" min="0" step="any" id="m_province" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_province" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">OT / Hoa hồng</label>
-                                    <input type="number" min="0" step="any" id="m_commission" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_commission" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-12">
+                                <div class="tw:col12-12">
                                     <label class="filter-label">Thưởng</label>
-                                    <input type="number" min="0" step="any" id="m_bonus" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_bonus" class="payroll-input salary-modal-calc" />
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="col-lg-4">
+                    <div class="tw:min-[62rem]:col12-4">
                         <div class="modal-section">
                             <div class="modal-section-title deduct">
                                 <i class="bi bi-dash-circle"></i>
                                 Khấu trừ
                             </div>
 
-                            <div class="row g-3">
-                                <div class="col-6">
+                            <div class="tw:row tw:g-3">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">BHXH</label>
-                                    <input type="number" min="0" step="any" id="m_bhxh" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_bhxh" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">BHYT</label>
-                                    <input type="number" min="0" step="any" id="m_bhyt" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_bhyt" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">BHTN</label>
-                                    <input type="number" min="0" step="any" id="m_bhtn" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_bhtn" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Thuế TNCN</label>
-                                    <input type="number" min="0" step="any" id="m_pit" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_pit" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Tạm ứng</label>
-                                    <input type="number" min="0" step="any" id="m_advance" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_advance" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="filter-label">Khấu trừ khác</label>
-                                    <input type="number" min="0" step="any" id="m_other_only" class="form-control salary-modal-calc">
+                                    <x-ui.input type="number" min="0" step="any" id="m_other_only" class="payroll-input salary-modal-calc" />
                                 </div>
 
-                                <div class="col-12">
+                                <div class="tw:col12-12">
                                     <label class="filter-label">Phạt đi trễ</label>
-                                    <input type="number" min="0" step="any" id="m_late_penalty" class="form-control salary-modal-calc bg-light" readonly>
-                                    <div class="small text-muted mt-1" id="m_late_penalty_note">
+                                    <x-ui.input type="number" min="0" step="any" id="m_late_penalty" class="payroll-input salary-modal-calc bg-light" readonly />
+                                    <div class="small tw:text-[rgba(33,37,41,0.75)] tw:mt-1" id="m_late_penalty_note">
                                         Tự lấy từ số lần đi trễ × mức phạt trong cài đặt chấm công.
                                     </div>
                                 </div>
 
-                                <div class="col-12">
+                                <div class="tw:col12-12">
                                     <label class="filter-label">Ghi chú kế toán</label>
-                                    <textarea id="m_note_text" rows="3" class="form-control salary-modal-calc" placeholder="Ví dụ: đã đối chiếu công, tạm ứng tháng này..."></textarea>
+                                    <x-ui.input as="textarea" id="m_note_text" rows="3" class="payroll-input salary-modal-calc" placeholder="Ví dụ: đã đối chiếu công, tạm ứng tháng này..."></x-ui.input>
                                 </div>
                             </div>
                         </div>

@@ -9,11 +9,16 @@ use App\Models\Inventory\Catalog\Brand;
 use App\Models\Inventory\Catalog\Product;
 use App\Models\Inventory\Catalog\ProductCategory;
 use App\Models\Inventory\Stock\ProductStock;
+use App\Services\Inventory\ProductAttributeWriter;
 use App\Services\Inventory\ProductCatalogOptionsService;
+use App\Services\Inventory\ProductEdit\ProductEditPageData;
 use App\Services\Inventory\ProductStockLotExcelExporter;
 use App\Services\Inventory\ProductStockLotQueryService;
 use App\Services\Inventory\Stock\StockLotService;
-use App\Support\EgoCompanyLock;
+use App\Support\EgoCompanyContext;
+use App\Support\SchemaCache;
+use App\View\Presenters\Inventory\ProductEditPresenter;
+use App\View\Presenters\Inventory\ProductListPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -29,12 +34,95 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 class ProductController extends Controller
 {
     /**
+     * Kho/Sản phẩm trên CRM này chỉ vận hành cho EGO Việt Nam.
+     */
+    private function egoVnCompanyId(): int
+    {
+        return EgoCompanyContext::defaultCompanyId();
+    }
+
+    private function egoForceVnRequest(Request $request): void
+    {
+        $request->merge(['company_id' => EgoCompanyContext::defaultCompanyId()]);
+
+        foreach (['v2_lines', 'initial_lots'] as $key) {
+            $rows = (array) $request->input($key, []);
+            foreach ($rows as $index => $row) {
+                if (is_array($row)) {
+                    $rows[$index]['company_id'] = EgoCompanyContext::defaultCompanyId();
+                }
+            }
+            if ($rows !== []) {
+                $request->merge([$key => $rows]);
+            }
+        }
+
+        $stocks = (array) $request->input('stocks', []);
+        if ($stocks !== []) {
+            $vnStocks = $stocks[EgoCompanyContext::defaultCompanyId()] ?? $stocks[(string) EgoCompanyContext::defaultCompanyId()] ?? [];
+            $request->merge(['stocks' => [EgoCompanyContext::defaultCompanyId() => $vnStocks]]);
+        }
+    }
+
+    private function egoVnWarehouseQuery()
+    {
+        $query = Warehouse::query();
+
+        $query->where(function ($warehouseQuery) {
+            $hasCondition = false;
+
+            if (SchemaCache::hasColumn('crm_warehouses', 'company_id')) {
+                $warehouseQuery->where('company_id', EgoCompanyContext::defaultCompanyId());
+                $hasCondition = true;
+            }
+
+            if (SchemaCache::hasTable('company_warehouse')) {
+                $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                $warehouseQuery->{$method}('id', function ($pivotQuery) {
+                    $pivotQuery->from('company_warehouse')
+                        ->select('warehouse_id')
+                        ->where('company_id', EgoCompanyContext::defaultCompanyId());
+                });
+                $hasCondition = true;
+            }
+
+            if (! $hasCondition) {
+                $warehouseQuery->whereRaw('1 = 0');
+            }
+        });
+
+        return $query;
+    }
+
+    private function egoWarehouseBelongsToVn(int $warehouseId): bool
+    {
+        if ($warehouseId <= 0) {
+            return false;
+        }
+
+        return $this->egoVnWarehouseQuery()->whereKey($warehouseId)->exists();
+    }
+
+    /**
+     * Đánh dấu sản phẩm thuộc công ty vận hành mặc định.
+     *
+     * Uỷ quyền cho ProductAttributeWriter để chỉ có MỘT nơi biết quy tắc này.
+     */
+    private function egoAssignVnCompanyToProduct(Product $product): void
+    {
+        $this->productAttributes->assignDefaultCompany($product);
+    }
+
+    /**
      * Khởi tạo controller, inject service truy vấn lô/tồn, nạp options catalog và exporter.
      */
     public function __construct(
         private readonly ProductStockLotQueryService $lotQuery,
         private readonly ProductCatalogOptionsService $catalogOptions,
         private readonly ProductStockLotExcelExporter $lotExporter,
+        private readonly ProductAttributeWriter $productAttributes,
+        private readonly ProductListPresenter $listPresenter,
+        private readonly ProductEditPresenter $editPresenter,
     ) {}
 
     /**
@@ -51,36 +139,26 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $keyword = trim((string) $request->get('search', ''));
-        // Hệ thống hiện chỉ vận hành kho của Công ty Quốc Tế EGO.
-        // Không nhận company_id từ URL để tránh truy cập chéo dữ liệu EGO VN.
-        $companyId = EgoCompanyLock::id();
-        $companyMode = (string) $companyId;
+        $request->merge(['company_id' => EgoCompanyContext::defaultCompanyId()]);
         $warehouseId = $request->filled('warehouse_id') ? (int) $request->get('warehouse_id') : null;
         $categoryId = $request->filled('category_id') ? (int) $request->get('category_id') : null;
+
         $brandId = $request->filled('brand_id') ? (int) $request->get('brand_id') : null;
         $priceTierId = $request->filled('price_tier_id') ? (int) $request->get('price_tier_id') : null;
 
-        if ($warehouseId && ! Warehouse::withoutGlobalScopes()
-            ->where('id', $warehouseId)
-            ->where('company_id', $companyId)
-            ->exists()) {
+        $companyId = EgoCompanyContext::defaultCompanyId();
+        $companyMode = (string) EgoCompanyContext::defaultCompanyId();
+        if ($warehouseId && ! $this->egoWarehouseBelongsToVn($warehouseId)) {
             $warehouseId = null;
         }
 
-        if (Schema::hasTable('crm_product_stock_lots')) {
+        if (SchemaCache::hasTable('crm_product_stock_lots')) {
             $products = $this->lotQuery->paginateStockLotIndexRows($keyword, $categoryId, $brandId, $companyId, $warehouseId);
 
-            $companies = DB::table('companies')->select('id', 'name')->where('id', EgoCompanyLock::id())->get();
+            $companies = DB::table('companies')->select('id', 'name')->where('id', EgoCompanyContext::defaultCompanyId())->get();
             $categories = $this->catalogOptions->buildCategoryOptions();
 
-            $warehousesQ = Warehouse::query()->orderBy('name');
-            if ($companyId) {
-                $warehousesQ->whereIn('id', function ($qq) use ($companyId) {
-                    $qq->from('company_warehouse')
-                        ->select('warehouse_id')
-                        ->where('company_id', $companyId);
-                });
-            }
+            $warehousesQ = $this->egoVnWarehouseQuery()->orderBy('name');
             $warehouses = $warehousesQ->get();
 
             $brands = Brand::query()->orderBy('name')->get();
@@ -91,7 +169,7 @@ class ProductController extends Controller
             $totalQtyAll = $totalsAll->total_qty;
             $totalAmountAll = $totalsAll->total_amount;
 
-            return view('products.index', compact(
+            return view('products.index', $this->listPresenter->index($request->user(), $products, $request->only(ProductListPresenter::FILTER_KEYS)) + compact(
                 'products',
                 'companies',
                 'categories',
@@ -112,7 +190,7 @@ class ProductController extends Controller
 
         $q = Product::query();
 
-        if (Schema::hasColumn((new Product)->getTable(), 'is_active')) {
+        if (SchemaCache::hasColumn((new Product)->getTable(), 'is_active')) {
             $q->where(function ($activeQuery) {
                 $activeQuery->where('is_active', 1)->orWhereNull('is_active');
             });
@@ -124,7 +202,7 @@ class ProductController extends Controller
         } catch (\Throwable $e) {
         }
         try {
-            $q->with(['brand', 'category', 'stocks.warehouse']);
+            $q->with(['brand', 'category']);
         } catch (\Throwable $e) {
         }
 
@@ -167,18 +245,11 @@ class ProductController extends Controller
         $products = $q->orderByDesc('id')->paginate(20)->withQueryString();
 
         // dropdown data
-        $companies = DB::table('companies')->select('id', 'name')->where('id', EgoCompanyLock::id())->get();
+        $companies = DB::table('companies')->select('id', 'name')->where('id', EgoCompanyContext::defaultCompanyId())->get();
         $categories = $this->catalogOptions->buildCategoryOptions();
 
         // ✅ Warehouses theo công ty (pivot company_warehouse)
-        $warehousesQ = Warehouse::query()->orderBy('name');
-        if ($companyId) {
-            $warehousesQ->whereIn('id', function ($qq) use ($companyId) {
-                $qq->from('company_warehouse')
-                    ->select('warehouse_id')
-                    ->where('company_id', $companyId);
-            });
-        }
+        $warehousesQ = $this->egoVnWarehouseQuery()->orderBy('name');
         $warehouses = $warehousesQ->get();
 
         $brands = Brand::query()->orderBy('name')->get();
@@ -192,7 +263,7 @@ class ProductController extends Controller
         $totalQtyAll = $totalsAll->total_qty;
         $totalAmountAll = $totalsAll->total_amount;
 
-        return view('products.index', compact(
+        return view('products.index', $this->listPresenter->index($request->user(), $products, $request->only(ProductListPresenter::FILTER_KEYS)) + compact(
             'products',
             'companies',
             'categories',
@@ -218,17 +289,15 @@ class ProductController extends Controller
     {
         // Dùng đúng logic giống index() để tránh 500
         $keyword = trim((string) $request->get('search', ''));
-        $companyId = EgoCompanyLock::id();
-        $companyMode = (string) $companyId;
+        $request->merge(['company_id' => EgoCompanyContext::defaultCompanyId()]);
         $warehouseId = $request->filled('warehouse_id') ? (int) $request->get('warehouse_id') : null;
         $categoryId = $request->filled('category_id') ? (int) $request->get('category_id') : null;
         $brandId = $request->filled('brand_id') ? (int) $request->get('brand_id') : null;
         $priceTierId = $request->filled('price_tier_id') ? (int) $request->get('price_tier_id') : null;
 
-        if ($warehouseId && ! Warehouse::withoutGlobalScopes()
-            ->where('id', $warehouseId)
-            ->where('company_id', $companyId)
-            ->exists()) {
+        $companyId = EgoCompanyContext::defaultCompanyId();
+        $companyMode = (string) EgoCompanyContext::defaultCompanyId();
+        if ($warehouseId && ! $this->egoWarehouseBelongsToVn($warehouseId)) {
             $warehouseId = null;
         }
 
@@ -245,7 +314,7 @@ class ProductController extends Controller
 
         $q = Product::query();
 
-        if (Schema::hasColumn((new Product)->getTable(), 'is_active')) {
+        if (SchemaCache::hasColumn((new Product)->getTable(), 'is_active')) {
             $q->where(function ($activeQuery) {
                 $activeQuery->where('is_active', 1)->orWhereNull('is_active');
             });
@@ -257,7 +326,7 @@ class ProductController extends Controller
         } catch (\Throwable $e) {
         }
         try {
-            $q->with(['brand', 'category', 'stocks.warehouse']);
+            $q->with(['brand', 'category']);
         } catch (\Throwable $e) {
         }
 
@@ -301,21 +370,11 @@ class ProductController extends Controller
         $categories = $this->catalogOptions->buildCategoryOptions();
 
         /* EGO_FIX_PRODUCTS_INPUT_ALL_WAREHOUSES_START
-           Màn Sản phẩm đầu vào chỉ hiển thị kho thuộc Công ty Quốc Tế EGO.
+           Màn Sản phẩm đầu vào phải nhìn được cả Kho EGO_QT và Kho EGO_VN.
            Một số model Warehouse đang bị scope theo công ty đang chọn trong session,
            nên dùng withoutGlobalScopes() và chỉ lọc theo company_id khi người dùng
            chọn rõ bộ lọc công ty trên màn hình. */
-        $warehousesQ = method_exists(Warehouse::class, 'withoutGlobalScopes')
-            ? Warehouse::withoutGlobalScopes()
-            : Warehouse::query();
-        $warehousesQ->orderBy('name');
-        if ($companyId) {
-            $warehousesQ->whereIn('id', function ($qq) use ($companyId) {
-                $qq->from('company_warehouse')
-                    ->select('warehouse_id')
-                    ->where('company_id', $companyId);
-            });
-        }
+        $warehousesQ = $this->egoVnWarehouseQuery()->orderBy('name');
         $warehouses = $warehousesQ->get();
         /* EGO_FIX_PRODUCTS_INPUT_ALL_WAREHOUSES_END */
 
@@ -331,7 +390,7 @@ class ProductController extends Controller
         $totalQtyAll = $totalsAll->total_qty;
         $totalAmountAll = $totalsAll->total_amount;
 
-        return view('products.index_input', compact(
+        return view('products.index_input', $this->listPresenter->input($request->user(), $products, $request->only(ProductListPresenter::FILTER_KEYS), $totalQtyAll, $totalAmountAll) + compact(
             'products',
             'categories',
             'warehouses',
@@ -355,32 +414,30 @@ class ProductController extends Controller
     public function exportInputExcel(Request $request)
     {
         $keyword = trim((string) $request->get('search', ''));
-        $companyId = EgoCompanyLock::id();
+        $request->merge(['company_id' => EgoCompanyContext::defaultCompanyId()]);
         $warehouseId = $request->filled('warehouse_id') ? (int) $request->get('warehouse_id') : null;
         $categoryId = $request->filled('category_id') ? (int) $request->get('category_id') : null;
         $brandId = $request->filled('brand_id') ? (int) $request->get('brand_id') : null;
 
-        if ($warehouseId && ! Warehouse::withoutGlobalScopes()
-            ->where('id', $warehouseId)
-            ->where('company_id', $companyId)
-            ->exists()) {
+        $companyId = EgoCompanyContext::defaultCompanyId();
+        if ($warehouseId && ! $this->egoWarehouseBelongsToVn($warehouseId)) {
             $warehouseId = null;
         }
 
-        if (Schema::hasTable('crm_product_stock_lots')) {
+        if (SchemaCache::hasTable('crm_product_stock_lots')) {
             return $this->lotExporter->exportStockLotInputExcel($keyword, $categoryId, $brandId, $companyId, $warehouseId);
         }
 
         $q = Product::query();
 
-        if (Schema::hasColumn((new Product)->getTable(), 'is_active')) {
+        if (SchemaCache::hasColumn((new Product)->getTable(), 'is_active')) {
             $q->where(function ($activeQuery) {
                 $activeQuery->where('is_active', 1)->orWhereNull('is_active');
             });
         }
 
         try {
-            $q->with(['brand', 'category', 'stocks.warehouse']);
+            $q->with(['brand', 'category']);
         } catch (\Throwable $e) {
         }
 
@@ -423,7 +480,7 @@ class ProductController extends Controller
 
         $stockRows = collect();
 
-        if ($productIds->isNotEmpty() && Schema::hasTable('crm_product_stock')) {
+        if ($productIds->isNotEmpty() && SchemaCache::hasTable('crm_product_stock')) {
             $stockQuery = DB::table('crm_product_stock as s')
                 ->leftJoin('crm_warehouses as w', 'w.id', '=', 's.warehouse_id')
                 ->whereIn('s.product_id', $productIds->all());
@@ -522,7 +579,7 @@ class ProductController extends Controller
 
             $priceBeforeVat = (float) ($product->price_agent ?? 0);
 
-            if (Schema::hasColumn($product->getTable(), 'cost_vat_percent')) {
+            if (SchemaCache::hasColumn($product->getTable(), 'cost_vat_percent')) {
                 $vatPercent = (float) ($product->cost_vat_percent ?? 0);
             } else {
                 $vatPercent = (float) ($product->vat_percent ?? 0);
@@ -610,31 +667,23 @@ class ProductController extends Controller
     {
         // ✅ output giống input 100% (vì view output cần prices tier)
         $keyword = trim((string) $request->get('search', ''));
-        $companyRaw = $request->get('company_id', 'all');
+        $request->merge(['company_id' => EgoCompanyContext::defaultCompanyId()]);
         $warehouseId = $request->filled('warehouse_id') ? (int) $request->get('warehouse_id') : null;
         $categoryId = $request->filled('category_id') ? (int) $request->get('category_id') : null;
         $brandId = $request->filled('brand_id') ? (int) $request->get('brand_id') : null;
         $priceTierId = $request->filled('price_tier_id') ? (int) $request->get('price_tier_id') : null;
 
-        $companyId = null;
-        $companyMode = 'all';
-        if ($companyRaw === '1' || $companyRaw === 1 || $companyRaw === '2' || $companyRaw === 2) {
-            $companyId = (int) $companyRaw;
-            $companyMode = (string) $companyId;
+        $companyId = EgoCompanyContext::defaultCompanyId();
+        $companyMode = (string) EgoCompanyContext::defaultCompanyId();
+        if ($warehouseId && ! $this->egoWarehouseBelongsToVn($warehouseId)) {
+            $warehouseId = null;
         }
 
-        if (Schema::hasTable('crm_product_stock_lots')) {
+        if (SchemaCache::hasTable('crm_product_stock_lots')) {
             $products = $this->lotQuery->paginateStockLotIndexRows($keyword, $categoryId, $brandId, $companyId, $warehouseId);
 
             $categories = $this->catalogOptions->buildCategoryOptions();
-            $warehousesQ = Warehouse::query()->orderBy('name');
-            if ($companyId) {
-                $warehousesQ->whereIn('id', function ($qq) use ($companyId) {
-                    $qq->from('company_warehouse')
-                        ->select('warehouse_id')
-                        ->where('company_id', $companyId);
-                });
-            }
+            $warehousesQ = $this->egoVnWarehouseQuery()->orderBy('name');
             $warehouses = $warehousesQ->get();
             $brands = Brand::query()->orderBy('name')->get();
             $priceTiers = $this->catalogOptions->loadPriceTiers();
@@ -644,7 +693,7 @@ class ProductController extends Controller
             $totalQtyAll = $totalsAll->total_qty;
             $totalAmountAll = $totalsAll->total_amount;
 
-            return view('products.index_output', compact(
+            return view('products.index_output', $this->listPresenter->output($request->user(), $products, $request->only(ProductListPresenter::FILTER_KEYS)) + compact(
                 'products',
                 'categories',
                 'warehouses',
@@ -664,7 +713,7 @@ class ProductController extends Controller
 
         $q = Product::query();
 
-        if (Schema::hasColumn((new Product)->getTable(), 'is_active')) {
+        if (SchemaCache::hasColumn((new Product)->getTable(), 'is_active')) {
             $q->where(function ($activeQuery) {
                 $activeQuery->where('is_active', 1)->orWhereNull('is_active');
             });
@@ -675,7 +724,7 @@ class ProductController extends Controller
         } catch (\Throwable $e) {
         }
         try {
-            $q->with(['brand', 'category', 'stocks.warehouse']);
+            $q->with(['brand', 'category']);
         } catch (\Throwable $e) {
         }
 
@@ -717,14 +766,7 @@ class ProductController extends Controller
 
         $categories = $this->catalogOptions->buildCategoryOptions();
 
-        $warehousesQ = Warehouse::query()->orderBy('name');
-        if ($companyId) {
-            $warehousesQ->whereIn('id', function ($qq) use ($companyId) {
-                $qq->from('company_warehouse')
-                    ->select('warehouse_id')
-                    ->where('company_id', $companyId);
-            });
-        }
+        $warehousesQ = $this->egoVnWarehouseQuery()->orderBy('name');
         $warehouses = $warehousesQ->get();
 
         $brands = Brand::query()->orderBy('name')->get();
@@ -739,7 +781,7 @@ class ProductController extends Controller
         $totalQtyAll = $totalsAll->total_qty;
         $totalAmountAll = $totalsAll->total_amount;
 
-        return view('products.index_output', compact(
+        return view('products.index_output', $this->listPresenter->output($request->user(), $products, $request->only(ProductListPresenter::FILTER_KEYS)) + compact(
             'products',
             'categories',
             'warehouses',
@@ -762,17 +804,17 @@ class ProductController extends Controller
      */
     public function history(Request $request)
     {
-        $hasNote = Schema::hasColumn('crm_stock_movements', 'note');
-        $hasReferenceType = Schema::hasColumn('crm_stock_movements', 'reference_type');
-        $hasQtyBefore = Schema::hasColumn('crm_stock_movements', 'qty_before');
-        $hasQtyAfter = Schema::hasColumn('crm_stock_movements', 'qty_after');
+        $hasNote = SchemaCache::hasColumn('crm_stock_movements', 'note');
+        $hasReferenceType = SchemaCache::hasColumn('crm_stock_movements', 'reference_type');
+        $hasQtyBefore = SchemaCache::hasColumn('crm_stock_movements', 'qty_before');
+        $hasQtyAfter = SchemaCache::hasColumn('crm_stock_movements', 'qty_after');
 
-        $orderTable = Schema::hasTable('crm_orders') ? 'crm_orders' : (Schema::hasTable('orders') ? 'orders' : null);
+        $orderTable = SchemaCache::hasTable('crm_orders') ? 'crm_orders' : (SchemaCache::hasTable('orders') ? 'orders' : null);
         $orderCodeColumn = null;
 
         if ($orderTable) {
             foreach (['order_code', 'code', 'order_no', 'order_number'] as $col) {
-                if (Schema::hasColumn($orderTable, $col)) {
+                if (SchemaCache::hasColumn($orderTable, $col)) {
                     $orderCodeColumn = $col;
                     break;
                 }
@@ -806,6 +848,8 @@ class ProductController extends Controller
                 $join->on('ps.product_id', '=', 'm.product_id')
                     ->on('ps.warehouse_id', '=', 'm.warehouse_id');
             });
+
+        $q->whereIn('m.warehouse_id', $this->egoVnWarehouseQuery()->select('id'));
 
         if ($orderTable) {
             $q->leftJoin($orderTable.' as o', function ($join) use ($hasReferenceType) {
@@ -882,7 +926,7 @@ class ProductController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $warehouses = DB::table('crm_warehouses')
+        $warehouses = $this->egoVnWarehouseQuery()
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
@@ -895,15 +939,11 @@ class ProductController extends Controller
      */
     public function create(Request $request)
     {
-        $companies = DB::table('companies')->select('id', 'name')->where('id', EgoCompanyLock::id())->get();
+        $companies = DB::table('companies')->select('id', 'name')->where('id', EgoCompanyContext::defaultCompanyId())->get();
         $categories = ProductCategory::query()->orderBy('name')->get();
         $brands = Brand::query()->orderBy('name')->get();
 
-        $companyWarehouses = $this->catalogOptions->loadCompanyWarehouses([EgoCompanyLock::id()]);
-        $warehouses = Warehouse::withoutGlobalScopes()
-            ->where('company_id', EgoCompanyLock::id())
-            ->orderBy('name')
-            ->get();
+        $companyWarehouses = [EgoCompanyContext::defaultCompanyId() => $this->egoVnWarehouseQuery()->orderBy('name')->get()];
         $priceTiers = $this->catalogOptions->loadPriceTiers();
 
         // formData đúng format blade bạn dùng
@@ -922,7 +962,6 @@ class ProductController extends Controller
             'categories' => $categories,
             'brands' => $brands,
             'companyWarehouses' => $companyWarehouses,
-            'warehouses' => $warehouses,
             'priceTiers' => $priceTiers,
             'formData' => $formData,
             'productStockLogs' => $productStockLogs,
@@ -934,19 +973,7 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        $lockedCompanyId = EgoCompanyLock::id();
-        $lockedLines = array_map(function ($line) use ($lockedCompanyId) {
-            if (is_array($line)) {
-                $line['company_id'] = $lockedCompanyId;
-            }
-
-            return $line;
-        }, (array) $request->input('v2_lines', []));
-
-        $request->merge([
-            'company_id' => $lockedCompanyId,
-            'v2_lines' => $lockedLines,
-        ]);
+        $this->egoForceVnRequest($request);
 
         DB::beginTransaction();
 
@@ -979,7 +1006,7 @@ class ProductController extends Controller
                     foreach ($v2Lines as $lineIndex => $line) {
                         $lineSku = trim((string) ($line['sku'] ?? ''));
                         $lineLotName = trim((string) ($line['lot_name'] ?? ''));
-                        $companyId = EgoCompanyLock::id();
+                        $companyId = (int) ($line['company_id'] ?? 0);
                         $warehouseId = (int) ($line['warehouse_id'] ?? 0);
                         $qtyIn = max(0, (int) ($line['qty_in'] ?? 0));
                         $serialCodes = $this->egoParseSerialCodes($line['serials'] ?? '');
@@ -992,17 +1019,8 @@ class ProductController extends Controller
                             throw new \Exception('Vui lòng nhập SKU cho dòng số '.($lineIndex + 1));
                         }
 
-                        if ($warehouseId <= 0) {
-                            throw new \Exception('Vui lòng chọn kho cho SKU '.$lineSku);
-                        }
-
-                        $warehouseIsValid = Warehouse::withoutGlobalScopes()
-                            ->where('id', $warehouseId)
-                            ->where('company_id', $companyId)
-                            ->exists();
-
-                        if (! $warehouseIsValid) {
-                            throw new \Exception('Kho của SKU '.$lineSku.' không thuộc Công ty Quốc Tế EGO.');
+                        if ($companyId !== EgoCompanyContext::defaultCompanyId() || ! $this->egoWarehouseBelongsToVn($warehouseId)) {
+                            throw new \Exception('Kho đã chọn không thuộc EGO Việt Nam.');
                         }
 
                         $finalSku = $this->egoBaseSkuFromLotSku($lineSku);
@@ -1013,46 +1031,15 @@ class ProductController extends Controller
                         $costAfterVat = round($costBeforeVat * (1 + $costVatPercent / 100), 2);
 
                         $product = $existingLineProduct ?: new Product;
-                        $product->name = $data['name'] ?? '';
                         $product->sku = $finalSku;
-                        $product->category_id = $data['category_id'] ?? null;
-                        $product->brand_id = $data['brand_id'] ?? null;
-                        $product->note = $data['note'] ?? null;
 
-                        if (Schema::hasColumn($product->getTable(), 'warehouse_note')) {
-                            $product->warehouse_note = $data['warehouse_note'] ?? null;
-                        }
-
-                        $product->price_agent = $costBeforeVat;
-
-                        if (Schema::hasColumn($product->getTable(), 'cost_vat_percent')) {
-                            $product->cost_vat_percent = $costVatPercent;
-                        }
-
-                        if (Schema::hasColumn($product->getTable(), 'price_agent_vat')) {
-                            $product->price_agent_vat = $costAfterVat;
-                        } else {
-                            $product->price_agent_vat = $costAfterVat;
-                        }
-
-                        $retailBeforeVat = isset($data['price_retail']) ? (float) $data['price_retail'] : 0;
-                        $retailVat = isset($data['vat_percent']) ? (float) $data['vat_percent'] : 0;
-
-                        if (Schema::hasColumn($product->getTable(), 'price_retail')) {
-                            $product->price_retail = $retailBeforeVat;
-                        }
-
-                        if (Schema::hasColumn($product->getTable(), 'price_retail_vat')) {
-                            $product->price_retail_vat = $retailBeforeVat * (1 + $retailVat / 100);
-                        }
-
-                        if (Schema::hasColumn($product->getTable(), 'vat_percent')) {
-                            $product->vat_percent = $retailVat;
-                        }
-
-                        $product->is_serialized = (! empty($data['is_serialized']) || ! empty($serialCodes)) ? 1 : 0;
-                        $product->is_active = 1;
-                        $product->save();
+                        $this->productAttributes->fillAndSave(
+                            $product,
+                            $data,
+                            $costBeforeVat,
+                            $costVatPercent,
+                            serialized: ! empty($data['is_serialized']) || ! empty($serialCodes),
+                        );
 
                         $lotRequest = new Request($request->all());
                         $lotRequest->merge([
@@ -1110,50 +1097,21 @@ class ProductController extends Controller
 
             if (! $product) {
                 $product = new Product;
-                $product->name = $data['name'] ?? '';
                 $product->sku = $sku;
-                $product->category_id = $data['category_id'] ?? null;
-                $product->brand_id = $data['brand_id'] ?? null;
-                $product->note = $data['note'] ?? null;
 
-                if (Schema::hasColumn($product->getTable(), 'warehouse_note')) {
-                    $product->warehouse_note = $data['warehouse_note'] ?? null;
-                }
-
-                $costBeforeVat = isset($data['price_agent']) ? (float) $data['price_agent'] : 0;
-                $costVat = isset($data['cost_vat_percent']) ? (float) $data['cost_vat_percent'] : 0;
-
-                $product->price_agent = $costBeforeVat;
-
-                if (Schema::hasColumn($product->getTable(), 'cost_vat_percent')) {
-                    $product->cost_vat_percent = $costVat;
-                }
-
-                $product->price_agent_vat = $costBeforeVat * (1 + $costVat / 100);
-
-                $retailBeforeVat = isset($data['price_retail']) ? (float) $data['price_retail'] : 0;
-                $retailVat = isset($data['vat_percent']) ? (float) $data['vat_percent'] : 0;
-
-                if (Schema::hasColumn($product->getTable(), 'price_retail')) {
-                    $product->price_retail = $retailBeforeVat;
-                }
-
-                if (Schema::hasColumn($product->getTable(), 'price_retail_vat')) {
-                    $product->price_retail_vat = $retailBeforeVat * (1 + $retailVat / 100);
-                }
-
-                if (Schema::hasColumn($product->getTable(), 'vat_percent')) {
-                    $product->vat_percent = $retailVat;
-                }
-
-                $product->is_serialized = ! empty($data['is_serialized']) ? 1 : 0;
-                $product->is_active = 1;
-                $product->save();
+                $this->productAttributes->fillAndSave(
+                    $product,
+                    $data,
+                    isset($data['price_agent']) ? (float) $data['price_agent'] : 0.0,
+                    isset($data['cost_vat_percent']) ? (float) $data['cost_vat_percent'] : 0.0,
+                    serialized: ! empty($data['is_serialized']),
+                );
 
                 $this->saveTierPricesFromRequest((int) $product->id, $request);
             } else {
-                if (Schema::hasColumn($product->getTable(), 'is_active') && (int) ($product->is_active ?? 1) !== 1) {
+                if (SchemaCache::hasColumn($product->getTable(), 'is_active') && (int) ($product->is_active ?? 1) !== 1) {
                     $product->is_active = 1;
+                    $this->egoAssignVnCompanyToProduct($product);
                     $product->save();
                 }
             }
@@ -1162,6 +1120,7 @@ class ProductController extends Controller
 
             if (! empty($serialCodes)) {
                 $product->is_serialized = 1;
+                $this->egoAssignVnCompanyToProduct($product);
                 $product->save();
             }
 
@@ -1239,7 +1198,7 @@ class ProductController extends Controller
             'crm_serial_unit_identifiers',
             'crm_serial_unit_states',
         ] as $table) {
-            if (! Schema::hasTable($table)) {
+            if (! SchemaCache::hasTable($table)) {
                 throw new \Exception('Thiếu bảng serial: '.$table);
             }
         }
@@ -1260,7 +1219,7 @@ class ProductController extends Controller
                 'updated_at' => now(),
             ];
 
-            if (Schema::hasColumn('crm_serial_units', 'warehouse_id')) {
+            if (SchemaCache::hasColumn('crm_serial_units', 'warehouse_id')) {
                 $unitData['warehouse_id'] = $warehouseId;
             }
 
@@ -1288,13 +1247,13 @@ class ProductController extends Controller
                 'synced_at' => now(),
             ];
 
-            if (Schema::hasColumn('crm_serial_unit_states', 'company_id')) {
+            if (SchemaCache::hasColumn('crm_serial_unit_states', 'company_id')) {
                 $stateData['company_id'] = $companyId;
             }
 
             DB::table('crm_serial_unit_states')->insert($stateData);
 
-            if (Schema::hasTable('crm_serial_warranty_events')) {
+            if (SchemaCache::hasTable('crm_serial_warranty_events')) {
                 DB::table('crm_serial_warranty_events')->insert([
                     'serial_unit_id' => $unitId,
                     'serial_code' => $code,
@@ -1319,6 +1278,7 @@ class ProductController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $this->egoForceVnRequest($request);
 
         /* EGO_FIX_UPDATE_GROUP_QTY_NO_DUPLICATE */
         if ($request->boolean('group_edit_mode')) {
@@ -1357,8 +1317,8 @@ class ProductController extends Controller
                     $companyId = (int) ($line['company_id'] ?? 0);
                     $warehouseId = (int) ($line['warehouse_id'] ?? 0);
 
-                    if ($companyId <= 0 || $warehouseId <= 0) {
-                        throw new \Exception('Vui lòng chọn công ty và kho cho SKU '.$baseSku);
+                    if ($companyId !== EgoCompanyContext::defaultCompanyId() || ! $this->egoWarehouseBelongsToVn($warehouseId)) {
+                        throw new \Exception('Kho đã chọn không thuộc EGO Việt Nam.');
                     }
 
                     $qtyIn = max(0, (int) ($line['qty_in'] ?? 0));
@@ -1377,7 +1337,7 @@ class ProductController extends Controller
                         $lineProduct = Product::where('id', $lineProductId)->lockForUpdate()->first();
                     }
 
-                    if (! $lineProduct && $lineLotId > 0 && Schema::hasTable('crm_product_stock_lots')) {
+                    if (! $lineProduct && $lineLotId > 0 && SchemaCache::hasTable('crm_product_stock_lots')) {
                         $lotProductId = DB::table('crm_product_stock_lots')->where('id', $lineLotId)->value('product_id');
 
                         if ($lotProductId) {
@@ -1409,49 +1369,50 @@ class ProductController extends Controller
                     $lineProduct->name = $request->input('name', $rootProduct->name);
                     $lineProduct->sku = $finalSku;
 
-                    if (Schema::hasColumn($productTable, 'category_id')) {
+                    if (SchemaCache::hasColumn($productTable, 'category_id')) {
                         $lineProduct->category_id = $request->input('category_id') ?: null;
                     }
 
-                    if (Schema::hasColumn($productTable, 'brand_id')) {
+                    if (SchemaCache::hasColumn($productTable, 'brand_id')) {
                         $lineProduct->brand_id = $request->input('brand_id') ?: null;
                     }
 
-                    if (Schema::hasColumn($productTable, 'note')) {
+                    if (SchemaCache::hasColumn($productTable, 'note')) {
                         $lineProduct->note = $request->input('note');
                     }
 
-                    if (Schema::hasColumn($productTable, 'price_agent')) {
+                    if (SchemaCache::hasColumn($productTable, 'price_agent')) {
                         $lineProduct->price_agent = $costBeforeVat;
                     }
 
-                    if (Schema::hasColumn($productTable, 'cost_vat_percent')) {
+                    if (SchemaCache::hasColumn($productTable, 'cost_vat_percent')) {
                         $lineProduct->cost_vat_percent = $costVatPercent;
                     }
 
-                    if (Schema::hasColumn($productTable, 'price_agent_vat')) {
+                    if (SchemaCache::hasColumn($productTable, 'price_agent_vat')) {
                         $lineProduct->price_agent_vat = $costAfterVat;
                     }
 
                     $retailBeforeVat = (float) $request->input('price_retail', 0);
                     $retailVat = (float) $request->input('vat_percent', 0);
 
-                    if (Schema::hasColumn($productTable, 'price_retail')) {
+                    if (SchemaCache::hasColumn($productTable, 'price_retail')) {
                         $lineProduct->price_retail = $retailBeforeVat;
                     }
 
-                    if (Schema::hasColumn($productTable, 'vat_percent')) {
+                    if (SchemaCache::hasColumn($productTable, 'vat_percent')) {
                         $lineProduct->vat_percent = $retailVat;
                     }
 
-                    if (Schema::hasColumn($productTable, 'price_retail_vat')) {
+                    if (SchemaCache::hasColumn($productTable, 'price_retail_vat')) {
                         $lineProduct->price_retail_vat = round($retailBeforeVat * (1 + $retailVat / 100), 2);
                     }
 
-                    if (Schema::hasColumn($productTable, 'is_active')) {
+                    if (SchemaCache::hasColumn($productTable, 'is_active')) {
                         $lineProduct->is_active = 1;
                     }
 
+                    $this->egoAssignVnCompanyToProduct($lineProduct);
                     $lineProduct->save();
                     $affectedProductIds[] = (int) $lineProduct->id;
 
@@ -1459,7 +1420,7 @@ class ProductController extends Controller
                         $this->saveTierPricesFromRequest((int) $lineProduct->id, $request);
                     }
 
-                    if (Schema::hasTable('crm_product_stock_lots')) {
+                    if (SchemaCache::hasTable('crm_product_stock_lots')) {
                         $lot = null;
 
                         if ($lineLotId > 0) {
@@ -1484,11 +1445,11 @@ class ProductController extends Controller
                             'updated_at' => now(),
                         ];
 
-                        if (Schema::hasColumn('crm_product_stock_lots', 'lot_name')) {
+                        if (SchemaCache::hasColumn('crm_product_stock_lots', 'lot_name')) {
                             $lotData['lot_name'] = $lineLotName !== '' ? $lineLotName : ('Dòng tồn / SKU '.($lineIndex + 1));
                         }
 
-                        if (Schema::hasColumn('crm_product_stock_lots', 'note')) {
+                        if (SchemaCache::hasColumn('crm_product_stock_lots', 'note')) {
                             $lotData['note'] = $lineNote;
                         }
 
@@ -1500,7 +1461,7 @@ class ProductController extends Controller
                         } else {
                             $lotData['created_at'] = now();
 
-                            if (Schema::hasColumn('crm_product_stock_lots', 'lot_code')) {
+                            if (SchemaCache::hasColumn('crm_product_stock_lots', 'lot_code')) {
                                 $lotData['lot_code'] = '';
                             }
 
@@ -1538,8 +1499,8 @@ class ProductController extends Controller
 
                 $affectedProductIds = array_values(array_unique($affectedProductIds));
 
-                if (Schema::hasTable('crm_product_stock') && Schema::hasTable('crm_product_stock_lots')) {
-                    $stockColumns = Schema::getColumnListing('crm_product_stock');
+                if (SchemaCache::hasTable('crm_product_stock') && SchemaCache::hasTable('crm_product_stock_lots')) {
+                    $stockColumns = SchemaCache::columns('crm_product_stock');
                     $qtyColumn = null;
 
                     foreach (['qty', 'quantity', 'stock_qty', 'stock_quantity'] as $candidate) {
@@ -1654,42 +1615,13 @@ class ProductController extends Controller
                         $product->sku = $finalSku;
                         $product->category_id = $data['category_id'] ?? null;
                         $product->brand_id = $data['brand_id'] ?? null;
-                        $product->note = $data['note'] ?? null;
-
-                        if (Schema::hasColumn($product->getTable(), 'warehouse_note')) {
-                            $product->warehouse_note = $data['warehouse_note'] ?? null;
-                        }
-
-                        $product->price_agent = $costBeforeVat;
-
-                        if (Schema::hasColumn($product->getTable(), 'cost_vat_percent')) {
-                            $product->cost_vat_percent = $costVatPercent;
-                        }
-
-                        if (Schema::hasColumn($product->getTable(), 'price_agent_vat')) {
-                            $product->price_agent_vat = $costAfterVat;
-                        } else {
-                            $product->price_agent_vat = $costAfterVat;
-                        }
-
-                        $retailBeforeVat = isset($data['price_retail']) ? (float) $data['price_retail'] : 0;
-                        $retailVat = isset($data['vat_percent']) ? (float) $data['vat_percent'] : 0;
-
-                        if (Schema::hasColumn($product->getTable(), 'price_retail')) {
-                            $product->price_retail = $retailBeforeVat;
-                        }
-
-                        if (Schema::hasColumn($product->getTable(), 'price_retail_vat')) {
-                            $product->price_retail_vat = $retailBeforeVat * (1 + $retailVat / 100);
-                        }
-
-                        if (Schema::hasColumn($product->getTable(), 'vat_percent')) {
-                            $product->vat_percent = $retailVat;
-                        }
-
-                        $product->is_serialized = ! empty($data['is_serialized']) ? 1 : 0;
-                        $product->is_active = 1;
-                        $product->save();
+                        $this->productAttributes->fillAndSave(
+                            $product,
+                            $data,
+                            $costBeforeVat,
+                            $costVatPercent,
+                            serialized: ! empty($data['is_serialized']),
+                        );
 
                         $lotRequest = new Request($request->all());
                         $lotRequest->merge([
@@ -1727,7 +1659,7 @@ class ProductController extends Controller
             $product->brand_id = $data['brand_id'] ?? $product->brand_id;
             $product->note = $data['note'] ?? $product->note;
 
-            if (Schema::hasColumn($product->getTable(), 'warehouse_note')) {
+            if (SchemaCache::hasColumn($product->getTable(), 'warehouse_note')) {
                 $product->warehouse_note = $data['warehouse_note'] ?? $product->warehouse_note;
             }
 
@@ -1741,11 +1673,11 @@ class ProductController extends Controller
             if (isset($data['cost_vat_percent'])) {
                 $costVat = (float) $data['cost_vat_percent'];
 
-                if (Schema::hasColumn($product->getTable(), 'cost_vat_percent')) {
+                if (SchemaCache::hasColumn($product->getTable(), 'cost_vat_percent')) {
                     $product->cost_vat_percent = $costVat;
                 }
             } else {
-                if (Schema::hasColumn($product->getTable(), 'cost_vat_percent')) {
+                if (SchemaCache::hasColumn($product->getTable(), 'cost_vat_percent')) {
                     $costVat = (float) ($product->cost_vat_percent ?? 0);
                 }
             }
@@ -1762,19 +1694,20 @@ class ProductController extends Controller
                 ? (float) $data['vat_percent']
                 : (float) ($product->vat_percent ?? 0);
 
-            if (Schema::hasColumn($product->getTable(), 'price_retail')) {
+            if (SchemaCache::hasColumn($product->getTable(), 'price_retail')) {
                 $product->price_retail = $retailBeforeVat;
             }
 
-            if (Schema::hasColumn($product->getTable(), 'price_retail_vat')) {
+            if (SchemaCache::hasColumn($product->getTable(), 'price_retail_vat')) {
                 $product->price_retail_vat = $retailBeforeVat * (1 + $retailVat / 100);
             }
 
-            if (Schema::hasColumn($product->getTable(), 'vat_percent')) {
+            if (SchemaCache::hasColumn($product->getTable(), 'vat_percent')) {
                 $product->vat_percent = $retailVat;
             }
             $product->is_serialized = ! empty($data['is_serialized']) ? 1 : 0;
 
+            $this->egoAssignVnCompanyToProduct($product);
             $product->save();
 
             $this->saveStocksFromRequest((int) $product->id, $request);
@@ -1838,11 +1771,11 @@ class ProductController extends Controller
             ]
         );
 
-        if (Schema::hasTable('crm_stock_movements')) {
+        if (SchemaCache::hasTable('crm_stock_movements')) {
             $movement = [];
 
             $addColumn = function (string $column, mixed $value) use (&$movement) {
-                if (Schema::hasColumn('crm_stock_movements', $column)) {
+                if (SchemaCache::hasColumn('crm_stock_movements', $column)) {
                     $movement[$column] = $value;
                 }
             };
@@ -1887,11 +1820,11 @@ class ProductController extends Controller
         int $qtyAfter,
         string $reason
     ): void {
-        if (! Schema::hasTable('crm_stock_movements')) {
+        if (! SchemaCache::hasTable('crm_stock_movements')) {
             return;
         }
 
-        $columns = Schema::getColumnListing('crm_stock_movements');
+        $columns = SchemaCache::columns('crm_stock_movements');
         $has = fn (string $column): bool => in_array($column, $columns, true);
         $payload = [];
 
@@ -1941,7 +1874,7 @@ class ProductController extends Controller
      */
     private function handleFifoLotAction(Product $product, Request $request): string
     {
-        if (! Schema::hasTable('crm_product_stock_lots')) {
+        if (! SchemaCache::hasTable('crm_product_stock_lots')) {
             throw new \Exception('Chưa có bảng crm_product_stock_lots.');
         }
 
@@ -1998,15 +1931,15 @@ class ProductController extends Controller
                 'updated_at' => now(),
             ];
 
-            if (Schema::hasColumn('crm_product_stock_lots', 'lot_name')) {
+            if (SchemaCache::hasColumn('crm_product_stock_lots', 'lot_name')) {
                 $insert['lot_name'] = $lotName;
             }
 
-            if (Schema::hasColumn('crm_product_stock_lots', 'extra_cost')) {
+            if (SchemaCache::hasColumn('crm_product_stock_lots', 'extra_cost')) {
                 $insert['extra_cost'] = $extraCost;
             }
 
-            if (Schema::hasColumn('crm_product_stock_lots', 'actual_cost_after_vat')) {
+            if (SchemaCache::hasColumn('crm_product_stock_lots', 'actual_cost_after_vat')) {
                 $insert['actual_cost_after_vat'] = $actualCostAfterVat;
             }
 
@@ -2136,7 +2069,7 @@ class ProductController extends Controller
                 $update['lot_code'] = $lotCode;
             }
 
-            if (Schema::hasColumn('crm_product_stock_lots', 'lot_name') && $lotName !== '') {
+            if (SchemaCache::hasColumn('crm_product_stock_lots', 'lot_name') && $lotName !== '') {
                 $update['lot_name'] = $lotName;
             }
 
@@ -2148,11 +2081,11 @@ class ProductController extends Controller
                 $update['note'] = $note;
             }
 
-            if (Schema::hasColumn('crm_product_stock_lots', 'extra_cost')) {
+            if (SchemaCache::hasColumn('crm_product_stock_lots', 'extra_cost')) {
                 $update['extra_cost'] = $extraCost;
             }
 
-            if (Schema::hasColumn('crm_product_stock_lots', 'actual_cost_after_vat')) {
+            if (SchemaCache::hasColumn('crm_product_stock_lots', 'actual_cost_after_vat')) {
                 $update['actual_cost_after_vat'] = $actualCostAfterVat;
             }
 
@@ -2214,7 +2147,7 @@ class ProductController extends Controller
                 throw new \Exception('Không tìm thấy lô cần xóa.');
             }
 
-            if (Schema::hasTable('crm_order_item_stock_allocations')
+            if (SchemaCache::hasTable('crm_order_item_stock_allocations')
                 && DB::table('crm_order_item_stock_allocations')->where('stock_lot_id', $lotId)->exists()) {
                 throw new \Exception('Lô này đã phát sinh xuất kho nên không được xóa.');
             }
@@ -2264,9 +2197,9 @@ class ProductController extends Controller
         $isSerialized = (bool) $request->input('is_serialized', false);
         $stocks = (array) $request->input('stocks', []);
 
-        $hasSerialCol = Schema::hasColumn('crm_product_stock', 'serials_json');
+        $hasSerialCol = SchemaCache::hasColumn('crm_product_stock', 'serials_json');
         $canUseLots = class_exists(StockLotService::class)
-            && Schema::hasTable('crm_product_stock_lots');
+            && SchemaCache::hasTable('crm_product_stock_lots');
 
         $product = Product::findOrFail($productId);
 
@@ -2274,7 +2207,7 @@ class ProductController extends Controller
 
         $costVatPercent = (float) $request->input(
             'cost_vat_percent',
-            Schema::hasColumn($product->getTable(), 'cost_vat_percent')
+            SchemaCache::hasColumn($product->getTable(), 'cost_vat_percent')
                 ? ($product->cost_vat_percent ?? 0)
                 : ($product->vat_percent ?? 0)
         );
@@ -2282,8 +2215,12 @@ class ProductController extends Controller
         foreach ($stocks as $companyId => $warehouses) {
             foreach ((array) $warehouses as $warehouseId => $payload) {
 
-                $companyId = (int) $companyId;
+                $companyId = EgoCompanyContext::defaultCompanyId();
                 $warehouseId = (int) $warehouseId;
+
+                if (! $this->egoWarehouseBelongsToVn($warehouseId)) {
+                    continue;
+                }
 
                 $qty = (int) ($payload['qty'] ?? 0);
                 if ($qty < 0) {
@@ -2371,11 +2308,11 @@ class ProductController extends Controller
                     $update
                 );
 
-                if (Schema::hasTable('crm_stock_movements') && $changeQty !== 0) {
+                if (SchemaCache::hasTable('crm_stock_movements') && $changeQty !== 0) {
                     $movement = [];
 
                     $addColumn = function (string $column, mixed $value) use (&$movement) {
-                        if (Schema::hasColumn('crm_stock_movements', $column)) {
+                        if (SchemaCache::hasColumn('crm_stock_movements', $column)) {
                             $movement[$column] = $value;
                         }
                     };
@@ -2471,9 +2408,9 @@ class ProductController extends Controller
         foreach ($candidateTables as $t) {
             if (
                 $this->catalogOptions->tableExists($t)
-                && Schema::hasColumn($t, 'product_id')
-                && (Schema::hasColumn($t, 'price_tier_id') || Schema::hasColumn($t, 'tier_id'))
-                && (Schema::hasColumn($t, 'price') || Schema::hasColumn($t, 'value'))
+                && SchemaCache::hasColumn($t, 'product_id')
+                && (SchemaCache::hasColumn($t, 'price_tier_id') || SchemaCache::hasColumn($t, 'tier_id'))
+                && (SchemaCache::hasColumn($t, 'price') || SchemaCache::hasColumn($t, 'value'))
             ) {
                 $table = $t;
                 break;
@@ -2484,10 +2421,10 @@ class ProductController extends Controller
             return;
         }
 
-        $tierCol = Schema::hasColumn($table, 'price_tier_id') ? 'price_tier_id' : 'tier_id';
-        $priceCol = Schema::hasColumn($table, 'price') ? 'price' : 'value';
+        $tierCol = SchemaCache::hasColumn($table, 'price_tier_id') ? 'price_tier_id' : 'tier_id';
+        $priceCol = SchemaCache::hasColumn($table, 'price') ? 'price' : 'value';
 
-        $columns = Schema::getColumnListing($table);
+        $columns = SchemaCache::columns($table);
         $hasVatCol = in_array('vat_percent', $columns, true);
         $hasAfterVatCol = in_array('price_after_vat', $columns, true);
         $hasEffectiveFrom = in_array('effective_from', $columns, true);
@@ -2564,7 +2501,7 @@ class ProductController extends Controller
             $usedInOrders = false;
 
             foreach (['crm_order_items', 'order_items'] as $table) {
-                if (Schema::hasTable($table) && Schema::hasColumn($table, 'product_id')) {
+                if (SchemaCache::hasTable($table) && SchemaCache::hasColumn($table, 'product_id')) {
                     if (DB::table($table)->where('product_id', $productId)->exists()) {
                         $usedInOrders = true;
                         break;
@@ -2573,7 +2510,7 @@ class ProductController extends Controller
             }
 
             if ($usedInOrders) {
-                if (Schema::hasColumn($product->getTable(), 'is_active')) {
+                if (SchemaCache::hasColumn($product->getTable(), 'is_active')) {
                     $product->is_active = 0;
                     $product->save();
 
@@ -2603,7 +2540,7 @@ class ProductController extends Controller
             ];
 
             foreach ($tablesByProductId as $table) {
-                if (Schema::hasTable($table) && Schema::hasColumn($table, 'product_id')) {
+                if (SchemaCache::hasTable($table) && SchemaCache::hasColumn($table, 'product_id')) {
                     DB::table($table)->where('product_id', $productId)->delete();
                 }
             }
@@ -2626,7 +2563,7 @@ class ProductController extends Controller
      */
     private function egoCurrentStockQtyForHistory(int $productId, int $companyId, int $warehouseId): int
     {
-        if (! Schema::hasTable('crm_product_stock')) {
+        if (! SchemaCache::hasTable('crm_product_stock')) {
             return 0;
         }
 
@@ -2634,7 +2571,7 @@ class ProductController extends Controller
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId);
 
-        if (Schema::hasColumn('crm_product_stock', 'company_id')) {
+        if (SchemaCache::hasColumn('crm_product_stock', 'company_id')) {
             $query->where('company_id', $companyId);
         }
 
@@ -2656,11 +2593,11 @@ class ProductController extends Controller
         ?string $note = null,
         string $referenceType = 'manual_input'
     ): void {
-        if ($changeQty === 0 || ! Schema::hasTable('crm_stock_movements')) {
+        if ($changeQty === 0 || ! SchemaCache::hasTable('crm_stock_movements')) {
             return;
         }
 
-        $columns = Schema::getColumnListing('crm_stock_movements');
+        $columns = SchemaCache::columns('crm_stock_movements');
         $has = fn (string $column): bool => in_array($column, $columns, true);
         $payload = [];
 
@@ -2729,7 +2666,7 @@ class ProductController extends Controller
      */
     private function saveInitialLotsFromCreateRequest($product, $request): void
     {
-        $schema = \Illuminate\Support\Facades\Schema::class;
+        $schema = Schema::class;
         $db = DB::class;
 
         if (! $schema::hasTable('crm_product_stock_lots')) {
@@ -2758,8 +2695,8 @@ class ProductController extends Controller
                 continue;
             }
 
-            if ($companyId <= 0 || $warehouseId <= 0) {
-                throw new \Exception('Vui lòng chọn công ty và kho cho lô nhập ban đầu.');
+            if ($companyId !== EgoCompanyContext::defaultCompanyId() || ! $this->egoWarehouseBelongsToVn($warehouseId)) {
+                throw new \Exception('Kho nhập ban đầu phải thuộc EGO Việt Nam.');
             }
 
             if ($qtyIn <= 0) {
@@ -2897,125 +2834,30 @@ class ProductController extends Controller
 
     /* EGO_HOTFIX_RESTORE_EDIT_START */
     /**
-     * Hồ sơ chi tiết sản phẩm: giá, tồn theo kho, lô nhập và biến động gần nhất.
-     *
-     * Đọc dữ liệu theo hướng an toàn để trang chi tiết không lỗi 500 khi một
-     * relation hoặc bảng phụ chưa có dữ liệu tương ứng.
-     */
-    public function show($id)
-    {
-        $product = Product::query()->findOrFail((int) $id);
-        $companyId = EgoCompanyLock::id();
-
-        // Từng relation được nạp riêng để một relation phụ lỗi không làm sập cả trang.
-        foreach ([
-            'category',
-            'brand',
-            'prices.priceTier',
-            'mainImage.media.metadata',
-        ] as $relation) {
-            try {
-                $product->loadMissing($relation);
-            } catch (\Throwable $e) {
-                report($e);
-            }
-        }
-
-        $stocks = collect();
-        try {
-            if (Schema::hasTable('crm_product_stock')) {
-                $stocks = ProductStock::withoutGlobalScopes()
-                    ->with(['warehouse' => function ($query) use ($companyId) {
-                        $query->withoutGlobalScopes()
-                            ->where('company_id', $companyId);
-                    }])
-                    ->where('product_id', $product->id)
-                    ->where('company_id', $companyId)
-                    ->orderBy('warehouse_id')
-                    ->get();
-            }
-        } catch (\Throwable $e) {
-            report($e);
-            $stocks = collect();
-        }
-
-        $lots = collect();
-        try {
-            if (Schema::hasTable('crm_product_stock_lots')) {
-                $lotsQuery = DB::table('crm_product_stock_lots as l')
-                    ->leftJoin('crm_warehouses as w', function ($join) use ($companyId) {
-                        $join->on('w.id', '=', 'l.warehouse_id')
-                            ->where('w.company_id', '=', $companyId);
-                    })
-                    ->where('l.product_id', $product->id);
-
-                if (Schema::hasColumn('crm_product_stock_lots', 'company_id')) {
-                    $lotsQuery->where('l.company_id', $companyId);
-                }
-
-                $lots = $lotsQuery
-                    ->select('l.*', 'w.name as warehouse_name')
-                    ->orderByDesc(
-                        Schema::hasColumn('crm_product_stock_lots', 'received_at')
-                            ? 'l.received_at'
-                            : 'l.id'
-                    )
-                    ->orderByDesc('l.id')
-                    ->limit(30)
-                    ->get();
-            }
-        } catch (\Throwable $e) {
-            report($e);
-            $lots = collect();
-        }
-
-        $movements = collect();
-        try {
-            if (Schema::hasTable('crm_stock_movements')) {
-                $movements = DB::table('crm_stock_movements as m')
-                    ->leftJoin('crm_warehouses as w', function ($join) use ($companyId) {
-                        $join->on('w.id', '=', 'm.warehouse_id')
-                            ->where('w.company_id', '=', $companyId);
-                    })
-                    ->where('m.product_id', $product->id)
-                    ->whereNotNull('w.id')
-                    ->select('m.*', 'w.name as warehouse_name')
-                    ->orderByDesc('m.created_at')
-                    ->orderByDesc('m.id')
-                    ->limit(40)
-                    ->get();
-            }
-        } catch (\Throwable $e) {
-            report($e);
-            $movements = collect();
-        }
-
-        return view('products.show', compact('product', 'stocks', 'lots', 'movements'));
-    }
-
-    /**
      * Form sửa sản phẩm: nạp tồn theo công ty/kho, serial, giá tier và lịch sử xuất nhập kho của sản phẩm.
      */
     public function edit($id)
     {
         $product = Product::findOrFail($id);
 
-        $companies = DB::table('companies')->select('id', 'name')->where('id', EgoCompanyLock::id())->get();
+        $companies = DB::table('companies')->select('id', 'name')->where('id', EgoCompanyContext::defaultCompanyId())->get();
         $categories = ProductCategory::query()->orderBy('name')->get();
         $brands = Brand::query()->orderBy('name')->get();
 
-        $companyWarehouses = $this->catalogOptions->loadCompanyWarehouses([EgoCompanyLock::id()]);
+        $companyWarehouses = [EgoCompanyContext::defaultCompanyId() => $this->egoVnWarehouseQuery()->orderBy('name')->get()];
         $priceTiers = $this->catalogOptions->loadPriceTiers();
 
         $rows = DB::table('crm_product_stock')
             ->where('product_id', $product->id)
+            ->where('company_id', EgoCompanyContext::defaultCompanyId())
+            ->whereIn('warehouse_id', $this->egoVnWarehouseQuery()->select('id'))
             ->get();
 
         $warehouseQty = [];
         $serialsByWarehouse = []; // ✅ load từ serials_json
         $totalQty = 0;
 
-        $hasSerialCol = Schema::hasColumn('crm_product_stock', 'serials_json');
+        $hasSerialCol = SchemaCache::hasColumn('crm_product_stock', 'serials_json');
 
         foreach ($rows as $r) {
             $cid = (int) $r->company_id;
@@ -3046,21 +2888,21 @@ class ProductController extends Controller
 
         $productStockLogs = collect();
 
-        if (Schema::hasTable('crm_stock_movements')) {
-            $hasReferenceType = Schema::hasColumn('crm_stock_movements', 'reference_type');
-            $hasNote = Schema::hasColumn('crm_stock_movements', 'note');
-            $hasQtyBefore = Schema::hasColumn('crm_stock_movements', 'qty_before');
-            $hasQtyAfter = Schema::hasColumn('crm_stock_movements', 'qty_after');
+        if (SchemaCache::hasTable('crm_stock_movements')) {
+            $hasReferenceType = SchemaCache::hasColumn('crm_stock_movements', 'reference_type');
+            $hasNote = SchemaCache::hasColumn('crm_stock_movements', 'note');
+            $hasQtyBefore = SchemaCache::hasColumn('crm_stock_movements', 'qty_before');
+            $hasQtyAfter = SchemaCache::hasColumn('crm_stock_movements', 'qty_after');
 
-            $orderTable = Schema::hasTable('crm_orders')
+            $orderTable = SchemaCache::hasTable('crm_orders')
                 ? 'crm_orders'
-                : (Schema::hasTable('orders') ? 'orders' : null);
+                : (SchemaCache::hasTable('orders') ? 'orders' : null);
 
             $orderCodeColumn = null;
 
             if ($orderTable) {
                 foreach (['order_code', 'code', 'order_no', 'order_number'] as $col) {
-                    if (Schema::hasColumn($orderTable, $col)) {
+                    if (SchemaCache::hasColumn($orderTable, $col)) {
                         $orderCodeColumn = $col;
                         break;
                     }
@@ -3089,7 +2931,8 @@ class ProductController extends Controller
                     }
                 })
                 ->leftJoin('sites as st', 'st.id', '=', 'mr.site_id')
-                ->where('m.product_id', $product->id);
+                ->where('m.product_id', $product->id)
+                ->whereIn('m.warehouse_id', $this->egoVnWarehouseQuery()->select('id'));
 
             if ($orderTable) {
                 $productStockLogsQuery->leftJoin($orderTable.' as o', function ($join) use ($hasReferenceType) {
@@ -3137,10 +2980,12 @@ class ProductController extends Controller
 
         $productStockLots = collect();
 
-        if (Schema::hasTable('crm_product_stock_lots')) {
+        if (SchemaCache::hasTable('crm_product_stock_lots')) {
             $productStockLots = DB::table('crm_product_stock_lots as l')
                 ->leftJoin('crm_warehouses as w', 'w.id', '=', 'l.warehouse_id')
                 ->where('l.product_id', $product->id)
+                ->where('l.company_id', EgoCompanyContext::defaultCompanyId())
+                ->whereIn('l.warehouse_id', $this->egoVnWarehouseQuery()->select('id'))
                 ->select([
                     'l.*',
                     DB::raw('COALESCE(w.name, CONCAT("Kho #", l.warehouse_id)) as warehouse_name'),
@@ -3157,7 +3002,13 @@ class ProductController extends Controller
             'tierPrices' => $tierPrices,
         ];
 
-        return view('products.edit', [
+        /*
+         * Phần dữ liệu tính toán do ProductEditPageData dựng — trước đây nằm
+         * trong hai khối `@php` (275 + 81 dòng) ngay trong view.
+         */
+        $pageData = app(ProductEditPageData::class)->build($product, collect($companies), (array) $companyWarehouses, (array) $formData);
+
+        return view('products.edit', array_merge([
             'product' => $product,
             'companies' => $companies,
             'categories' => $categories,
@@ -3165,9 +3016,17 @@ class ProductController extends Controller
             'companyWarehouses' => $companyWarehouses,
             'priceTiers' => $priceTiers,
             'formData' => $formData,
-            'productStockLogs' => $productStockLogs,
             'productStockLots' => $productStockLots,
-        ]);
+        ], $pageData, $this->editPresenter->viewData(
+            $product,
+            $pageData['egoSerialProductIds'],
+            $pageData['egoSerialProducts'],
+            $pageData['egoSerialRowsByProduct'],
+            $productStockLogs,
+            $priceTiers,
+            $pageData['savedTierPrices'],
+            (array) request()->old(),
+        )));
     }
     /* EGO_HOTFIX_RESTORE_EDIT_END */
 

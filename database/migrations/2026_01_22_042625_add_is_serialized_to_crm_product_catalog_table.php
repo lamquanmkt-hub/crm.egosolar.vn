@@ -11,10 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('crm_product_catalog', function (Blueprint $table) {
-            $table->boolean('is_serialized')->default(false)->after('sku');
-            $table->index(['is_serialized'], 'crm_product_catalog_is_serialized_idx');
-        });
+        if (Schema::hasTable('crm_product_catalog')) {
+            Schema::table('crm_product_catalog', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_product_catalog', 'is_serialized')) {
+                    $table->boolean('is_serialized')->default(false)->after('sku');
+                }
+                $table->index(['is_serialized'], 'crm_product_catalog_is_serialized_idx');
+            });
+        }
     }
 
     /**
@@ -22,9 +26,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('crm_product_catalog', function (Blueprint $table) {
-            $table->dropIndex('crm_product_catalog_is_serialized_idx');
-            $table->dropColumn('is_serialized');
-        });
+        if (Schema::hasTable('crm_product_catalog')) {
+            Schema::table('crm_product_catalog', function (Blueprint $table) {
+                $table->dropIndex('crm_product_catalog_is_serialized_idx');
+                $table->dropColumn('is_serialized');
+            });
+        }
     }
 };

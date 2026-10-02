@@ -82,10 +82,6 @@ class SolarMaintenanceAccess
                 'ky_thuat_manager',
                 'quan_ly_ky_thuat',
                 'manager',
-                'management',
-                'director',
-                'giam_doc',
-                'ban_giam_doc',
             ]);
     }
 
@@ -94,7 +90,6 @@ class SolarMaintenanceAccess
         return self::isManager($user)
             || self::hasPermission($user, 'maintenance.submit')
             || self::hasAny($user, [
-                'ky_thuat',
                 'technical',
                 'technician',
                 'technical_staff',
@@ -112,7 +107,6 @@ class SolarMaintenanceAccess
         }
 
         return self::hasAny($user, [
-            'ky_thuat',
             'technical',
             'technician',
             'technical_staff',
@@ -128,7 +122,8 @@ class SolarMaintenanceAccess
 
     public static function canViewAny(?User $user): bool
     {
-        return self::isTechnician($user)
+        return self::isExecutive($user)
+            || self::isTechnician($user)
             || self::hasPermission($user, 'maintenance.view')
             || self::hasAny($user, [
                 'accounting', 'ketoan', 'ke_toan',
@@ -138,28 +133,17 @@ class SolarMaintenanceAccess
             ]);
     }
 
-    public static function canPlan(?User $user): bool
+    public static function canCreate(?User $user): bool
     {
         return self::isManager($user)
-            || self::hasPermission($user, 'maintenance.plan')
             || self::hasPermission($user, 'maintenance.create');
     }
 
-    public static function canCreate(?User $user): bool
-    {
-        return self::canPlan($user);
-    }
-
-    public static function canAssign(?User $user): bool
-    {
-        return self::isManager($user)
-            || self::hasPermission($user, 'maintenance.assign');
-    }
-
-    /** Tương thích code cũ: manage nay đồng nghĩa quản lý kế hoạch, không còn mặc định cho mọi kỹ thuật viên. */
     public static function canManage(?User $user): bool
     {
-        return self::canPlan($user);
+        return self::isManager($user)
+            || self::isTechnician($user)
+            || self::hasPermission($user, 'maintenance.update');
     }
 
     public static function isWarehouse(?User $user): bool
@@ -177,45 +161,11 @@ class SolarMaintenanceAccess
             || self::hasPermission($user, 'maintenance.claim.create');
     }
 
-    /**
-     * Chọn/giữ/xuất/thu hồi serial & linh kiện: CHỈ Kho (hoặc Admin / quyền maintenance.stock).
-     * Trưởng phòng Kỹ thuật KHÔNG còn mặc định được làm việc của Kho.
-     */
     public static function canHandleWarrantyStock(?User $user): bool
     {
-        return self::isWarehouse($user);
-    }
-
-    /**
-     * Trưởng phòng Kỹ thuật / Giám đốc / Admin — người được duyệt nghiệp vụ Bảo hành & Sửa chữa.
-     * Role 'manager' chung của phòng ban khác KHÔNG được tính.
-     */
-    public static function isTechnicalLead(?User $user): bool
-    {
-        return self::isAdmin($user)
-            || self::hasPermission($user, 'maintenance.approve')
-            || self::hasAny($user, [
-                'technical_manager', 'truong_phong_ky_thuat', 'maintenance_manager',
-                'ky_thuat_manager', 'quan_ly_ky_thuat',
-                'director', 'general_director', 'ceo', 'giam_doc', 'tong_giam_doc', 'ban_giam_doc',
-            ]);
-    }
-
-    public static function canApproveWarranty(?User $user): bool
-    {
-        return self::isTechnicalLead($user);
-    }
-
-    /** Emergency override: tự duyệt / bỏ qua ràng buộc — cần quyền riêng + lý do bắt buộc + audit. */
-    public static function canOverrideWarranty(?User $user): bool
-    {
-        return self::isAdmin($user) || self::hasPermission($user, 'warranty.override');
-    }
-
-    /** Ghi chú nội bộ kỹ thuật: chỉ Kỹ thuật/Trưởng phòng/Giám đốc/Admin. */
-    public static function canViewTechnicalInternal(?User $user): bool
-    {
-        return self::isTechnician($user) || self::isExecutive($user);
+        return self::isManager($user)
+            || self::isWarehouse($user)
+            || self::hasPermission($user, 'maintenance.stock');
     }
 
     public static function canApprove(?User $user): bool
@@ -264,7 +214,7 @@ class SolarMaintenanceAccess
 
         $joined = self::normalize(implode(' ', array_filter($values)));
 
-        return str_contains($joined, 'ky_thuat')
+        return str_contains($joined, 'technical')
             || str_contains($joined, 'technical')
             || str_contains($joined, 'bao_hanh')
             || str_contains($joined, 'maintenance');

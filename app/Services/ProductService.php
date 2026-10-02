@@ -20,10 +20,10 @@ use App\Models\Inventory\Stock\InventoryEvent;
 use App\Models\Inventory\Stock\ProductStock;
 use App\Models\Media\MediaFile;
 use App\Services\Inventory\Stock\StockLotService;
+use App\Support\SchemaCache;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Service xử lý nghiệp vụ sản phẩm (Product): danh mục, giá, media, tồn kho, serial.
@@ -35,12 +35,12 @@ class ProductService implements ProductServiceInterface
      */
     public function getProductsForSelect(int $warehouseId): array
     {
-        $brandTable = Schema::hasTable('crm_brands') ? 'crm_brands' : null;
+        $brandTable = SchemaCache::hasTable('crm_brands') ? 'crm_brands' : null;
 
         $query = DB::table('crm_product_catalog as p')
             ->join('crm_product_stock as s', 's.product_id', '=', 'p.id');
 
-        if ($brandTable && Schema::hasColumn('crm_product_catalog', 'brand_id')) {
+        if ($brandTable && SchemaCache::hasColumn('crm_product_catalog', 'brand_id')) {
             $query->leftJoin($brandTable.' as b', 'b.id', '=', 'p.brand_id');
         }
 
@@ -54,7 +54,7 @@ class ProductService implements ProductServiceInterface
             DB::raw('SUM(s.qty) as stock_qty'),
         ];
 
-        if ($brandTable && Schema::hasColumn('crm_product_catalog', 'brand_id')) {
+        if ($brandTable && SchemaCache::hasColumn('crm_product_catalog', 'brand_id')) {
             $select[] = DB::raw('COALESCE(b.name, "") as brand_name');
         } else {
             $select[] = DB::raw('"" as brand_name');
@@ -66,7 +66,7 @@ class ProductService implements ProductServiceInterface
             ->select($select)
             ->groupBy('p.id', 'p.name', 'p.sku', 'p.price_agent', 'p.price_retail', 'p.vat_percent');
 
-        if ($brandTable && Schema::hasColumn('crm_product_catalog', 'brand_id')) {
+        if ($brandTable && SchemaCache::hasColumn('crm_product_catalog', 'brand_id')) {
             $rows->groupBy('b.name');
         }
 
@@ -77,7 +77,7 @@ class ProductService implements ProductServiceInterface
         // Load tier prices in batch for all products
         $productIds = $rows->pluck('id')->toArray();
         $tierPricesMap = [];
-        if (! empty($productIds) && Schema::hasTable('crm_product_prices')) {
+        if (! empty($productIds) && SchemaCache::hasTable('crm_product_prices')) {
             $tierRows = DB::table('crm_product_prices')
                 ->whereIn('product_id', $productIds)
                 ->select('product_id', 'price_tier_id', 'price')
@@ -436,8 +436,8 @@ class ProductService implements ProductServiceInterface
 
         $stocksByCompany = $data['stocks'];
 
-        $hasCompanyInStock = Schema::hasColumn('crm_product_stock', 'company_id');
-        $hasCompanyInSerialState = Schema::hasColumn('crm_serial_unit_states', 'company_id');
+        $hasCompanyInStock = SchemaCache::hasColumn('crm_product_stock', 'company_id');
+        $hasCompanyInSerialState = SchemaCache::hasColumn('crm_serial_unit_states', 'company_id');
 
         $costBeforeVat = (float) ($data['price_agent'] ?? $product->price_agent ?? 0);
         $costVatPercent = (float) ($data['cost_vat_percent'] ?? $product->cost_vat_percent ?? $product->vat_percent ?? 0);
@@ -729,21 +729,21 @@ class ProductService implements ProductServiceInterface
             ->where('product_id', $product->id)
             ->sum('qty');
 
-        if (Schema::hasColumn('crm_product_catalog', 'qty')) {
+        if (SchemaCache::hasColumn('crm_product_catalog', 'qty')) {
             $product->qty = (int) $sum;
             $product->save();
 
             return;
         }
 
-        if (Schema::hasColumn('crm_product_catalog', 'quantity')) {
+        if (SchemaCache::hasColumn('crm_product_catalog', 'quantity')) {
             $product->quantity = (int) $sum;
             $product->save();
 
             return;
         }
 
-        if (Schema::hasColumn('crm_product_catalog', 'stock_qty')) {
+        if (SchemaCache::hasColumn('crm_product_catalog', 'stock_qty')) {
             $product->stock_qty = (int) $sum;
             $product->save();
 

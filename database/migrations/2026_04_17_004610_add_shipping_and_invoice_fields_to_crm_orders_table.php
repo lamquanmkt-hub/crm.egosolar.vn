@@ -8,21 +8,29 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('crm_orders', function (Blueprint $table) {
-            $table->enum('shipping_fee_payer', ['seller', 'buyer'])
-                ->default('seller')
-                ->after('shipping_fee');
+        if (Schema::hasTable('crm_orders')) {
+            Schema::table('crm_orders', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_orders', 'shipping_fee_payer')) {
+                    $table->enum('shipping_fee_payer', ['seller', 'buyer'])
+                        ->default('seller')
+                        ->after('shipping_fee');
+                }
 
-            $table->enum('invoice_status', ['no_invoice', 'pending', 'issued'])
-                ->default('no_invoice')
-                ->after('shipping_fee_payer');
-        });
+                if (! Schema::hasColumn('crm_orders', 'invoice_status')) {
+                    $table->enum('invoice_status', ['no_invoice', 'pending', 'issued'])
+                        ->default('no_invoice')
+                        ->after('shipping_fee_payer');
+                }
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('crm_orders', function (Blueprint $table) {
-            $table->dropColumn(['shipping_fee_payer', 'invoice_status']);
-        });
+        if (Schema::hasTable('crm_orders')) {
+            Schema::table('crm_orders', function (Blueprint $table) {
+                $table->dropColumn(['shipping_fee_payer', 'invoice_status']);
+            });
+        }
     }
 };

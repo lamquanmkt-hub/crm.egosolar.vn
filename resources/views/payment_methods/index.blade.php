@@ -3,86 +3,97 @@
 @section('title', 'Quản lý phương thức thanh toán')
 
 @section('content')
-    <div class="container-fluid px-4">
-        <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
-            <h2 class="fw-bold text-secondary">PHƯƠNG THỨC THANH TOÁN</h2>
-            <a href="{{ route('payment-methods.create') }}" class="btn btn-primary">
+    {{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+         thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+         quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+    {{-- `.container-fluid` = width 100% + đệm calc(1.5rem*.5)=12px + margin auto; trang này đã có
+         `tw:px-6` (24px) nên đệm 12px của container vốn đã bị đè — giữ nguyên thứ tự để không đổi. --}}
+    <div class="tw:w-full tw:mx-auto tw:px-6 tw:py-4">
+        <div class="tw:flex tw:justify-between tw:items-center tw:mb-6 tw:mt-6">
+            <h2 class="tw:font-bold tw:text-[#6c757d]">PHƯƠNG THỨC THANH TOÁN</h2>
+            <x-ui.button href="{{ route('payment-methods.create') }}" variant="primary">
                 <i class="bi bi-plus-lg"></i> Thêm mới
-            </a>
+            </x-ui.button>
         </div>
 
         {{-- Thông báo thành công --}}
         @if(session('success'))
-            <div class="alert alert-success alert-dismissible fade show">
+            <x-ui.alert variant="success" :dismissible="true">
                 {{ session('success') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
+            </x-ui.alert>
         @endif
 
-        <div class="card shadow-sm">
-            <div class="card-header bg-white py-3">
-                <form action="{{ route('payment-methods.index') }}" method="GET" class="row g-3">
-                    <div class="col-md-4">
+        <x-ui.card class="tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)]">
+            <x-ui.card-header class="tw:bg-white tw:py-4">
+                <form action="{{ route('payment-methods.index') }}" method="GET" class="tw:row tw:g-3">
+                    <div class="tw:md:col12-4">
+                        {{-- `.input-group` GIỮ NGUYÊN: nó là MÓC của chính CSS repo — `resources/css/app.css:152`
+                             khai `.input-group > input:not(.form-control){position:relative;flex:1 1 auto;width:1%;
+                             min-width:0}` để ô `<x-ui.input>` (không còn `.form-control`) vẫn co giãn đúng; cộng
+                             luật con của Bootstrap bỏ bo góc giữa hai phần tử. Thay bằng utility làm ô nở 363→405px
+                             và nút rớt xuống dòng (đo được 116 ô lệch). Cùng nhóm "cấm đụng" với `.table-responsive`. --}}
                         <div class="input-group">
-                            <input type="text" name="keyword" class="form-control" placeholder="Tìm kiếm tên..." value="{{ request('keyword') }}">
-                            <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+                            <x-ui.input type="text" name="keyword" placeholder="Tìm kiếm tên..." value="{{ request('keyword') }}" />
+                            {{-- Nút này là con của `.input-group`: Bootstrap cho nó position/z-index qua
+                             `.input-group > .btn`. Bỏ `.btn` là mất, viền chồng bị đè. --}}
+                        <x-ui.button variant="outline-secondary" type="submit" class="tw:relative tw:z-[2]"><i class="bi bi-search"></i></x-ui.button>
                         </div>
                     </div>
                 </form>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
+            </x-ui.card-header>
+            <x-ui.card-body class="tw:p-0">
+                <x-ui.table-wrap>
+                    <x-ui.table hover class="tw:align-middle tw:mb-0">
+                        <x-ui.table-head>
                         <tr>
-                            <th class="ps-4">Tên phương thức</th>
+                            <th class="tw:pl-6!">Tên phương thức</th>
                             <th>Mã Code</th>
                             <th>Mô tả</th>
                             <th>Trạng thái</th>
-                            <th class="text-end pe-4">Hành động</th>
+                            <th class="tw:text-right tw:pr-6!">Hành động</th>
                         </tr>
-                        </thead>
+                        </x-ui.table-head>
                         <tbody>
-                        @forelse($methods as $method)
+                        @forelse($methodRows as $row)
                             <tr>
-                                <td class="ps-4 fw-bold">{{ $method->method_name }}</td>
-                                <td><span class="badge bg-secondary font-monospace">{{ $method->code }}</span></td>
-                                <td class="text-muted small">{{ Str::limit($method->description, 50) }}</td>
+                                <td class="tw:pl-6! tw:font-bold">{{ $row->methodName }}</td>
+                                <td><span class="tw:inline-block tw:px-[0.65em] tw:py-[0.35em] tw:text-[0.75em] tw:font-bold tw:leading-none tw:text-center tw:whitespace-nowrap tw:align-baseline tw:rounded-[0.375rem] tw:bg-[rgb(108,117,125)] tw:text-white tw:[font-family:SFMono-Regular,Menlo,Monaco,Consolas,'Liberation_Mono','Courier_New',monospace]">{{ $row->code }}</span></td>
+                                <td class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">{{ $row->descriptionText }}</td>
                                 <td>
-                                    @if($method->is_active)
-                                        <span class="badge bg-success-subtle text-success border border-success">Hoạt động</span>
+                                    @if($row->isActive)
+                                        <x-finance.pill tone="success" class="tw:px-[0.65em] tw:text-[#198754] tw:[border:1px_solid_rgb(25,135,84)] tw:rounded-[0.375rem]">Hoạt động</x-finance.pill>
                                     @else
-                                        <span class="badge bg-danger-subtle text-danger border border-danger">Tạm khóa</span>
+                                        <x-finance.pill tone="danger" class="tw:px-[0.65em] tw:text-[#dc3545] tw:[border:1px_solid_rgb(220,53,69)] tw:rounded-[0.375rem]">Tạm khóa</x-finance.pill>
                                     @endif
                                 </td>
-                                <td class="text-end pe-4">
-                                    <a href="{{ route('payment-methods.edit', $method->id) }}" class="btn btn-sm btn-outline-primary me-1">
+                                <td class="tw:text-right tw:pr-6!">
+                                    <x-ui.button href="{{ route('payment-methods.edit', $row->id) }}" variant="outline-primary" size="sm" class="tw:mr-1">
                                         <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <form action="{{ route('payment-methods.destroy', $method->id) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Bạn có chắc chắn muốn xóa phương thức này?');">
+                                    </x-ui.button>
+                                    <form action="{{ route('payment-methods.destroy', $row->id) }}" method="POST" class="tw:inline-block" onsubmit="return confirm('Bạn có chắc chắn muốn xóa phương thức này?');">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <x-ui.button variant="outline-danger" size="sm" type="submit">
                                             <i class="bi bi-trash"></i>
-                                        </button>
+                                        </x-ui.button>
                                     </form>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center py-5 text-muted">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                <td colspan="5" class="tw:text-center tw:py-12 tw:text-[rgba(33,37,41,0.75)]">
+                                    <i class="bi bi-inbox tw:text-[calc(1.375rem+1.5vw)] tw:min-[75rem]:text-[2.5rem] tw:block tw:mb-2"></i>
                                     Chưa có phương thức thanh toán nào.
                                 </td>
                             </tr>
                         @endforelse
                         </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="card-footer bg-white">
+                    </x-ui.table>
+                </x-ui.table-wrap>
+            </x-ui.card-body>
+            <x-ui.card-footer class="tw:bg-white">
                 {{ $methods->withQueryString()->links() }}
-            </div>
-        </div>
+            </x-ui.card-footer>
+        </x-ui.card>
     </div>
 @endsection

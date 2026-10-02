@@ -8,7 +8,7 @@ return new class extends Migration
 {
     private function addConditionColumn(string $tableName): void
     {
-        if (Schema::hasTable($tableName) && !Schema::hasColumn($tableName, 'item_condition')) {
+        if (Schema::hasTable($tableName) && ! Schema::hasColumn($tableName, 'item_condition')) {
             Schema::table($tableName, function (Blueprint $table) {
                 $table->string('item_condition')->nullable()->after('id');
             });

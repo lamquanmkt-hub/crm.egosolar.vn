@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Marketing;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -21,7 +21,7 @@ class MarketingReportController extends Controller
     {
         $table = 'mkt_actual_kpi_daily';
 
-        if (! Schema::hasTable($table)) {
+        if (! SchemaCache::hasTable($table)) {
             $filters = [
                 'from' => Carbon::today()->startOfMonth()->toDateString(),
                 'to' => Carbon::today()->toDateString(),
@@ -184,7 +184,7 @@ class MarketingReportController extends Controller
                 return $r;
             });
 
-        $hasExternal = Schema::hasColumn($table, 'campaign_external_id');
+        $hasExternal = SchemaCache::hasColumn($table, 'campaign_external_id');
 
         $selectCampaign = '
             COALESCE(campaign_name,"(no campaign)") as campaign_name,
@@ -327,7 +327,7 @@ class MarketingReportController extends Controller
 
         $channelOptions = collect();
 
-        if (Schema::hasTable($planTable)) {
+        if (SchemaCache::hasTable($planTable)) {
             $channelOptions = $channelOptions->merge(
                 DB::table($planTable)
                     ->select($planPlatformCol)
@@ -339,7 +339,7 @@ class MarketingReportController extends Controller
             );
         }
 
-        if (Schema::hasTable($actualTable)) {
+        if (SchemaCache::hasTable($actualTable)) {
             $channelOptions = $channelOptions->merge(
                 DB::table($actualTable)
                     ->select($actualChannelCol)
@@ -354,7 +354,7 @@ class MarketingReportController extends Controller
         $channelOptions = $channelOptions->unique()->values();
 
         $campaignOptions = collect();
-        if (Schema::hasTable($planTable)) {
+        if (SchemaCache::hasTable($planTable)) {
             $q = DB::table($planTable)
                 ->select($planCampaignCol)
                 ->whereNotNull($planCampaignCol)
@@ -370,7 +370,7 @@ class MarketingReportController extends Controller
         }
 
         $recent = collect();
-        if (Schema::hasTable($actualTable)) {
+        if (SchemaCache::hasTable($actualTable)) {
             $recent = DB::table($actualTable)
                 ->select('date', 'channel', 'campaign_name', 'spend', 'impressions', 'clicks', 'leads', 'revenue', 'updated_at')
                 ->orderByDesc('date')
@@ -396,7 +396,7 @@ class MarketingReportController extends Controller
     {
         $actualTable = 'mkt_actual_kpi_daily';
 
-        if (! Schema::hasTable($actualTable)) {
+        if (! SchemaCache::hasTable($actualTable)) {
             return back()->with('error', 'Chưa có bảng mkt_actual_kpi_daily.');
         }
 
@@ -419,11 +419,11 @@ class MarketingReportController extends Controller
             'revenue' => (float) ($data['revenue'] ?? 0),
         ];
 
-        if (Schema::hasColumn($actualTable, 'updated_at')) {
+        if (SchemaCache::hasColumn($actualTable, 'updated_at')) {
             $payload['updated_at'] = now();
         }
 
-        if (Schema::hasColumn($actualTable, 'created_at')) {
+        if (SchemaCache::hasColumn($actualTable, 'created_at')) {
             $payload['created_at'] = now();
         }
 
@@ -455,7 +455,7 @@ class MarketingReportController extends Controller
     {
         $actualTable = 'mkt_actual_kpi_daily';
 
-        if (! Schema::hasTable($actualTable)) {
+        if (! SchemaCache::hasTable($actualTable)) {
             return back()->with('error', 'Chưa có bảng mkt_actual_kpi_daily.');
         }
 
@@ -479,52 +479,10 @@ class MarketingReportController extends Controller
     }
 
     /**
-     * Tạo bảng mkt_actual_kpi_daily nếu chưa có và bổ sung các cột còn thiếu.
-     */
-    private function ensureAdsActualTableForImport(): void
-    {
-        DB::statement('
-            CREATE TABLE IF NOT EXISTS mkt_actual_kpi_daily (
-                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                date DATE NOT NULL,
-                channel VARCHAR(120) NULL,
-                channel_id BIGINT UNSIGNED NULL,
-                platform_id BIGINT UNSIGNED NULL,
-                website_id BIGINT UNSIGNED NULL,
-                campaign_external_id VARCHAR(255) NULL,
-                campaign_name VARCHAR(255) NOT NULL,
-                spend DECIMAL(15,2) NOT NULL DEFAULT 0,
-                impressions BIGINT UNSIGNED NOT NULL DEFAULT 0,
-                clicks BIGINT UNSIGNED NOT NULL DEFAULT 0,
-                leads BIGINT UNSIGNED NOT NULL DEFAULT 0,
-                revenue DECIMAL(15,2) NOT NULL DEFAULT 0,
-                sessions BIGINT UNSIGNED NOT NULL DEFAULT 0,
-                conversions BIGINT UNSIGNED NOT NULL DEFAULT 0,
-                source_type VARCHAR(100) NULL,
-                raw_payload LONGTEXT NULL,
-                created_at TIMESTAMP NULL DEFAULT NULL,
-                updated_at TIMESTAMP NULL DEFAULT NULL,
-                INDEX mkt_actual_date_index (date),
-                INDEX mkt_actual_channel_index (channel),
-                INDEX mkt_actual_campaign_index (campaign_name)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ');
-
-        if (! Schema::hasColumn('mkt_actual_kpi_daily', 'source_type')) {
-            DB::statement('ALTER TABLE mkt_actual_kpi_daily ADD COLUMN source_type VARCHAR(100) NULL AFTER conversions');
-        }
-
-        if (! Schema::hasColumn('mkt_actual_kpi_daily', 'raw_payload')) {
-            DB::statement('ALTER TABLE mkt_actual_kpi_daily ADD COLUMN raw_payload LONGTEXT NULL AFTER source_type');
-        }
-    }
-
-    /**
      * Import báo cáo ads từ file CSV/XLSX (Meta Ads) vào bảng KPI theo ngày.
      */
     public function adsImport(Request $request)
     {
-        $this->ensureAdsActualTableForImport();
 
         $actualTable = 'mkt_actual_kpi_daily';
 
@@ -549,7 +507,7 @@ class MarketingReportController extends Controller
             return back()->with('error', 'File không có dữ liệu để nhập.');
         }
 
-        $columns = array_flip(Schema::getColumnListing($actualTable));
+        $columns = array_flip(SchemaCache::columns($actualTable));
 
         $imported = 0;
         $skipped = 0;

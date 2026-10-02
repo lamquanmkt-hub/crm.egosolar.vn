@@ -1,1339 +1,6 @@
 @extends('layouts.app')
 
 @section('content')
-@php
-    $month = request('month', $month ?? now()->format('Y-m'));
-    $filterSalesId = (int) request('sales_id', 0);
-
-    try {
-        $periodStart = \Carbon\Carbon::createFromFormat('Y-m-d', $month . '-01')->startOfMonth();
-    } catch (\Throwable $e) {
-        $month = now()->format('Y-m');
-        $periodStart = now()->startOfMonth();
-    }
-
-    $periodEnd = $periodStart->copy()->endOfMonth();
-    $prevMonth = $periodStart->copy()->subMonth()->format('Y-m');
-    $nextMonth = $periodStart->copy()->addMonth()->format('Y-m');
-
-    $fmtMoney = fn($v) => number_format((float)($v ?? 0), 0, ',', '.') . ' đ';
-    $fmtNum = fn($v) => number_format((float)($v ?? 0), 0, ',', '.');
-    $fmtPercent = fn($v) => number_format((float)($v ?? 0), 2, ',', '.') . '%';
-    $fmtRate = function ($v) {
-        $txt = number_format((float)($v ?? 0), 2, ',', '.');
-        $txt = rtrim(rtrim($txt, '0'), ',');
-        return ($txt === '' ? '0' : $txt) . '%';
-    };
-
-    $hasTable = fn($t) => \Illuminate\Support\Facades\Schema::hasTable($t);
-    $hasCol = fn($t, $c) => $hasTable($t) && \Illuminate\Support\Facades\Schema::hasColumn($t, $c);
-
-    $firstCol = function ($table, $cols) use ($hasCol) {
-        foreach ($cols as $c) {
-            if ($hasCol($table, $c)) return $c;
-        }
-        return null;
-    };
-
-    try {
-        $policyData = app(\App\Services\CommissionEngineService::class)->settingsViewData($month);
-    } catch (\Throwable $e) {
-        $policyData = [];
-    }
-
-    $policy = $policyData['policy'] ?? (object)[
-        'period_month' => $month,
-        'project_rate_percent' => 3,
-        'trade_rate_percent' => 1,
-        'panel_fixed_amount' => 0,
-        'only_paid' => 0,
-        'only_shipped' => 0,
-        'only_completed' => 0,
-        'hold_if_debt' => 0,
-    ];
-
-    $rules = collect($policyData['rules'] ?? []);
-    $activeRules = $rules->where('is_active', 1)->count();
-
-    $salesUsers = collect($policyData['salesUsers'] ?? []);
-    $salarySettings = collect($policyData['salarySettings'] ?? []);
-    $kpiTiers = collect($policyData['kpiTiers'] ?? []);
-
-    $orderTable = $hasTable('crm_orders') ? 'crm_orders' : ($hasTable('orders') ? 'orders' : null);
-    $orderDateCol = $orderTable ? $firstCol($orderTable, ['order_date', 'ordered_at', 'date', 'created_at']) : null;
-    $orderTotalCol = $orderTable ? $firstCol($orderTable, ['final_amount', 'grand_total', 'total_amount', 'total', 'amount']) : null;
-    $orderBeforeVatCol = $orderTable ? $firstCol($orderTable, [
-        'total_before_vat',
-        'subtotal_before_vat',
-        'before_vat_total',
-        'amount_before_vat',
-        'sub_total',
-        'subtotal',
-        'net_total',
-        'net_amount',
-        'total_without_vat',
-        'total_ex_vat',
-        'total_excluding_vat'
-    ]) : null;
-    $orderVatAmountCols = $orderTable ? array_values(array_filter([
-        $hasCol($orderTable, 'tax_amount') ? 'tax_amount' : null,
-        $hasCol($orderTable, 'vat_amount') ? 'vat_amount' : null,
-        $hasCol($orderTable, 'total_vat') ? 'total_vat' : null,
-        $hasCol($orderTable, 'total_tax') ? 'total_tax' : null,
-    ])) : [];
-
-    $orderVatAmountCol = $orderVatAmountCols[0] ?? null;
-    $orderVatPercentCol = $orderTable ? $firstCol($orderTable, [
-        'vat_percent',
-        'vat_rate',
-        'tax_percent',
-        'tax_rate',
-        'vat'
-    ]) : null;
-    $orderPaidCol = $orderTable ? $firstCol($orderTable, ['paid_amount', 'amount_paid', 'total_paid']) : null;
-    $orderStatusCol = $orderTable ? $firstCol($orderTable, ['status', 'order_status']) : null;
-    $orderCodeCol = $orderTable ? $firstCol($orderTable, ['code', 'order_code', 'order_no']) : null;
-    $orderSalesCol = $orderTable ? $firstCol($orderTable, ['sales_id', 'sale_id', 'user_id', 'created_by']) : null;
-    $orderCustomerCol = $orderTable ? $firstCol($orderTable, ['customer_name', 'lead_name', 'name']) : null;
-    $orderCustomerIdCol = $orderTable ? $firstCol($orderTable, ['customer_id', 'client_id', 'buyer_id']) : null;
-    $orderLeadIdCol = $orderTable ? $firstCol($orderTable, ['lead_id', 'crm_lead_id']) : null;
-
-    $allTableNames = collect();
-
-    try {
-        $allTableNames = collect(\Illuminate\Support\Facades\DB::select('SHOW TABLES'))
-            ->map(fn($r) => array_values((array)$r)[0] ?? null)
-            ->filter()
-            ->values();
-    } catch (\Throwable $e) {
-        $allTableNames = collect();
-    }
-
-    $findTable = function (array $candidates) use ($allTableNames) {
-        foreach ($candidates as $name) {
-            if ($allTableNames->contains($name)) {
-                return $name;
-            }
-        }
-
-        foreach ($candidates as $name) {
-            $found = $allTableNames->first(fn($t) => str_contains(strtolower($t), strtolower($name)));
-            if ($found) {
-                return $found;
-            }
-        }
-
-        return null;
-    };
-
-    $paymentTable = $findTable([
-        'crm_order_payments',
-        'order_payments',
-        'crm_payments',
-        'payments',
-        'payment_histories',
-        'crm_payment_histories',
-        'crm_order_payment_histories',
-    ]);
-
-    $paymentOrderCol = $paymentTable ? $firstCol($paymentTable, ['order_id', 'crm_order_id']) : null;
-    $paymentAmountCol = $paymentTable ? $firstCol($paymentTable, ['amount', 'paid_amount', 'payment_amount', 'money', 'value', 'total']) : null;
-    $paymentStatusCol = $paymentTable ? $firstCol($paymentTable, ['status', 'payment_status']) : null;
-
-    $customerNameFromTable = function (?string $table, $id) use ($hasTable, $firstCol) {
-        if (!$table || !$id || !$hasTable($table)) {
-            return null;
-        }
-
-        $nameCol = $firstCol($table, [
-            'name',
-            'full_name',
-            'customer_name',
-            'company_name',
-            'contact_name',
-            'display_name',
-        ]);
-
-        if (!$nameCol) {
-            return null;
-        }
-
-        try {
-            $val = \Illuminate\Support\Facades\DB::table($table)->where('id', $id)->value($nameCol);
-            return $val ? trim((string)$val) : null;
-        } catch (\Throwable $e) {
-            return null;
-        }
-    };
-
-    $customerNameForOrder = function ($order) use (
-        $orderCustomerCol,
-        $orderCustomerIdCol,
-        $orderLeadIdCol,
-        $customerNameFromTable,
-        $hasTable,
-        $firstCol
-    ) {
-        if ($orderCustomerCol && !empty($order->{$orderCustomerCol})) {
-            return trim((string)$order->{$orderCustomerCol});
-        }
-
-        if ($orderCustomerIdCol && !empty($order->{$orderCustomerIdCol})) {
-            $id = $order->{$orderCustomerIdCol};
-
-            foreach (['crm_customers', 'customers', 'clients'] as $table) {
-                $name = $customerNameFromTable($table, $id);
-                if ($name) {
-                    return $name;
-                }
-            }
-        }
-
-        if ($orderLeadIdCol && !empty($order->{$orderLeadIdCol})) {
-            $leadId = $order->{$orderLeadIdCol};
-
-            foreach (['crm_leads', 'leads'] as $table) {
-                if (!$hasTable($table)) {
-                    continue;
-                }
-
-                $leadName = $customerNameFromTable($table, $leadId);
-                if ($leadName) {
-                    return $leadName;
-                }
-
-                try {
-                    $lead = \Illuminate\Support\Facades\DB::table($table)->where('id', $leadId)->first();
-
-                    if ($lead) {
-                        foreach (['customer_name', 'company_name', 'name', 'full_name', 'contact_name'] as $col) {
-                            if (isset($lead->{$col}) && trim((string)$lead->{$col}) !== '') {
-                                return trim((string)$lead->{$col});
-                            }
-                        }
-
-                        foreach (['customer_id', 'client_id'] as $col) {
-                            if (isset($lead->{$col}) && !empty($lead->{$col})) {
-                                foreach (['crm_customers', 'customers', 'clients'] as $customerTable) {
-                                    $name = $customerNameFromTable($customerTable, $lead->{$col});
-                                    if ($name) {
-                                        return $name;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    //
-                }
-            }
-        }
-
-        return '---';
-    };
-
-    $customerStatusForOrder = function ($order) use (
-        $orderCustomerIdCol,
-        $orderLeadIdCol,
-        $hasTable,
-        $firstCol
-    ) {
-        $normalizeStatus = function ($value) {
-            $value = trim((string)($value ?? ''));
-            return $value !== '' ? strtolower($value) : '';
-        };
-
-        foreach (['customer_status', 'status_customer', 'customer_type', 'type'] as $col) {
-            if (isset($order->{$col}) && trim((string)$order->{$col}) !== '') {
-                return $normalizeStatus($order->{$col});
-            }
-        }
-
-        $lookupCustomerStatus = function ($customerId) use ($hasTable, $firstCol, $normalizeStatus) {
-            if (!$customerId) {
-                return '';
-            }
-
-            foreach (['crm_customers', 'customers', 'clients'] as $table) {
-                if (!$hasTable($table)) {
-                    continue;
-                }
-
-                $statusCol = $firstCol($table, ['customer_status', 'status', 'type', 'customer_type']);
-                if (!$statusCol) {
-                    continue;
-                }
-
-                try {
-                    $value = \Illuminate\Support\Facades\DB::table($table)
-                        ->where('id', $customerId)
-                        ->value($statusCol);
-
-                    $value = $normalizeStatus($value);
-                    if ($value !== '') {
-                        return $value;
-                    }
-                } catch (\Throwable $e) {
-                    //
-                }
-            }
-
-            return '';
-        };
-
-        if ($orderCustomerIdCol && !empty($order->{$orderCustomerIdCol})) {
-            $status = $lookupCustomerStatus($order->{$orderCustomerIdCol});
-            if ($status !== '') {
-                return $status;
-            }
-        }
-
-        if ($orderLeadIdCol && !empty($order->{$orderLeadIdCol})) {
-            foreach (['crm_leads', 'leads'] as $leadTable) {
-                if (!$hasTable($leadTable)) {
-                    continue;
-                }
-
-                try {
-                    $lead = \Illuminate\Support\Facades\DB::table($leadTable)
-                        ->where('id', $order->{$orderLeadIdCol})
-                        ->first();
-
-                    if (!$lead) {
-                        continue;
-                    }
-
-                    foreach (['customer_status', 'status', 'type', 'source'] as $col) {
-                        if (isset($lead->{$col}) && trim((string)$lead->{$col}) !== '') {
-                            return $normalizeStatus($lead->{$col});
-                        }
-                    }
-
-                    foreach (['customer_id', 'client_id'] as $col) {
-                        if (isset($lead->{$col}) && !empty($lead->{$col})) {
-                            $status = $lookupCustomerStatus($lead->{$col});
-                            if ($status !== '') {
-                                return $status;
-                            }
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    //
-                }
-            }
-        }
-
-        return '';
-    };
-
-    $paidAmountForOrder = function ($order) use (
-        $orderPaidCol,
-        $paymentTable,
-        $paymentOrderCol,
-        $paymentAmountCol,
-        $paymentStatusCol
-    ) {
-        $orderId = $order->id ?? null;
-
-        if ($paymentTable && $paymentOrderCol && $paymentAmountCol && $orderId) {
-            try {
-                $q = \Illuminate\Support\Facades\DB::table($paymentTable)
-                    ->where($paymentOrderCol, $orderId);
-
-                if ($paymentStatusCol) {
-                    $q->whereNotIn($paymentStatusCol, [
-                        'cancel',
-                        'cancelled',
-                        'canceled',
-                        'void',
-                        'failed',
-                        'deleted',
-                    ]);
-                }
-
-                $sum = (float)$q->sum($paymentAmountCol);
-
-                if ($sum > 0) {
-                    return $sum;
-                }
-            } catch (\Throwable $e) {
-                //
-            }
-        }
-
-        if ($orderPaidCol && isset($order->{$orderPaidCol})) {
-            return (float)($order->{$orderPaidCol} ?? 0);
-        }
-
-        return 0;
-    };
-
-    $orderItemTable = $findTable([
-        'crm_order_items',
-        'crm_order_details',
-        'order_items',
-        'order_details',
-        'crm_order_products',
-        'crm_order_item_products',
-        'order_product_items',
-    ]);
-
-    $orderItemOrderCol = $orderItemTable ? $firstCol($orderItemTable, [
-        'order_id',
-        'crm_order_id',
-        'sale_order_id'
-    ]) : null;
-
-    /**
-     * EGO CRM:
-     * - crm_orders.total_amount là tổng sau VAT.
-     * - crm_order_items.unit_price / line_total đang là sau VAT.
-     * - crm_order_items.vat_percent nhiều dòng đang = 0 nên không thể chia VAT từ item.
-     * - Giá trước VAT chuẩn nằm ở crm_product_prices.price theo product_id + price_tier_id.
-     *
-     * Hoa hồng phải tính trên trước VAT:
-     * before_vat = SUM(crm_product_prices.price * crm_order_items.quantity)
-     */
-    $beforeVatAmountForOrder = function ($order) use (
-        $orderBeforeVatCol,
-        $orderVatAmountCol,
-        $orderVatAmountCols,
-        $orderVatPercentCol,
-        $orderTotalCol,
-        $orderItemTable,
-        $orderItemOrderCol
-    ) {
-        $toNumber = function ($value) {
-            if ($value === null || $value === '') {
-                return 0.0;
-            }
-
-            if (is_numeric($value)) {
-                return (float) $value;
-            }
-
-            $v = preg_replace('/[^\d\.\-]/', '', (string) $value);
-            return is_numeric($v) ? (float) $v : 0.0;
-        };
-
-        $orderId = $order->id ?? null;
-
-        $totalAfterVat = $orderTotalCol && isset($order->{$orderTotalCol})
-            ? $toNumber($order->{$orderTotalCol})
-            : 0;
-
-        $orderVatAmount = 0.0;
-        foreach ($orderVatAmountCols as $vatCol) {
-            if (isset($order->{$vatCol})) {
-                $v = $toNumber($order->{$vatCol});
-                if ($v > 0) {
-                    $orderVatAmount = $v;
-                    break;
-                }
-            }
-        }
-
-        // 1. Ưu tiên đúng nhất với DB hiện tại: total_amount sau VAT - tax_amount.
-        // Vì crm_order_items.vat_percent đang lưu 0 và product_prices.price có thể null.
-        if ($totalAfterVat > 0 && $orderVatAmount > 0 && $totalAfterVat >= $orderVatAmount) {
-            return round($totalAfterVat - $orderVatAmount);
-        }
-
-        // 2. Sau đó mới thử lấy giá trước VAT trong crm_product_prices.
-        if ($orderItemTable && $orderItemOrderCol && $orderId && \Illuminate\Support\Facades\Schema::hasTable('crm_product_prices')) {
-            try {
-                $itemCols = \Illuminate\Support\Facades\Schema::getColumnListing($orderItemTable);
-
-                $has = fn($col) => in_array($col, $itemCols, true);
-
-                $rows = \Illuminate\Support\Facades\DB::table($orderItemTable)
-                    ->where($orderItemOrderCol, $orderId)
-                    ->get();
-
-                $sumFromProductPrices = 0;
-                $hasAnyProductPrice = false;
-
-                foreach ($rows as $item) {
-                    $productId = $has('product_id') ? (int)($item->product_id ?? 0) : 0;
-                    $priceTierId = $has('price_tier_id') ? (int)($item->price_tier_id ?? 0) : 0;
-
-                    $qty = $has('quantity') ? $toNumber($item->quantity ?? 0) : 0;
-                    if ($qty <= 0 && $has('qty')) {
-                        $qty = $toNumber($item->qty ?? 0);
-                    }
-                    if ($qty <= 0) {
-                        $qty = 1;
-                    }
-
-                    if ($productId <= 0 || $priceTierId <= 0) {
-                        continue;
-                    }
-
-                    $productPrice = \Illuminate\Support\Facades\DB::table('crm_product_prices')
-                        ->where('product_id', $productId)
-                        ->where('price_tier_id', $priceTierId)
-                        ->orderByDesc('id')
-                        ->first();
-
-                    if ($productPrice && isset($productPrice->price)) {
-                        $priceBeforeVat = $toNumber($productPrice->price);
-
-                        if ($priceBeforeVat > 0) {
-                            $sumFromProductPrices += $priceBeforeVat * $qty;
-                            $hasAnyProductPrice = true;
-                        }
-                    }
-                }
-
-                if ($hasAnyProductPrice && $sumFromProductPrices > 0) {
-                    return round($sumFromProductPrices);
-                }
-            } catch (\Throwable $e) {
-                //
-            }
-        }
-
-        // 2. Nếu order có sẵn tổng trước VAT rõ nghĩa thì dùng.
-        if ($orderBeforeVatCol && isset($order->{$orderBeforeVatCol})) {
-            $v = $toNumber($order->{$orderBeforeVatCol});
-
-            if ($v > 0 && ($totalAfterVat <= 0 || $v <= $totalAfterVat + 1)) {
-                return round($v);
-            }
-        }
-
-        // 3. Fallback tính từ item nếu item có VAT thật.
-        if ($orderItemTable && $orderItemOrderCol && $orderId) {
-            try {
-                $itemCols = \Illuminate\Support\Facades\Schema::getColumnListing($orderItemTable);
-
-                $has = fn($col) => in_array($col, $itemCols, true);
-
-                $rows = \Illuminate\Support\Facades\DB::table($orderItemTable)
-                    ->where($orderItemOrderCol, $orderId)
-                    ->get();
-
-                $sumBeforeVat = 0;
-
-                foreach ($rows as $item) {
-                    $qty = $has('quantity') ? $toNumber($item->quantity ?? 0) : 0;
-                    if ($qty <= 0 && $has('qty')) {
-                        $qty = $toNumber($item->qty ?? 0);
-                    }
-                    if ($qty <= 0) {
-                        $qty = 1;
-                    }
-
-                    $vatPercent = $has('vat_percent') ? $toNumber($item->vat_percent ?? 0) : 0;
-                    if ($vatPercent <= 0 && $has('vat')) {
-                        $vatPercent = $toNumber($item->vat ?? 0);
-                    }
-
-                    // EGO FIX: nếu item chưa lưu VAT thì lấy VAT từ sản phẩm để quy đổi sau VAT -> trước VAT.
-                    if ($vatPercent <= 0 && $has('product_id') && !empty($item->product_id)
-                        && \Illuminate\Support\Facades\Schema::hasTable('crm_product_catalog')
-                        && \Illuminate\Support\Facades\Schema::hasColumn('crm_product_catalog', 'vat_percent')) {
-                        try {
-                            static $egoProductVatCache = [];
-                            $pid = (int) $item->product_id;
-
-                            if ($pid > 0) {
-                                if (!array_key_exists($pid, $egoProductVatCache)) {
-                                    $egoProductVatCache[$pid] = (float) \Illuminate\Support\Facades\DB::table('crm_product_catalog')
-                                        ->where('id', $pid)
-                                        ->value('vat_percent');
-                                }
-
-                                $vatPercent = (float) ($egoProductVatCache[$pid] ?? 0);
-                            }
-                        } catch (\Throwable $e) {
-                            // Không chặn trang nếu thiếu schema dữ liệu sản phẩm.
-                        }
-                    }
-
-                    if ($has('line_total')) {
-                        $lineAfterVat = $toNumber($item->line_total ?? 0);
-                    } elseif ($has('total_amount')) {
-                        $lineAfterVat = $toNumber($item->total_amount ?? 0);
-                    } elseif ($has('total')) {
-                        $lineAfterVat = $toNumber($item->total ?? 0);
-                    } elseif ($has('amount')) {
-                        $lineAfterVat = $toNumber($item->amount ?? 0);
-                    } else {
-                        $unitAfterVat = $has('unit_price') ? $toNumber($item->unit_price ?? 0) : 0;
-                        if ($unitAfterVat <= 0 && $has('price')) {
-                            $unitAfterVat = $toNumber($item->price ?? 0);
-                        }
-
-                        $discountPercent = $has('discount_percent') ? $toNumber($item->discount_percent ?? 0) : 0;
-                        $discountAmount = $has('discount_amount') ? $toNumber($item->discount_amount ?? 0) : 0;
-
-                        $lineAfterVat = max(0, ($qty * $unitAfterVat * (1 - $discountPercent / 100)) - $discountAmount);
-                    }
-
-                    if ($lineAfterVat <= 0) {
-                        continue;
-                    }
-
-                    // Chỉ quy đổi từ line_total nếu dòng item có VAT % thật.
-                    // Nếu vat_percent = 0 thì line_total hiện đang là SAU VAT nhưng không đủ dữ liệu để chia.
-                    // Lúc đó bỏ qua item và fallback xuống crm_orders.tax_amount.
-                    if ($vatPercent > 0) {
-                        $lineBeforeVat = $lineAfterVat / (1 + $vatPercent / 100);
-                        $sumBeforeVat += $lineBeforeVat;
-                    }
-                }
-
-                if ($sumBeforeVat > 0) {
-                    return round($sumBeforeVat);
-                }
-            } catch (\Throwable $e) {
-                //
-            }
-        }
-
-        // 4. Nếu order có tiền VAT thì lấy tổng sau VAT - VAT.
-        if ($totalAfterVat > 0 && $orderVatAmount > 0 && $totalAfterVat >= $orderVatAmount) {
-            return round($totalAfterVat - $orderVatAmount);
-        }
-
-        // 5. Nếu order có VAT % thì quy đổi tổng sau VAT về trước VAT.
-        if ($totalAfterVat > 0 && $orderVatPercentCol && isset($order->{$orderVatPercentCol})) {
-            $vatPercent = $toNumber($order->{$orderVatPercentCol});
-
-            if ($vatPercent > 0 && $vatPercent <= 100) {
-                return round($totalAfterVat / (1 + $vatPercent / 100));
-            }
-        }
-
-        return round($totalAfterVat);
-    };
-
-    $orderProductInfoForOrder = function ($order) use ($orderItemTable, $orderItemOrderCol) {
-        $orderId = $order->id ?? null;
-        $info = (object)[
-            'text' => '',
-            'quantity' => 0.0,
-        ];
-
-        if (!$orderItemTable || !$orderItemOrderCol || !$orderId) {
-            return $info;
-        }
-
-        try {
-            $itemCols = \Illuminate\Support\Facades\Schema::getColumnListing($orderItemTable);
-            $has = fn($col) => in_array($col, $itemCols, true);
-
-            $q = \Illuminate\Support\Facades\DB::table($orderItemTable . ' as oi')
-                ->where('oi.' . $orderItemOrderCol, $orderId);
-
-            $selects = ['oi.*'];
-            $canJoinProduct = $has('product_id') && \Illuminate\Support\Facades\Schema::hasTable('crm_product_catalog');
-
-            if ($canJoinProduct) {
-                $q->leftJoin('crm_product_catalog as pc', 'pc.id', '=', 'oi.product_id');
-
-                foreach ([
-                    'name' => 'ego_product_name',
-                    'barcode' => 'ego_product_code',
-                    'model' => 'ego_product_model',
-                    'sku' => 'ego_product_sku',
-                ] as $col => $alias) {
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('crm_product_catalog', $col)) {
-                        $selects[] = \Illuminate\Support\Facades\DB::raw('pc.`' . $col . '` as ' . $alias);
-                    }
-                }
-            }
-
-            $rows = $q->get($selects);
-
-            $texts = [];
-            $qty = 0.0;
-
-            foreach ($rows as $item) {
-                $qItem = $has('quantity') ? (float)($item->quantity ?? 0) : 0;
-                if ($qItem <= 0 && $has('qty')) {
-                    $qItem = (float)($item->qty ?? 0);
-                }
-                if ($qItem <= 0) {
-                    $qItem = 1;
-                }
-
-                $qty += $qItem;
-
-                foreach (['ego_product_name', 'ego_product_code', 'ego_product_model', 'ego_product_sku', 'product_name', 'name', 'model', 'sku', 'barcode'] as $col) {
-                    if (isset($item->{$col}) && trim((string)$item->{$col}) !== '') {
-                        $texts[] = trim((string)$item->{$col});
-                    }
-                }
-            }
-
-            $info->text = implode(' ', array_unique($texts));
-            $info->quantity = $qty;
-        } catch (\Throwable $e) {
-            //
-        }
-
-        return $info;
-    };
-
-    $isCompletedPaidOrder = function ($order, float $total, float $paid) use ($orderStatusCol) {
-        if ($total <= 0) {
-            return false;
-        }
-
-        if ($paid + 0.01 < $total) {
-            return false;
-        }
-
-        if ($orderStatusCol && isset($order->{$orderStatusCol})) {
-            $status = strtolower(trim((string)$order->{$orderStatusCol}));
-
-            if (in_array($status, [
-                'cancel',
-                'cancelled',
-                'canceled',
-                'void',
-                'deleted',
-                'refunded',
-            ], true)) {
-                return false;
-            }
-        }
-
-        return true;
-    };
-
-    $commissionAmountByRules = function (
-        float $beforeVat,
-        float $afterVat,
-        float $monthlyRevenueBeforeVat,
-        ?string $customerStatus = '',
-        float $quantity = 0,
-        string $productText = ''
-    ) use ($rules, $policy) {
-        $beforeVat = max(0, $beforeVat);
-        $afterVat = max(0, $afterVat);
-        $monthlyRevenueBeforeVat = max(0, $monthlyRevenueBeforeVat);
-        $quantity = max(0, $quantity);
-
-        $normalize = function ($value) {
-            $value = trim((string)($value ?? ''));
-
-            if (class_exists(\Illuminate\Support\Str::class)) {
-                $value = \Illuminate\Support\Str::ascii($value);
-            }
-
-            $value = strtolower($value);
-            $value = preg_replace('/[^a-z0-9]+/u', '', $value);
-
-            return $value ?: '';
-        };
-
-        $normType = function ($value) use ($normalize) {
-            return $normalize(str_replace(['_', '-'], '', (string)$value));
-        };
-
-        $status = $normalize($customerStatus);
-        $productTextNorm = $normalize($productText);
-
-        $active = collect($rules)
-            ->filter(fn($r) => (int)($r->is_active ?? 0) === 1)
-            ->sortByDesc(fn($r) => (int)($r->priority ?? 0))
-            ->values();
-
-        if ($active->isEmpty()) {
-            return $beforeVat * ((float)($policy->trade_rate_percent ?? 0)) / 100;
-        }
-
-        $isTradeRule = function ($rule) use ($normType) {
-            $type = $normType($rule->commission_type ?? 'trade_product');
-
-            return in_array($type, [
-                'tradeproduct',
-                'thuongmai',
-                'commercial',
-                'sales',
-                'order',
-            ], true);
-        };
-
-        $isSolarPanelRule = function ($rule) use ($normType) {
-            $type = $normType($rule->commission_type ?? '');
-
-            return in_array($type, [
-                'solarpanel',
-                'tampin',
-                'panel',
-            ], true);
-        };
-
-        $splitTargetText = function ($text) use ($normalize) {
-            $parts = preg_split('/[,;|\/]+/', (string)$text) ?: [];
-
-            return collect($parts)
-                ->map(fn($v) => $normalize($v))
-                ->filter()
-                ->values()
-                ->all();
-        };
-
-        $isLeadAdsNeedle = function ($needle) {
-            return strpos($needle, 'lead') !== false
-                || strpos($needle, 'ads') !== false
-                || strpos($needle, 'khachads') !== false
-                || strpos($needle, 'khachhangads') !== false;
-        };
-
-        $isLeadAdsStatus = function ($value) {
-            return strpos($value, 'lead') !== false
-                || strpos($value, 'ads') !== false
-                || strpos($value, 'khachads') !== false
-                || strpos($value, 'khachhangads') !== false;
-        };
-
-        $isRetailNeedle = function ($needle) {
-            return in_array($needle, [
-                'khachle',
-                'khachhangle',
-                'retail',
-                'retailcustomer',
-                'le',
-            ], true);
-        };
-
-        $isRetailStatus = function ($value) {
-            return in_array($value, [
-                'khachle',
-                'khachhangle',
-                'retail',
-                'retailcustomer',
-                'le',
-            ], true);
-        };
-
-        $matchesTarget = function ($rule) use (
-            $normalize,
-            $normType,
-            $splitTargetText,
-            $status,
-            $productTextNorm,
-            $isLeadAdsNeedle,
-            $isLeadAdsStatus,
-            $isRetailNeedle,
-            $isRetailStatus
-        ) {
-            $targetType = $normType($rule->target_type ?? 'all');
-            $needles = $splitTargetText($rule->target_text ?? '');
-
-            if ($targetType === '' || $targetType === 'all' || empty($needles)) {
-                return true;
-            }
-
-            if (in_array($targetType, ['customerstatus', 'khachhang', 'trangthaikhach'], true)) {
-                if ($status === '') {
-                    return false;
-                }
-
-                foreach ($needles as $needle) {
-                    if ($needle === $status) {
-                        return true;
-                    }
-
-                    if ($isLeadAdsNeedle($needle) && $isLeadAdsStatus($status)) {
-                        return true;
-                    }
-
-                    if ($isRetailNeedle($needle) && $isRetailStatus($status)) {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            if (in_array($targetType, ['keyword', 'product', 'productname', 'model', 'sku', 'barcode', 'brand', 'category', 'sanpham'], true)) {
-                foreach ($needles as $needle) {
-                    if ($needle !== '' && strpos($productTextNorm, $needle) !== false) {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            return true;
-        };
-
-        $calcRuleAmount = function ($rule) use ($beforeVat, $afterVat, $monthlyRevenueBeforeVat, $quantity, $normType) {
-            $fromAmount = ($rule->from_amount ?? '') !== '' && $rule->from_amount !== null ? (float)$rule->from_amount : null;
-            $toAmount = ($rule->to_amount ?? '') !== '' && $rule->to_amount !== null ? (float)$rule->to_amount : null;
-
-            // Mốc doanh thu là doanh thu tháng của Sales.
-            if ($fromAmount !== null && $monthlyRevenueBeforeVat + 0.01 < $fromAmount) {
-                return null;
-            }
-
-            if ($toAmount !== null && $monthlyRevenueBeforeVat - 0.01 > $toAmount) {
-                return null;
-            }
-
-            $fromQty = ($rule->from_qty ?? '') !== '' && $rule->from_qty !== null ? (float)$rule->from_qty : null;
-            $toQty = ($rule->to_qty ?? '') !== '' && $rule->to_qty !== null ? (float)$rule->to_qty : null;
-
-            if ($fromQty !== null && $quantity + 0.01 < $fromQty) {
-                return null;
-            }
-
-            if ($toQty !== null && $quantity - 0.01 > $toQty) {
-                return null;
-            }
-
-            $baseType = $normType($rule->base_type ?? 'revenue_before_vat');
-            $calcType = $normType($rule->calculation_type ?? 'percent');
-
-            $base = in_array($baseType, ['revenueaftervat', 'aftervat', 'sauvat'], true)
-                ? $afterVat
-                : (in_array($baseType, ['quantity', 'qty', 'soluong'], true) ? $quantity : $beforeVat);
-
-            if (in_array($calcType, ['fixedperitem', 'peritem', 'theosanpham'], true)) {
-                return $quantity * (float)($rule->amount_per_unit ?? ($rule->fixed_amount ?? 0));
-            }
-
-            if (in_array($calcType, ['fixedperkwp', 'perkwp'], true)) {
-                return $quantity * (float)($rule->amount_per_kwp ?? 0);
-            }
-
-            if (in_array($calcType, ['fixedperorder', 'perorder', 'fixed'], true)) {
-                return (float)($rule->fixed_amount ?? 0);
-            }
-
-            return $base * (float)($rule->rate_percent ?? 0) / 100;
-        };
-
-        $tradeCommission = null;
-        $fallbackCandidates = [];
-        $extraCommission = 0.0;
-
-        $hasRevenueFloorTradeRule = $active->contains(function ($rule) use ($isTradeRule) {
-            return $isTradeRule($rule)
-                && ($rule->from_amount ?? null) !== null
-                && (float)($rule->from_amount ?? 0) > 0;
-        });
-
-        foreach ($active as $rule) {
-            if (!$isTradeRule($rule) && !$isSolarPanelRule($rule)) {
-                continue;
-            }
-
-            $amount = $calcRuleAmount($rule);
-            if ($amount === null) {
-                continue;
-            }
-
-            $amount = max(0, (float)$amount);
-
-            if ($isSolarPanelRule($rule)) {
-                if ($matchesTarget($rule)) {
-                    $extraCommission += $amount;
-                }
-
-                continue;
-            }
-
-            if (!$isTradeRule($rule)) {
-                continue;
-            }
-
-            if ($matchesTarget($rule)) {
-                if ($tradeCommission === null) {
-                    $tradeCommission = $amount;
-                }
-
-                continue;
-            }
-
-            // Fallback cho đơn thương mại không đọc được trạng thái khách:
-            // ưu tiên rule có mốc doanh thu, ví dụ 0.5% từ 500tr.
-            if ($hasRevenueFloorTradeRule) {
-                if (($rule->from_amount ?? null) !== null && (float)($rule->from_amount ?? 0) > 0) {
-                    $fallbackCandidates[] = [
-                        'amount' => $amount,
-                        'rate' => (float)($rule->rate_percent ?? 0),
-                        'priority' => (int)($rule->priority ?? 0),
-                    ];
-                }
-            } else {
-                $fallbackCandidates[] = [
-                    'amount' => $amount,
-                    'rate' => (float)($rule->rate_percent ?? 0),
-                    'priority' => (int)($rule->priority ?? 0),
-                ];
-            }
-        }
-
-        if ($tradeCommission === null && !empty($fallbackCandidates)) {
-            usort($fallbackCandidates, function ($a, $b) {
-                $rateCompare = ($a['rate'] <=> $b['rate']);
-
-                if ($rateCompare !== 0) {
-                    return $rateCompare;
-                }
-
-                return $b['priority'] <=> $a['priority'];
-            });
-
-            $tradeCommission = (float)($fallbackCandidates[0]['amount'] ?? 0);
-        }
-
-        return ($tradeCommission ?? 0.0) + $extraCommission;
-    };
-    $commissionTable = $hasTable('crm_sales_commissions') ? 'crm_sales_commissions' : null;
-    $commissionSalesCol = $commissionTable ? $firstCol($commissionTable, ['sales_id', 'sale_id', 'user_id', 'created_by']) : null;
-    $commissionAmountCol = $commissionTable ? $firstCol($commissionTable, ['commission_amount', 'total_commission', 'amount', 'commission']) : null;
-    $commissionDateCol = $commissionTable ? $firstCol($commissionTable, ['period_month', 'commission_month', 'created_at', 'date']) : null;
-
-    $periodFrom = $periodStart->format('Y-m-d') . ' 00:00:00';
-    $periodTo = $periodEnd->format('Y-m-d') . ' 23:59:59';
-
-    $salesRows = collect();
-
-    foreach ($salesUsers as $u) {
-        $uid = (int)($u->id ?? 0);
-        if ($uid <= 0) continue;
-
-        $salary = $salarySettings->get($uid);
-        $baseSalary = (float)($salary->base_salary ?? 7000000);
-        $targetRevenue = (float)($salary->target_revenue ?? 500000000);
-        $targetCommission = (float)($salary->target_commission ?? 0);
-
-        $revenue = 0;
-        $paid = 0;
-        $orderCount = 0;
-        $eligibleRevenue = 0;
-        $eligibleRevenueBeforeVat = 0;
-        $eligibleOrderIds = [];
-        $eligibleOrderRows = [];
-
-        if ($orderTable && $orderDateCol && $orderTotalCol && $orderSalesCol) {
-            $ordersForSales = \Illuminate\Support\Facades\DB::table($orderTable)
-                ->whereBetween($orderDateCol, [$periodFrom, $periodTo])
-                ->where($orderSalesCol, $uid)
-                ->get();
-
-            $orderCount = $ordersForSales->count();
-
-            foreach ($ordersForSales as $orderRow) {
-                $orderTotal = (float)($orderRow->{$orderTotalCol} ?? 0);
-                $orderPaid = (float)$paidAmountForOrder($orderRow);
-
-                $revenue += $orderTotal;
-                $paid += $orderPaid;
-
-                if ($isCompletedPaidOrder($orderRow, $orderTotal, $orderPaid)) {
-                    $eligibleRevenue += $orderTotal;
-                    $beforeVatForCommission = (float) $beforeVatAmountForOrder($orderRow);
-                    $eligibleRevenueBeforeVat += $beforeVatForCommission;
-
-                    $productInfoForCommission = $orderProductInfoForOrder($orderRow);
-
-                    $eligibleOrderRows[] = (object)[
-                        'after_vat' => $orderTotal,
-                        'before_vat' => $beforeVatForCommission,
-                        'customer_status' => $customerStatusForOrder($orderRow),
-                        'quantity' => (float)($productInfoForCommission->quantity ?? 0),
-                        'product_text' => (string)($productInfoForCommission->text ?? ''),
-                    ];
-
-                    if (!empty($orderRow->id)) {
-                        $eligibleOrderIds[] = (int)$orderRow->id;
-                    }
-                }
-            }
-        }
-
-        $commission = 0;
-
-        // Hoa hồng chỉ tính cho đơn đã thu đủ tiền / không còn công nợ.
-        if (
-            $commissionTable &&
-            $commissionAmountCol &&
-            $commissionSalesCol &&
-            !empty($eligibleOrderIds) &&
-            \Illuminate\Support\Facades\Schema::hasColumn($commissionTable, 'order_id')
-        ) {
-            $cq = \Illuminate\Support\Facades\DB::table($commissionTable)
-                ->where($commissionSalesCol, $uid)
-                ->whereIn('order_id', $eligibleOrderIds);
-
-            if ($commissionDateCol) {
-                if (in_array($commissionDateCol, ['period_month', 'commission_month'], true)) {
-                    $cq->where($commissionDateCol, $month);
-                } else {
-                    $cq->whereBetween($commissionDateCol, [$periodFrom, $periodTo]);
-                }
-            }
-
-            $commission = (float)$cq->sum($commissionAmountCol);
-        } else {
-            // Hoa hồng tính theo rule cấu hình: Lead/ADS 0.5% chỉ chạy khi Sales đạt mốc từ 500tr.
-            foreach ($eligibleOrderRows as $eligibleOrderRow) {
-                $commission += $commissionAmountByRules(
-                    (float)($eligibleOrderRow->before_vat ?? 0),
-                    (float)($eligibleOrderRow->after_vat ?? 0),
-                    $eligibleRevenueBeforeVat,
-                    (string)($eligibleOrderRow->customer_status ?? ''),
-                    (float)($eligibleOrderRow->quantity ?? 0),
-                    (string)($eligibleOrderRow->product_text ?? '')
-                );
-            }
-        }
-
-        $bestKpi = null;
-
-        foreach ($kpiTiers->where('is_active', 1) as $tier) {
-            $tierSalesId = $tier->sales_id ?? null;
-            if (!empty($tierSalesId) && (int)$tierSalesId !== $uid) continue;
-
-            $from = (float)($tier->from_revenue ?? 0);
-            $to = $tier->to_revenue !== null && $tier->to_revenue !== '' ? (float)$tier->to_revenue : null;
-
-            if ($revenue < $from) continue;
-            if ($to !== null && $revenue > $to) continue;
-
-            if (!$bestKpi || (float)($tier->from_revenue ?? 0) >= (float)($bestKpi->from_revenue ?? 0)) {
-                $bestKpi = $tier;
-            }
-        }
-
-        $kpiBonus = 0;
-
-        if ($bestKpi) {
-            $bonusType = $bestKpi->bonus_type ?? 'fixed';
-            $bonusAmount = (float)($bestKpi->bonus_amount ?? 0);
-
-            if ($bonusType === 'percent_revenue') {
-                $kpiBonus = $revenue * $bonusAmount / 100;
-            } elseif ($bonusType === 'percent_commission') {
-                $kpiBonus = $commission * $bonusAmount / 100;
-            } elseif ($bonusType === 'salary_percent') {
-                $kpiBonus = $baseSalary * $bonusAmount / 100;
-            } else {
-                $kpiBonus = $bonusAmount;
-            }
-        }
-
-        $totalIncome = $baseSalary + $commission + $kpiBonus;
-        $targetRate = $targetRevenue > 0 ? min(999, ($revenue / $targetRevenue) * 100) : 0;
-
-        $salesRows->push((object)[
-            'id' => $uid,
-            'name' => $u->name ?? ('Sales #' . $uid),
-            'email' => $u->email ?? '',
-            'base_salary' => $baseSalary,
-            'target_revenue' => $targetRevenue,
-            'target_commission' => $targetCommission,
-            'revenue' => $revenue,
-            'paid' => $paid,
-            'debt' => max(0, $revenue - $paid),
-            'order_count' => $orderCount,
-            'commission' => $commission,
-            'commission_rate' => $eligibleRevenueBeforeVat > 0 ? ($commission / $eligibleRevenueBeforeVat) * 100 : 0,
-            'eligible_revenue_before_vat' => $eligibleRevenueBeforeVat,
-            'kpi_bonus' => $kpiBonus,
-            'total_income' => $totalIncome,
-            'target_rate' => $targetRate,
-            'kpi_name' => $bestKpi->tier_name ?? 'Chưa đạt KPI',
-        ]);
-    }
-
-    /* EGO_COMMISSION_POLICY_20260806_START
-     * Đồng bộ số hoa hồng trên dashboard với Controller:
-     * - tính theo tiền thực thu trong kỳ;
-     * - Lead = 0,5%; khách còn lại = 1%;
-     * - không yêu cầu đơn phải thanh toán đủ 100% mới ghi nhận.
-     */
-    $controllerCommissionRows = collect($rows ?? []);
-
-    if ($controllerCommissionRows->isNotEmpty()) {
-        $commissionBySales = $controllerCommissionRows->groupBy(fn($r) => (int)($r->sales_user_id ?? 0));
-
-        $salesRows = $salesRows->map(function ($salesRow) use ($commissionBySales) {
-            $group = collect($commissionBySales->get((int)($salesRow->id ?? 0), []));
-
-            $salesRow->paid = (float)$group->sum(fn($r) => (float)($r->paid_total ?? 0));
-            $salesRow->eligible_revenue_before_vat = (float)$group->sum(fn($r) => (float)($r->total_amount ?? 0));
-            $salesRow->commission = (float)$group->sum(fn($r) => (float)($r->commission_calc ?? 0));
-            $salesRow->debt = max(0, (float)($salesRow->revenue ?? 0) - $salesRow->paid);
-            $salesRow->target_rate = (float)($salesRow->target_revenue ?? 0) > 0
-                ? min(999, ($salesRow->paid / (float)$salesRow->target_revenue) * 100)
-                : 0;
-            $salesRow->commission_rate = $salesRow->eligible_revenue_before_vat > 0
-                ? ($salesRow->commission / $salesRow->eligible_revenue_before_vat) * 100
-                : 0;
-            $salesRow->total_income = (float)($salesRow->base_salary ?? 0)
-                + (float)($salesRow->commission ?? 0)
-                + (float)($salesRow->kpi_bonus ?? 0);
-
-            return $salesRow;
-        });
-    }
-    /* EGO_COMMISSION_POLICY_20260806_END */
-
-    $salesRows = $salesRows->sortByDesc('total_income')->values();
-
-/* EGO_FILTER_SALES_ROWS_START */
-$selectedSalesUser = $filterSalesId > 0
-    ? $salesUsers->firstWhere('id', $filterSalesId)
-    : null;
-
-if ($filterSalesId > 0 && !$selectedSalesUser) {
-    $filterSalesId = 0;
-}
-
-if ($filterSalesId > 0) {
-    $salesRows = $salesRows
-        ->filter(fn($r) => (int)($r->id ?? 0) === $filterSalesId)
-        ->values();
-}
-/* EGO_FILTER_SALES_ROWS_END */
-
-    $totalRevenue = $salesRows->sum('revenue');
-    $totalPaid = $salesRows->sum('paid');
-    $totalDebt = $salesRows->sum('debt');
-    $totalBaseSalary = $salesRows->sum('base_salary');
-    $totalCommission = $salesRows->sum('commission');
-    $totalKpiBonus = $salesRows->sum('kpi_bonus');
-    $totalIncome = $salesRows->sum('total_income');
-    $totalOrders = $salesRows->sum('order_count');
-    $topSales = $salesRows->first();
-    $maxRevenue = max(1, $salesRows->max('revenue') ?: 1);
-
-    $recentOrders = collect();
-
-    $validSalesIds = $salesUsers
-        ->pluck('id')
-        ->map(fn($id) => (int) $id)
-        ->filter(fn($id) => $id > 0)
-        ->values()
-        ->all();
-
-    if ($orderTable && $orderDateCol && $orderTotalCol) {
-        $oq = \Illuminate\Support\Facades\DB::table($orderTable)
-            ->whereBetween($orderDateCol, [$periodFrom, $periodTo]);
-
-        // Chỉ hiện đơn đã có Sales thuộc role Sales, bỏ đơn Sales = ---.
-        if ($orderSalesCol) {
-            if ($filterSalesId > 0) {
-                $oq->where($orderSalesCol, $filterSalesId);
-            } elseif (!empty($validSalesIds)) {
-                $oq->whereIn($orderSalesCol, $validSalesIds);
-            } else {
-                $oq->whereRaw('1 = 0');
-            }
-        } else {
-            $oq->whereRaw('1 = 0');
-        }
-
-        $oq->orderByDesc($orderDateCol)
-            ->limit(200);
-
-        $recentOrders = $oq->get()->map(function ($o) use (
-            $orderCodeCol,
-            $orderDateCol,
-            $orderTotalCol,
-            $orderStatusCol,
-            $orderSalesCol,
-            $salesRows,
-            $customerNameForOrder,
-            $paidAmountForOrder,
-            $isCompletedPaidOrder,
-            $beforeVatAmountForOrder,
-            $commissionTable,
-            $commissionAmountCol,
-            $commissionSalesCol,
-            $commissionDateCol,
-            $periodFrom,
-            $periodTo,
-            $month,
-            $policy,
-            $customerStatusForOrder,
-            $orderProductInfoForOrder,
-            $commissionAmountByRules
-        ) {
-            $sid = $orderSalesCol ? (int)($o->{$orderSalesCol} ?? 0) : 0;
-            $sales = $salesRows->firstWhere('id', $sid);
-            $total = $orderTotalCol ? (float)($o->{$orderTotalCol} ?? 0) : 0;
-            $paid = (float)$paidAmountForOrder($o);
-            $debt = max(0, $total - $paid);
-            $isEligibleCommission = $isCompletedPaidOrder($o, $total, $paid);
-            $orderCommission = 0;
-
-            $beforeVatTotal = (float) $beforeVatAmountForOrder($o);
-            $customerStatusForCommission = $customerStatusForOrder($o);
-            $productInfoForCommission = $orderProductInfoForOrder($o);
-            $monthlyRevenueBeforeVatForSales = (float)($sales->eligible_revenue_before_vat ?? 0);
-
-            if ($isEligibleCommission) {
-                if (
-                    $commissionTable &&
-                    $commissionAmountCol &&
-                    \Illuminate\Support\Facades\Schema::hasColumn($commissionTable, 'order_id') &&
-                    !empty($o->id)
-                ) {
-                    try {
-                        $cq = \Illuminate\Support\Facades\DB::table($commissionTable)
-                            ->where('order_id', $o->id);
-
-                        if ($commissionSalesCol && $sid > 0) {
-                            $cq->where($commissionSalesCol, $sid);
-                        }
-
-                        if ($commissionDateCol) {
-                            if (in_array($commissionDateCol, ['period_month', 'commission_month'], true)) {
-                                $cq->where($commissionDateCol, $month);
-                            } else {
-                                $cq->whereBetween($commissionDateCol, [$periodFrom, $periodTo]);
-                            }
-                        }
-
-                        $orderCommission = (float)$cq->sum($commissionAmountCol);
-                    } catch (\Throwable $e) {
-                        $orderCommission = 0;
-                    }
-                }
-
-                // Nếu chưa có bảng record hoa hồng theo đơn thì tính theo rule đang cấu hình.
-                if ($orderCommission <= 0) {
-                    $orderCommission = $commissionAmountByRules(
-                        $beforeVatTotal,
-                        $total,
-                        $monthlyRevenueBeforeVatForSales,
-                        $customerStatusForCommission,
-                        (float)($productInfoForCommission->quantity ?? 0),
-                        (string)($productInfoForCommission->text ?? '')
-                    );
-                }
-            }
-
-            return (object)[
-                'id' => $o->id ?? null,
-                'code' => $orderCodeCol ? ($o->{$orderCodeCol} ?? ('#' . ($o->id ?? ''))) : ('#' . ($o->id ?? '')),
-                'date' => $orderDateCol ? ($o->{$orderDateCol} ?? '') : '',
-                'customer' => $customerNameForOrder($o),
-                'sales' => $sales->name ?? '---',
-                'total' => $total,
-                'before_vat' => $beforeVatTotal,
-                'paid' => $paid,
-                'debt' => $debt,
-                'commission' => $orderCommission,
-                'commission_rate' => $beforeVatTotal > 0 ? ($orderCommission / $beforeVatTotal) * 100 : 0,
-                'commission_eligible' => $isEligibleCommission,
-                'status' => $orderStatusCol ? ($o->{$orderStatusCol} ?? '') : '',
-            ];
-        });
-    }
-@endphp
 
 <style>
 .sales-dashboard-pro{
@@ -1752,7 +419,10 @@ if ($filterSalesId > 0) {
 /* EGO_EMPLOYEE_FILTER_COMPACT_UI_END */
 </style>
 
-<div class="container-fluid sales-dashboard-pro">
+{{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+     thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+     quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+<div class="container-fluid sales-dashboard-pro tw:py-4">
     <div class="sdp-hero">
         <div class="sdp-hero-inner">
             <div>
@@ -1820,12 +490,12 @@ if ($filterSalesId > 0) {
     </div>
 
     <div class="sdp-stat-grid">
-        <div class="sdp-stat"><span>Doanh thu</span><b>{{ $fmtMoney($totalRevenue) }}</b></div>
-        <div class="sdp-stat"><span>Đã thu</span><b>{{ $fmtMoney($totalPaid) }}</b></div>
-        <div class="sdp-stat"><span>Công nợ</span><b>{{ $fmtMoney($totalDebt) }}</b></div>
-        <div class="sdp-stat"><span>Hoa hồng</span><b>{{ $fmtMoney($totalCommission) }}</b></div>
-        <div class="sdp-stat"><span>KPI thưởng</span><b>{{ $fmtMoney($totalKpiBonus) }}</b></div>
-        <div class="sdp-stat dark"><span>Tổng thu nhập</span><b>{{ $fmtMoney($totalIncome) }}</b></div>
+        <div class="sdp-stat"><span>Doanh thu</span><b>{{ $fmt->money($totalRevenue) }}</b></div>
+        <div class="sdp-stat"><span>Đã thu</span><b>{{ $fmt->money($totalPaid) }}</b></div>
+        <div class="sdp-stat"><span>Công nợ</span><b>{{ $fmt->money($totalDebt) }}</b></div>
+        <div class="sdp-stat"><span>Hoa hồng</span><b>{{ $fmt->money($totalCommission) }}</b></div>
+        <div class="sdp-stat"><span>KPI thưởng</span><b>{{ $fmt->money($totalKpiBonus) }}</b></div>
+        <div class="sdp-stat dark"><span>Tổng thu nhập</span><b>{{ $fmt->money($totalIncome) }}</b></div>
     </div>
 
     <div class="sdp-layout">
@@ -1837,9 +507,9 @@ if ($filterSalesId > 0) {
                         <div class="sdp-sub">Tổng thu nhập = Lương cứng + Hoa hồng đơn hàng + Thưởng KPI.</div>
                     </div>
 
-                    <div class="d-flex gap-2 flex-wrap">
+                    <div class="tw:flex tw:gap-2 flex-wrap">
                         <span class="sdp-chip">Sales: {{ $salesRows->count() }}</span>
-                        <span class="sdp-chip green">Đơn: {{ $fmtNum($totalOrders) }}</span>
+                        <span class="sdp-chip green">Đơn: {{ $fmt->number($totalOrders) }}</span>
                     </div>
                 </div>
 
@@ -1875,23 +545,23 @@ if ($filterSalesId > 0) {
                                     <div class="sdp-name">{{ $r->name }}</div>
                                     <div class="sdp-meta">{{ $r->email }}</div>
                                 </td>
-                                <td><div class="sdp-name">{{ $fmtMoney($r->revenue) }}</div></td>
+                                <td><div class="sdp-name">{{ $fmt->money($r->revenue) }}</div></td>
                                 <td>
-                                    <div class="d-flex align-items-center gap-2">
+                                    <div class="tw:flex tw:items-center tw:gap-2">
                                         <div class="sdp-progress"><span style="width:{{ $rate }}%"></span></div>
-                                        <b>{{ number_format($r->target_rate, 0, ',', '.') }}%</b>
+                                        <b>{{ \App\Support\DisplayFormat::percent($r->target_rate) }}</b>
                                     </div>
-                                    <div class="sdp-meta">Target: {{ $fmtMoney($r->target_revenue) }}</div>
+                                    <div class="sdp-meta">Target: {{ $fmt->money($r->target_revenue) }}</div>
                                 </td>
                                 <td><span class="sdp-chip">{{ $r->order_count }} đơn</span></td>
-                                <td><div class="sdp-name">{{ $fmtMoney($r->base_salary) }}</div></td>
-                                <td><div class="sdp-name text-success">{{ $fmtMoney($r->commission) }}</div></td>
-                                <td><span class="sdp-chip green sdp-rate">{{ $fmtRate($r->commission_rate ?? 0) }}</span></td>
+                                <td><div class="sdp-name">{{ $fmt->money($r->base_salary) }}</div></td>
+                                <td><div class="sdp-name tw:text-[#198754]!">{{ $fmt->money($r->commission) }}</div></td>
+                                <td><span class="sdp-chip green sdp-rate">{{ $fmt->rate($r->commission_rate ?? 0) }}</span></td>
                                 <td>
-                                    <div class="sdp-name">{{ $fmtMoney($r->kpi_bonus) }}</div>
+                                    <div class="sdp-name">{{ $fmt->money($r->kpi_bonus) }}</div>
                                     <div class="sdp-meta">{{ $r->kpi_name }}</div>
                                 </td>
-                                <td><div class="sdp-name text-primary">{{ $fmtMoney($r->total_income) }}</div></td>
+                                <td><div class="sdp-name tw:text-[#0d6efd]!">{{ $fmt->money($r->total_income) }}</div></td>
                                 <td><span class="sdp-chip {{ $statusClass }}">{{ $statusText }}</span></td>
                             </tr>
                         @empty
@@ -1927,7 +597,7 @@ if ($filterSalesId > 0) {
                                 <div class="sdp-bar-fill" style="width:{{ $w }}%"></div>
                             </div>
 
-                            <div class="text-end fw-bold">{{ $fmtMoney($r->revenue) }}</div>
+                            <div class="tw:text-right tw:font-bold">{{ $fmt->money($r->revenue) }}</div>
                         </div>
                     @empty
                         <div class="sdp-empty">Chưa có dữ liệu biểu đồ.</div>
@@ -1942,7 +612,7 @@ if ($filterSalesId > 0) {
                         <div class="sdp-sub">
                             Dùng để đối chiếu nhanh doanh thu, công nợ và Sales phụ trách.
                             @if($filterSalesId > 0)
-                                <span class="sdp-chip green ms-2">Đang lọc theo nhân viên</span>
+                                <span class="sdp-chip green tw:ml-2">Đang lọc theo nhân viên</span>
                             @endif
                         </div>
                     </div>
@@ -1979,7 +649,7 @@ if ($filterSalesId > 0) {
                             <tr>
                                 <td>
                                     @if(!empty($o->id))
-                                        <a class="sdp-chip text-decoration-none"
+                                        <a class="sdp-chip tw:no-underline"
                                            href="{{ url('/orders/' . $o->id) }}">
                                             {{ $o->code }}
                                         </a>
@@ -1987,7 +657,7 @@ if ($filterSalesId > 0) {
                                         <span class="sdp-chip">{{ $o->code }}</span>
                                     @endif
 
-                                    <div class="sdp-meta mt-1">
+                                    <div class="sdp-meta tw:mt-1">
                                         @if($o->date)
                                             {{ \Carbon\Carbon::parse($o->date)->format('d/m/Y') }}
                                         @else
@@ -2002,25 +672,25 @@ if ($filterSalesId > 0) {
                                 </td>
 
                                 <td>
-                                    <div class="sdp-name">{{ $fmtMoney($o->total) }}</div>
-                                    <div class="sdp-meta">Trước VAT: {{ $fmtMoney($o->before_vat ?? 0) }}</div>
+                                    <div class="sdp-name">{{ $fmt->money($o->total) }}</div>
+                                    <div class="sdp-meta">Trước VAT: {{ $fmt->money($o->before_vat ?? 0) }}</div>
                                 </td>
 
                                 <td>
-                                    <div class="sdp-name text-success">{{ $fmtMoney($o->paid) }}</div>
+                                    <div class="sdp-name tw:text-[#198754]!">{{ $fmt->money($o->paid) }}</div>
 
                                     @if(($o->debt ?? 0) <= 0 && ($o->total ?? 0) > 0)
-                                        <span class="sdp-chip green mt-1">Đủ tiền</span>
+                                        <span class="sdp-chip green tw:mt-1">Đủ tiền</span>
                                     @else
-                                        <span class="sdp-chip red mt-1">Nợ {{ $fmtMoney($o->debt ?? 0) }}</span>
+                                        <span class="sdp-chip red tw:mt-1">Nợ {{ $fmt->money($o->debt ?? 0) }}</span>
                                     @endif
                                 </td>
 
                                 <td>
                                     @if(!empty($o->commission_eligible))
-                                        <div class="sdp-name text-success">{{ $fmtMoney($o->commission ?? 0) }}</div>
+                                        <div class="sdp-name tw:text-[#198754]!">{{ $fmt->money($o->commission ?? 0) }}</div>
                                         <div class="sdp-meta">
-                                            {{ $fmtRate($o->commission_rate ?? (((float)($o->before_vat ?? 0) > 0) ? (((float)($o->commission ?? 0) / (float)($o->before_vat ?? 1)) * 100) : 0)) }}
+                                            {{ $fmt->rate($o->commission_rate ?? (((float)($o->before_vat ?? 0) > 0) ? (((float)($o->commission ?? 0) / (float)($o->before_vat ?? 1)) * 100) : 0)) }}
                                         </div>
                                     @else
                                         <span class="sdp-chip gray">Chưa tính</span>
@@ -2055,10 +725,10 @@ if ($filterSalesId > 0) {
                             <p>{{ $topSales->email }}</p>
 
                             <div class="sdp-income-grid">
-                                <div class="sdp-income"><span>Doanh thu</span><b>{{ $fmtMoney($topSales->revenue) }}</b></div>
-                                <div class="sdp-income"><span>Thu nhập</span><b>{{ $fmtMoney($topSales->total_income) }}</b></div>
-                                <div class="sdp-income"><span>Hoa hồng</span><b>{{ $fmtMoney($topSales->commission) }}</b></div>
-                                <div class="sdp-income"><span>KPI</span><b>{{ $fmtMoney($topSales->kpi_bonus) }}</b></div>
+                                <div class="sdp-income"><span>Doanh thu</span><b>{{ $fmt->money($topSales->revenue) }}</b></div>
+                                <div class="sdp-income"><span>Thu nhập</span><b>{{ $fmt->money($topSales->total_income) }}</b></div>
+                                <div class="sdp-income"><span>Hoa hồng</span><b>{{ $fmt->money($topSales->commission) }}</b></div>
+                                <div class="sdp-income"><span>KPI</span><b>{{ $fmt->money($topSales->kpi_bonus) }}</b></div>
                             </div>
                         @else
                             <p>Chưa có dữ liệu Sales.</p>
@@ -2075,13 +745,13 @@ if ($filterSalesId > 0) {
                     </div>
                 </div>
 
-                <div class="p-3 d-grid gap-2">
-                    <div class="sdp-stat m-0"><span>Công trình</span><b>{{ $fmtPercent($policy->project_rate_percent ?? 4) }}</b></div>
-                    <div class="sdp-stat m-0"><span>Thương mại</span><b>{{ $fmtPercent($policy->trade_rate_percent ?? 1) }}</b></div>
-                    <div class="sdp-stat m-0"><span>Tấm pin</span><b>{{ $fmtMoney($policy->panel_fixed_amount ?? 0) }}</b></div>
+                <div class="tw:p-4 d-grid tw:gap-2">
+                    <div class="sdp-stat m-0"><span>Công trình</span><b>{{ $fmt->percent($policy->project_rate_percent ?? 4) }}</b></div>
+                    <div class="sdp-stat m-0"><span>Thương mại</span><b>{{ $fmt->percent($policy->trade_rate_percent ?? 1) }}</b></div>
+                    <div class="sdp-stat m-0"><span>Tấm pin</span><b>{{ $fmt->money($policy->panel_fixed_amount ?? 15000) }}</b></div>
                     <div class="sdp-stat m-0 dark"><span>Rule bật</span><b>{{ $activeRules }}</b></div>
 
-                    <a class="sdp-btn sdp-btn-main mt-2" href="{{ route('sales.commissions.settings', ['month' => $month]) }}">
+                    <a class="sdp-btn sdp-btn-main tw:mt-2" href="{{ route('sales.commissions.settings', ['month' => $month]) }}">
                         Sửa chính sách tháng này
                     </a>
                 </div>
@@ -2095,7 +765,7 @@ if ($filterSalesId > 0) {
                     </div>
                 </div>
 
-                <div class="p-3 d-grid gap-2">
+                <div class="tw:p-4 d-grid tw:gap-2">
                     <span class="sdp-chip {{ !empty($policy->only_paid) ? 'green' : 'gray' }}">Đã thanh toán</span>
                     <span class="sdp-chip {{ !empty($policy->only_shipped) ? 'green' : 'gray' }}">Đã xuất kho</span>
                     <span class="sdp-chip {{ !empty($policy->only_completed) ? 'green' : 'gray' }}">Hoàn tất đơn</span>
@@ -2108,46 +778,8 @@ if ($filterSalesId > 0) {
 
 
 {{-- EGO_SALES_MANAGER_DROPDOWN_START --}}
-@php
-    $egoSalesManagerOptions = collect();
-
-    try {
-        $egoSalesManagerOptions = \App\Models\User::query()
-            ->get()
-            ->filter(function ($u) {
-                $roles = [];
-
-                foreach (['role', 'type', 'position', 'department'] as $field) {
-                    if (!empty($u->{$field})) {
-                        $roles[] = mb_strtolower((string) $u->{$field});
-                    }
-                }
-
-                if (method_exists($u, 'getRoleNames')) {
-                    foreach ($u->getRoleNames() as $roleName) {
-                        $roles[] = mb_strtolower((string) $roleName);
-                    }
-                }
-
-                $roleText = implode('|', array_unique(array_filter($roles)));
-
-                return str_contains($roleText, 'sales_manager')
-                    || str_contains($roleText, 'sales manager')
-                    || str_contains($roleText, 'trưởng phòng sales')
-                    || str_contains($roleText, 'truong_phong_sales')
-                    || str_contains($roleText, 'manager_sales');
-            })
-            ->map(function ($u) {
-                return [
-                    'id' => (string) $u->id,
-                    'name' => (string) ($u->name ?? $u->email ?? ('User #' . $u->id)),
-                ];
-            })
-            ->values();
-    } catch (\Throwable $e) {
-        $egoSalesManagerOptions = collect();
-    }
-@endphp
+{{-- $egoSalesManagerOptions do App\Services\Sales\SalesManagerDirectory cung cấp
+     qua ViewComposerServiceProvider — KHÔNG truy vấn User trong Blade. --}}
 
 <script>
 (function () {

@@ -6,10 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
 use App\Models\OvertimeRequest;
 use App\Models\User;
+use App\Support\SchemaCache;
+use App\View\Presenters\Hr\OvertimeListPresenter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller quản lý đơn đăng ký tăng ca của nhân viên.
@@ -81,14 +82,14 @@ class OvertimeRequestController extends Controller
 
         $employees = $canManage ? $this->employeeOptions() : collect();
 
-        return view('hr.overtime.index', compact(
-            'requests',
-            'summary',
-            'employees',
-            'month',
-            'status',
-            'userId',
-            'canManage'
+        return view('hr.overtime.index', array_merge(
+            compact('requests', 'summary', 'employees', 'month', 'status', 'userId', 'canManage'),
+            app(OvertimeListPresenter::class)->viewData(
+                requests: $requests,
+                summary: $summary,
+                currentUserId: (int) ($user->id ?? 0),
+                canManage: $canManage,
+            )
         ));
     }
 
@@ -287,7 +288,7 @@ class OvertimeRequestController extends Controller
     {
         $query = User::query()->orderBy('name');
 
-        if (Schema::hasColumn('users', 'is_active')) {
+        if (SchemaCache::hasColumn('users', 'is_active')) {
             $query->where('is_active', 1);
         }
 
@@ -301,7 +302,7 @@ class OvertimeRequestController extends Controller
     {
         return User::query()
             ->with('department')
-            ->when(Schema::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
+            ->when(SchemaCache::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'department_id']);
     }

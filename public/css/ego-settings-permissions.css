@@ -321,3 +321,166 @@
 @media(max-width:991.98px){.ego-settings-shell{padding:12px}.ego-settings-layout{grid-template-columns:1fr}.ego-settings-nav-card{position:static}.ego-settings-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.ego-settings-principle{display:none}.ego-settings-role-layout,.ego-settings-permission-layout{grid-template-columns:1fr}.ego-settings-role-list-card{position:static}.ego-settings-role-list{display:flex;max-height:none;overflow-x:auto}.ego-settings-role-list a{min-width:180px}.ego-settings-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.ego-settings-hero{align-items:flex-start;flex-direction:column}.ego-settings-live{align-self:flex-start}.ego-settings-nav{grid-template-columns:1fr 1fr}.ego-settings-overview-grid,.ego-settings-permission-grid,.ego-settings-form-grid{grid-template-columns:1fr}.ego-settings-action-checks{grid-template-columns:1fr}.ego-settings-form-full{grid-column:auto}.ego-settings-card-head{align-items:flex-start;flex-direction:column}.ego-settings-toolbar{width:100%}.ego-settings-search{width:100%;min-width:0}.ego-settings-savebar{align-items:stretch;flex-direction:column}.ego-settings-savebar .ego-settings-btn{width:100%}.ego-settings-users{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.ego-settings-shell *{animation:none!important;transition:none!important}}
+
+/* ==========================================================================
+   Ma trận quyền CRUD (màn "Quyền thao tác")
+   --------------------------------------------------------------------------
+   Mỗi trang một hàng, bốn cột Xem / Thêm / Sửa / Xoá. Bảng dạng ma trận để
+   đối chiếu được cả hàng lẫn cột — danh sách phẳng không làm được việc đó.
+
+   Viết theo hệ thiết kế của chính file này (biến --esp-*, viền #dfe8ef, chữ
+   ~10.5px) chứ KHÔNG dùng Bootstrap: ứng dụng chỉ nạp bộ icon Bootstrap, không
+   nạp Bootstrap CSS, nên class .table/.btn sẽ không có tác dụng.
+   ========================================================================== */
+
+.ego-crud-matrix-wrap{
+    margin:0 14px 14px;
+    border:1px solid var(--esp-border);
+    border-radius:14px;
+    background:#fff;
+    overflow:auto;              /* bảng rộng thì cuộn trong khung, không đẩy trang */
+    max-height:62vh;
+}
+
+.ego-crud-matrix{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    font-size:10.5px;
+}
+
+/* Hàng tiêu đề dính khi cuộn dọc — cuộn xuống cuối vẫn biết đang ở cột nào. */
+.ego-crud-matrix thead th{
+    position:sticky;
+    top:0;
+    z-index:2;
+    padding:10px 8px;
+    border-bottom:1px solid var(--esp-border);
+    background:#f7fafc;
+    color:#5d7890;
+    font-size:9.5px;
+    font-weight:900;
+    letter-spacing:.03em;
+    text-align:center;
+    vertical-align:bottom;
+    white-space:nowrap;
+}
+.ego-crud-matrix thead th i{display:block;margin-bottom:3px;color:#087fa4;font-size:13px}
+.ego-crud-matrix thead th.is-destructive i{color:var(--esp-danger)}
+
+/* Cột đầu (tên trang) dính khi cuộn ngang. */
+.ego-crud-matrix__module{
+    position:sticky;
+    left:0;
+    z-index:1;
+    min-width:230px;
+    padding:9px 12px;
+    background:#fff;
+    text-align:left;
+    font-weight:600;
+}
+.ego-crud-matrix thead .ego-crud-matrix__module{z-index:3;background:#f7fafc}
+.ego-crud-matrix tbody .ego-crud-matrix__module{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    border-bottom:1px solid #edf2f5;
+}
+.ego-crud-matrix tbody .ego-crud-matrix__module>i{
+    display:grid;place-items:center;
+    flex:0 0 auto;
+    width:28px;height:28px;
+    border-radius:9px;
+    color:#087fa4;background:#eaf8fc;
+    font-size:13px;
+}
+.ego-crud-matrix tbody .ego-crud-matrix__module>span{flex:1 1 auto;min-width:0}
+.ego-crud-matrix__module strong{display:block;color:#193a54;font-size:11px;font-weight:800}
+.ego-crud-matrix__module code{display:block;margin-top:2px;color:#8b9aa8;font-size:8.8px}
+
+.ego-crud-matrix tbody tr:hover .ego-crud-matrix__module,
+.ego-crud-matrix tbody tr:hover td{background:#f6fcfe}
+
+/* Cột thao tác: cố định bề rộng để 4 cột đều nhau dù nhãn dài ngắn khác nhau. */
+.ego-crud-matrix__action{width:92px;min-width:92px}
+
+.ego-crud-matrix td{
+    padding:9px 8px;
+    border-bottom:1px solid #edf2f5;
+    background:#fff;
+    text-align:center;
+}
+.ego-crud-matrix td.is-destructive{background:#fffafb}
+.ego-crud-matrix tbody tr:hover td.is-destructive{background:#fff4f6}
+
+/* Ô tick: input thật bị ẩn, hộp vuông vẽ bằng span để tô màu được. */
+.ego-crud-matrix td label{display:inline-flex;cursor:pointer}
+.ego-crud-matrix td input{position:absolute;opacity:0;width:0;height:0}
+.ego-crud-matrix__box{
+    position:relative;
+    display:block;
+    width:19px;height:19px;
+    border:1.5px solid #c7d5e0;
+    border-radius:6px;
+    background:#fff;
+    transition:.15s ease;
+}
+.ego-crud-matrix__box::after{
+    content:"";
+    position:absolute;
+    top:2px;left:6px;
+    width:4px;height:9px;
+    border:solid #fff;
+    border-width:0 2px 2px 0;
+    transform:rotate(45deg) scale(.4);
+    opacity:0;
+    transition:.15s ease;
+}
+.ego-crud-matrix td label:hover .ego-crud-matrix__box{border-color:var(--esp-cyan)}
+.ego-crud-matrix input:checked+.ego-crud-matrix__box{
+    border-color:var(--esp-cyan);
+    background:linear-gradient(135deg,var(--esp-cyan),var(--esp-teal));
+}
+.ego-crud-matrix input:checked+.ego-crud-matrix__box::after{opacity:1;transform:rotate(45deg) scale(1)}
+.ego-crud-matrix td.is-destructive input:checked+.ego-crud-matrix__box{
+    border-color:var(--esp-danger);
+    background:linear-gradient(135deg,#e2536a,var(--esp-danger));
+}
+.ego-crud-matrix input:focus-visible+.ego-crud-matrix__box{outline:2px solid var(--esp-cyan);outline-offset:2px}
+
+/* Khoá (vai trò admin): vẫn thấy trạng thái nhưng không bấm được. */
+.ego-crud-matrix input:disabled+.ego-crud-matrix__box{opacity:.55;cursor:not-allowed}
+.ego-crud-matrix td:has(input:disabled) label{cursor:not-allowed}
+
+/* Trang không có thao tác này */
+.ego-crud-matrix__na{color:#c3cfd9;font-size:12px;user-select:none}
+
+/* Nút "tất cả" bật/tắt cả hàng hoặc cả cột */
+.ego-crud-matrix__toggle{
+    margin-left:auto;
+    padding:3px 7px;
+    border:1px solid #d7e3ec;
+    border-radius:99px;
+    background:#fff;
+    color:#6b8194;
+    font-size:8.5px;
+    font-weight:800;
+    line-height:1.4;
+    cursor:pointer;
+    transition:.15s ease;
+}
+.ego-crud-matrix thead .ego-crud-matrix__toggle{display:block;margin:4px auto 0}
+.ego-crud-matrix__toggle:hover{border-color:var(--esp-cyan);color:#087fa4;background:#eaf8fc}
+.ego-crud-matrix__toggle[hidden]{display:none!important}
+
+/* Bảng bị khoá toàn bộ (vai trò admin) */
+.ego-crud-matrix-wrap.is-locked{background:#fbfcfd}
+
+@media(max-width:900px){
+    .ego-crud-matrix__module{min-width:170px}
+    .ego-crud-matrix__module code{display:none}
+}
+
+/* Thông báo "vai trò admin bị khoá" — dùng tông trung tính, không phải lỗi. */
+.ego-settings-explain--locked{border-color:#e0d6b8!important;background:#fdf9ec!important}
+.ego-settings-explain--locked>i{color:#a9852a!important;background:#f7edd2!important}

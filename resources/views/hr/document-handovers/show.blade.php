@@ -12,7 +12,7 @@
 
 <div class="hs-page">
     @if(session('success'))
-        <div class="alert alert-success" style="border-radius:16px;font-weight:800">{{ session('success') }}</div>
+        <x-ui.alert variant="success" style="border-radius:16px;font-weight:800">{{ session('success') }}</x-ui.alert>
     @endif
 
     <div class="hs-hero">
@@ -178,7 +178,7 @@
                                 <button type="button"
                                         class="hs-btn success tiny"
                                         onclick="openHsPreview('{{ route('hr.document-handovers.files.preview', [$item->id, $file->id]) }}', '{{ addslashes($file->original_name ?: basename($file->path)) }}')">
-                                    Xem trước
+                                    Xem
                                 </button>
 
                                 <a class="hs-btn soft tiny" href="{{ route('hr.document-handovers.files.download', [$item->id, $file->id]) }}">
@@ -241,11 +241,69 @@
     </div>
 </div>
 
+
+{{-- MODAL XEM FILE CHÍNH GIỮA MÀN HÌNH --}}
+<div class="hs-preview-modal" id="hsPreviewModal" aria-hidden="true">
+    <div class="hs-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="hsPreviewTitle">
+        <div class="hs-preview-head">
+            <div class="hs-preview-title" id="hsPreviewTitle">Xem file</div>
+
+            <button
+                type="button"
+                class="hs-preview-close"
+                onclick="closeHsPreview()"
+                aria-label="Đóng cửa sổ xem file"
+            >
+                ×
+            </button>
+        </div>
+
+        <div class="hs-preview-body">
+            <iframe
+                id="hsPreviewFrame"
+                src="about:blank"
+                title="Nội dung file"
+                loading="lazy"
+                allowfullscreen
+            ></iframe>
+        </div>
+    </div>
+</div>
+
 <script>
 function openHsModal(id){const el=document.getElementById(id);if(!el)return;el.classList.add('show');document.body.style.overflow='hidden'}
 function closeHsModal(id){const el=document.getElementById(id);if(!el)return;el.classList.remove('show');document.body.style.overflow=''}
-function openHsPreview(url,title){const modal=document.getElementById('hsPreviewModal');const frame=document.getElementById('hsPreviewFrame');const ttl=document.getElementById('hsPreviewTitle');if(!modal||!frame)return;ttl.textContent=title||'Xem trước file';frame.src=url;modal.classList.add('show');document.body.style.overflow='hidden'}
-function closeHsPreview(){const modal=document.getElementById('hsPreviewModal');const frame=document.getElementById('hsPreviewFrame');if(!modal||!frame)return;modal.classList.remove('show');frame.src='about:blank';document.body.style.overflow=''}
+function openHsPreview(url, title) {
+    const modal = document.getElementById('hsPreviewModal');
+    const frame = document.getElementById('hsPreviewFrame');
+    const titleElement = document.getElementById('hsPreviewTitle');
+
+    if (!modal || !frame) {
+        return;
+    }
+
+    if (titleElement) {
+        titleElement.textContent = title || 'Xem file';
+    }
+
+    frame.src = url;
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+}
+function closeHsPreview() {
+    const modal = document.getElementById('hsPreviewModal');
+    const frame = document.getElementById('hsPreviewFrame');
+
+    if (!modal || !frame) {
+        return;
+    }
+
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    frame.src = 'about:blank';
+    document.body.style.overflow = '';
+}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.hs-modal.show,.hs-preview-modal.show').forEach(el=>el.classList.remove('show'));const f=document.getElementById('hsPreviewFrame');if(f)f.src='about:blank';document.body.style.overflow=''}});
 document.addEventListener('click',e=>{if(e.target.classList&&e.target.classList.contains('hs-modal')){e.target.classList.remove('show');document.body.style.overflow=''}if(e.target.classList&&e.target.classList.contains('hs-preview-modal')){closeHsPreview()}});
 </script>

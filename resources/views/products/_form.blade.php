@@ -1,5 +1,15 @@
+{{--
+    EGO_VIEW_CHET — VIEW CHẾT, KHÔNG AI RENDER (rà soát 2026-09-04)
+
+    Không @include nào gọi partial này. products/create và products/edit dựng form ngay trong tệp của chúng.
+
+    Partial mồ côi.
+
+    CHƯA XOÁ theo yêu cầu: chỉ đánh dấu để lần sau khỏi rà lại.
+    Nếu bạn đấu view này vào một route/@include, hãy XOÁ dấu này —
+    tests/Feature/View/DeadViewsMarkedTest.php sẽ báo đỏ để nhắc.
+--}}
 @php
-    use Illuminate\Support\Facades\Schema;
 
     $productInstance = $product ?? null;
 
@@ -19,9 +29,9 @@
 
     $buttonText = $buttonText ?? ($productInstance ? 'Cập nhật sản phẩm' : 'Tạo sản phẩm');
 
-    $serialCol = Schema::hasColumn('crm_product_stock','serials')
+    $serialCol = \App\Support\SchemaCache::hasColumn('crm_product_stock','serials')
         ? 'serials'
-        : (Schema::hasColumn('crm_product_stock','serials_json') ? 'serials_json' : null);
+        : (\App\Support\SchemaCache::hasColumn('crm_product_stock','serials_json') ? 'serials_json' : null);
 
     // Giá vốn
     $costBeforeVat = old('price_agent', $productInstance?->price_agent ?? 0);
@@ -50,7 +60,8 @@
         box-shadow:0 8px 20px rgba(2,6,23,.05);
         overflow:hidden;
     }
-    .ego-card .card-header{
+    .ego-card .card-header,
+    .ego-card [data-ego-card-header]{
         background: var(--ego06);
         border-bottom:1px solid rgba(2,6,23,.06);
     }
@@ -102,26 +113,26 @@
     }
 </style>
 
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+<div class="tw:flex flex-wrap tw:items-center tw:justify-between tw:gap-2 mb-3">
     <div class="small text-muted">Nhập thông tin sản phẩm và lưu để cập nhật hệ thống.</div>
-    <div class="d-flex gap-2">
+    <div class="tw:flex tw:gap-2">
         <a href="{{ url()->previous() }}" class="btn btn-outline-secondary">Quay lại</a>
         <button type="submit" class="btn btn-ego">{{ $buttonText }}</button>
     </div>
 </div>
 
-<div class="row g-3">
+<div class="tw:row tw:g-3">
     {{-- LEFT --}}
-    <div class="col-lg-8">
-        <div class="card ego-card">
-            <div class="card-header px-3 py-3">
+    <div class="tw:min-[62rem]:col12-8">
+        <x-ui.card class="ego-card">
+            <x-ui.card-header class="tw:px-4 tw:py-4">
                 <div class="fw-bold">Thông tin cơ bản</div>
                 <div class="small text-muted">Tên, mô tả, SKU, danh mục và thương hiệu.</div>
-            </div>
+            </x-ui.card-header>
 
-            <div class="card-body p-3 p-md-4">
+            <x-ui.card-body class="tw:p-4">
                 <div class="mb-3">
-                    <label class="form-label ego-label">Tên sản phẩm <span class="text-danger">*</span></label>
+                    <label class="form-label ego-label">Tên sản phẩm <span class="tw:text-[#dc3545]">*</span></label>
                     <input type="text" name="name" class="form-control"
                            value="{{ old('name', $productInstance?->name ?? '') }}" required>
                 </div>
@@ -131,14 +142,14 @@
                     <textarea name="note" class="form-control" rows="3">{{ old('note', $productInstance?->note ?? '') }}</textarea>
                 </div>
 
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label ego-label">Mã SKU <span class="text-danger">*</span></label>
+                <div class="tw:row tw:g-3">
+                    <div class="tw:md:col12-6">
+                        <label class="form-label ego-label">Mã SKU <span class="tw:text-[#dc3545]">*</span></label>
                         <input type="text" name="sku" class="form-control"
                                value="{{ old('sku', $productInstance?->sku ?? '') }}" required>
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="tw:md:col12-6">
                         <label class="form-label ego-label">Danh mục</label>
                         <select name="category_id" class="form-select">
                             @foreach($categories as $cat)
@@ -151,8 +162,8 @@
                     </div>
                 </div>
 
-                <div class="row g-3 mt-0">
-                    <div class="col-md-6">
+                <div class="tw:row tw:g-3 tw:mt-0">
+                    <div class="tw:md:col12-6">
                         <label class="form-label ego-label">Brand</label>
                         <select name="brand_id" class="form-select">
                             <option value="">-- Không chọn --</option>
@@ -163,12 +174,12 @@
                                 </option>
                             @endforeach
                         </select>
-                        <div class="ego-hint mt-1">Giúp chuẩn hoá thương hiệu, dễ tìm kiếm.</div>
+                        <div class="ego-hint tw:mt-1">Giúp chuẩn hoá thương hiệu, dễ tìm kiếm.</div>
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="tw:md:col12-6">
                         <label class="form-label ego-label">Serial/IMEI</label>
-                        <div class="form-check form-switch mt-1">
+                        <div class="form-check form-switch tw:mt-1">
                             <input class="form-check-input" type="checkbox" id="is_serialized" name="is_serialized" value="1"
                                    {{ $isSerialized ? 'checked' : '' }}>
                             <label class="form-check-label" for="is_serialized">
@@ -178,34 +189,34 @@
                         <div class="ego-hint">Bật để nhập serial (qty sẽ tự tính theo serial).</div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </x-ui.card-body>
+        </x-ui.card>
 
         {{-- STOCK --}}
-        <div class="card ego-card mt-3">
-            <div class="card-header px-3 py-3">
+        <x-ui.card class="ego-card tw:mt-4">
+            <x-ui.card-header class="tw:px-4 tw:py-4">
                 <div class="fw-bold">Tồn kho</div>
                 <div class="small text-muted">Theo công ty, theo kho, tự tạo lô khi tăng số lượng.</div>
-            </div>
+            </x-ui.card-header>
 
-            <div class="card-body p-3 p-md-4">
-                <div class="d-flex justify-content-between align-items-center mb-2">
+            <x-ui.card-body class="tw:p-4">
+                <div class="tw:flex tw:justify-between tw:items-center tw:mb-2">
                     <div class="fw-bold">Tổng tồn kho</div>
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                         <span class="text-muted">Tổng:</span>
-                        <input type="text" id="total_qty_display" class="form-control form-control-sm text-center fw-bold"
+                        <input type="text" id="total_qty_display" class="form-control form-control-sm tw:text-center fw-bold"
                                style="width:110px" value="{{ (int)$totalQty }}" disabled>
                     </div>
                 </div>
 
-                <div class="row g-3">
+                <div class="tw:row tw:g-3">
                     @foreach($companies as $c)
                         @php
                             $cid = (int)$c->id;
                             $ws = $companyWarehouses[$cid] ?? collect();
                         @endphp
 
-                        <div class="col-md-6">
+                        <div class="tw:md:col12-6">
                             <div class="ego-company-box">
                                 <div class="ego-company-title">{{ $c->name }}</div>
 
@@ -214,8 +225,8 @@
                                         <thead>
                                         <tr>
                                             <th>Kho</th>
-                                            <th style="width:140px" class="text-center">Tồn sau nhập</th>
-                                            <th style="width:160px" class="text-center serial-col">Serial/IMEI</th>
+                                            <th style="width:140px" class="tw:text-center">Tồn sau nhập</th>
+                                            <th style="width:160px" class="tw:text-center serial-col">Serial/IMEI</th>
                                         </tr>
                                         </thead>
                                         <tbody>
@@ -238,23 +249,23 @@
 
                                             <tr>
                                                 <td>
-                                                    <div class="fw-semibold">{{ $w->name }}</div>
+                                                    <div class="tw:font-semibold">{{ $w->name }}</div>
                                                     @if(!empty($w->location))
                                                         <div class="text-muted small">{{ $w->location }}</div>
                                                     @endif
                                                 </td>
 
-                                                <td class="text-center">
+                                                <td class="tw:text-center">
                                                     <input type="number"
                                                            min="0"
-                                                           class="form-control form-control-sm text-center js-warehouse-qty"
+                                                           class="form-control form-control-sm tw:text-center js-warehouse-qty"
                                                            data-company-id="{{ $cid }}"
                                                            data-warehouse-id="{{ $wid }}"
                                                            name="stocks[{{ $cid }}][{{ $wid }}][qty]"
                                                            value="{{ $currentQty }}">
                                                 </td>
 
-                                                <td class="text-center serial-col">
+                                                <td class="tw:text-center serial-col">
                                                     <button type="button"
                                                             class="btn btn-sm btn-outline-primary ego-serial-btn"
                                                             onclick="openSerialModal({{ $cid }}, {{ $wid }}, '{{ addslashes($w->name) }}')">
@@ -268,7 +279,7 @@
                                                 </td>
                                             </tr>
                                         @empty
-                                            <tr><td colspan="3" class="text-center text-muted py-3">Chưa có kho</td></tr>
+                                            <tr><td colspan="3" class="tw:text-center text-muted tw:py-4">Chưa có kho</td></tr>
                                         @endforelse
                                         </tbody>
                                     </table>
@@ -278,26 +289,26 @@
                     @endforeach
                 </div>
 
-                <div class="alert alert-info mt-3 mb-0" style="border-radius:14px;">
+                <x-ui.alert variant="info" class="tw:mt-4 tw:mb-0" style="border-radius:14px;">
                     <i class="bi bi-info-circle"></i>
                     <b>Lưu ý lô hàng:</b> Khi bạn tăng <b>Tồn sau nhập</b>, hệ thống sẽ tự tạo <b>lô nhập mới</b>
                     theo <b>Giá vốn trước VAT</b> và <b>VAT giá vốn</b> hiện tại. Khi xuất đơn hàng, hệ thống tự trừ
                     lô còn tồn lâu nhất trước.
-                </div>
-            </div>
-        </div>
+                </x-ui.alert>
+            </x-ui.card-body>
+        </x-ui.card>
     </div>
 
     {{-- RIGHT --}}
-    <div class="col-lg-4">
+    <div class="tw:min-[62rem]:col12-4">
         {{-- BẢNG GIÁ VỐN --}}
-        <div class="card ego-card">
-            <div class="card-header px-3 py-3">
+        <x-ui.card class="ego-card">
+            <x-ui.card-header class="tw:px-4 tw:py-4">
                 <div class="fw-bold">Bảng giá vốn</div>
                 <div class="small text-muted">Giá vốn trước VAT / VAT / Giá vốn sau VAT.</div>
-            </div>
+            </x-ui.card-header>
 
-            <div class="card-body p-0">
+            <x-ui.card-body class="tw:p-0">
                 <div class="table-responsive">
                     <table class="table table-bordered align-middle mb-0">
                         <thead class="table-light">
@@ -350,17 +361,17 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
+            </x-ui.card-body>
+        </x-ui.card>
 
         {{-- BẢNG GIÁ BÁN --}}
-        <div class="card ego-card mt-3">
-            <div class="card-header px-3 py-3">
+        <x-ui.card class="ego-card tw:mt-4">
+            <x-ui.card-header class="tw:px-4 tw:py-4">
                 <div class="fw-bold">Bảng giá bán</div>
                 <div class="small text-muted">Giá bán mặc định / loại giá / Giá trước VAT / VAT / Giá sau VAT.</div>
-            </div>
+            </x-ui.card-header>
 
-            <div class="card-body p-0">
+            <x-ui.card-body class="tw:p-0">
                 <div class="table-responsive">
                     <table class="table table-hover table-bordered align-middle mb-0">
                         <thead class="table-light">
@@ -374,7 +385,7 @@
                         <tbody>
                             {{-- GIÁ BÁN MẶC ĐỊNH --}}
                             <tr>
-                                <td class="fw-semibold">Giá bán mặc định</td>
+                                <td class="tw:font-semibold">Giá bán mặc định</td>
 
                                 <td>
                                     <div class="input-group input-group-sm">
@@ -426,7 +437,7 @@
                                 $afterVat = is_array($tierRow) ? ($tierRow['after_vat'] ?? 0) : 0;
                             @endphp
                             <tr>
-                                <td class="fw-semibold">{{ $tier->name }}</td>
+                                <td class="tw:font-semibold">{{ $tier->name }}</td>
 
                                 <td>
                                     <div class="input-group input-group-sm">
@@ -470,25 +481,25 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="text-center text-muted py-3">Chưa có loại giá</td>
+                                <td colspan="4" class="tw:text-center text-muted tw:py-4">Chưa có loại giá</td>
                             </tr>
                         @endforelse
                         </tbody>
                     </table>
                 </div>
-                <div class="px-3 py-2 ego-hint">Tip: để trống giá nếu loại giá đó không sử dụng.</div>
-            </div>
-        </div>
+                <div class="tw:px-4 tw:py-2 ego-hint">Tip: để trống giá nếu loại giá đó không sử dụng.</div>
+            </x-ui.card-body>
+        </x-ui.card>
 
         {{-- Actions --}}
-        <div class="card ego-card mt-3">
-            <div class="card-body p-3 p-md-4">
-                <div class="d-grid gap-2">
+        <x-ui.card class="ego-card tw:mt-4">
+            <x-ui.card-body class="tw:p-4">
+                <div class="d-grid tw:gap-2">
                     <button type="submit" class="btn btn-ego btn-lg">{{ $buttonText }}</button>
                     <a href="{{ url()->previous() }}" class="btn btn-outline-secondary">Hủy / Quay lại</a>
                 </div>
-            </div>
-        </div>
+            </x-ui.card-body>
+        </x-ui.card>
     </div>
 </div>
 
@@ -504,20 +515,20 @@
             </div>
 
             <div class="modal-body">
-                <div class="alert alert-info">
+                <x-ui.alert variant="info">
                     <b>Hướng dẫn:</b> mỗi serial 1 dòng. Tự IN HOA. Chỉ A-Z, 0-9, -, _, / (6-50 ký tự).
-                </div>
+                </x-ui.alert>
 
                 <div id="serial-errors" style="display:none;"></div>
 
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <b>Đã nhập: <span id="serial-entered-count" class="text-primary">0</span></b>
+                <div class="tw:flex tw:justify-between tw:items-center tw:mb-2">
+                    <b>Đã nhập: <span id="serial-entered-count" class="tw:text-[#0d6efd]">0</span></b>
                 </div>
 
                 <textarea id="serial-textarea" class="form-control font-monospace" rows="10"
                           placeholder="56000NAW258L1292&#10;56000NAW258L1293"></textarea>
 
-                <div id="serial-list-preview" class="mt-3"></div>
+                <div id="serial-list-preview" class="tw:mt-4"></div>
             </div>
 
             <div class="modal-footer">
@@ -595,19 +606,19 @@ function updateEnteredCount() {
     }
 
     preview.innerHTML =
-        '<div class="small text-muted mb-1">Preview:</div>' +
-        '<div class="border rounded p-2 bg-light" style="max-height:180px;overflow:auto;">' +
-        serials.map((s, idx) => `<span class="badge bg-secondary me-1 mb-1">${idx+1}. ${s.toUpperCase()}</span>`).join('') +
+        '<div class="small text-muted tw:mb-1">Preview:</div>' +
+        '<div class="border rounded tw:p-2 bg-light" style="max-height:180px;overflow:auto;">' +
+        serials.map((s, idx) => `<span class="badge bg-secondary me-1 tw:mb-1">${idx+1}. ${s.toUpperCase()}</span>`).join('') +
         '</div>';
 }
 
 function showSerialErrors(errors) {
     const box = document.getElementById('serial-errors');
     box.style.display = 'block';
-    box.innerHTML = `<div class="alert alert-danger">
+    box.innerHTML = `<x-ui.alert variant="danger">
         <b>Có ${errors.length} lỗi:</b>
-        <ul class="mb-0 mt-2">${errors.map(e => `<li>${e}</li>`).join('')}</ul>
-    </div>`;
+        <ul class="mb-0 tw:mt-2">${errors.map(e => `<li>${e}</li>`).join('')}</ul>
+</x-ui.alert>`;
 }
 
 function hideSerialErrors() {

@@ -11,23 +11,25 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('mkt_actual_kpi_daily', function (Blueprint $table) {
+        if (Schema::hasTable('mkt_actual_kpi_daily')) {
+            Schema::table('mkt_actual_kpi_daily', function (Blueprint $table) {
 
-            // Nếu bảng đã có channel thì sẽ không lỗi khi migrate lại
-            if (!Schema::hasColumn('mkt_actual_kpi_daily', 'channel')) {
-                $table->string('channel', 100)
-                      ->nullable()
-                      ->after('date')
-                      ->comment('Tên kênh quảng cáo: Facebook, Google, TikTok...');
-            }
+                // Nếu bảng đã có channel thì sẽ không lỗi khi migrate lại
+                if (! Schema::hasColumn('mkt_actual_kpi_daily', 'channel')) {
+                    $table->string('channel', 100)
+                        ->nullable()
+                        ->after('date')
+                        ->comment('Tên kênh quảng cáo: Facebook, Google, TikTok...');
+                }
 
-            if (!Schema::hasColumn('mkt_actual_kpi_daily', 'revenue')) {
-                $table->decimal('revenue', 15, 2)
-                      ->default(0)
-                      ->after('leads')
-                      ->comment('Doanh thu ghi nhận từ ads');
-            }
-        });
+                if (! Schema::hasColumn('mkt_actual_kpi_daily', 'revenue')) {
+                    $table->decimal('revenue', 15, 2)
+                        ->default(0)
+                        ->after('leads')
+                        ->comment('Doanh thu ghi nhận từ ads');
+                }
+            });
+        }
     }
 
     /**
@@ -35,15 +37,17 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('mkt_actual_kpi_daily', function (Blueprint $table) {
+        if (Schema::hasTable('mkt_actual_kpi_daily')) {
+            Schema::table('mkt_actual_kpi_daily', function (Blueprint $table) {
 
-            if (Schema::hasColumn('mkt_actual_kpi_daily', 'channel')) {
-                $table->dropColumn('channel');
-            }
+                if (Schema::hasColumn('mkt_actual_kpi_daily', 'channel')) {
+                    $table->dropColumn('channel');
+                }
 
-            if (Schema::hasColumn('mkt_actual_kpi_daily', 'revenue')) {
-                $table->dropColumn('revenue');
-            }
-        });
+                if (Schema::hasColumn('mkt_actual_kpi_daily', 'revenue')) {
+                    $table->dropColumn('revenue');
+                }
+            });
+        }
     }
 };

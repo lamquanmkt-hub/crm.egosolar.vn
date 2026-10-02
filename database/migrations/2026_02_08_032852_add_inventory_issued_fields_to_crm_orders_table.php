@@ -11,12 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('crm_orders', function (Blueprint $table) {
-            $table->boolean('inventory_issued')->default(false)->after('current_department');
-            $table->dateTime('inventory_issued_at')->nullable()->after('inventory_issued');
-            $table->unsignedBigInteger('inventory_issued_by')->nullable()->after('inventory_issued_at');
-            $table->foreign('inventory_issued_by')->references('id')->on('users')->nullOnDelete();
-        });
+        if (Schema::hasTable('crm_orders')) {
+            Schema::table('crm_orders', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_orders', 'inventory_issued')) {
+                    $table->boolean('inventory_issued')->default(false)->after('current_department');
+                }
+                if (! Schema::hasColumn('crm_orders', 'inventory_issued_at')) {
+                    $table->dateTime('inventory_issued_at')->nullable()->after('inventory_issued');
+                }
+                if (! Schema::hasColumn('crm_orders', 'inventory_issued_by')) {
+                    $table->unsignedBigInteger('inventory_issued_by')->nullable()->after('inventory_issued_at');
+                }
+                $table->foreign('inventory_issued_by')->references('id')->on('users')->nullOnDelete();
+            });
+        }
     }
 
     /**
@@ -24,13 +32,15 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('crm_orders', function (Blueprint $table) {
-            $table->dropForeign(['inventory_issued_by']);
-            $table->dropColumn([
-                'inventory_issued',
-                'inventory_issued_at',
-                'inventory_issued_by',
-            ]);
-        });
+        if (Schema::hasTable('crm_orders')) {
+            Schema::table('crm_orders', function (Blueprint $table) {
+                $table->dropForeign(['inventory_issued_by']);
+                $table->dropColumn([
+                    'inventory_issued',
+                    'inventory_issued_at',
+                    'inventory_issued_by',
+                ]);
+            });
+        }
     }
 };

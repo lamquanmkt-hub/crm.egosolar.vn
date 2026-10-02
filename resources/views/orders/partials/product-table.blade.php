@@ -38,7 +38,7 @@
     <header class="oc-section-head oc-products-head">
         <div>
             <h2>Sản phẩm</h2>
-            <p>Chọn sản phẩm trước, hệ thống sẽ hiển thị tất cả kho và tồn hiện tại.</p>
+            <p>Chọn sản phẩm trước, hệ thống sẽ hiển thị kho còn hàng.</p>
         </div>
 
         <div class="oc-products-actions">
@@ -119,11 +119,11 @@
                     <div class="oc-product-cell oc-warehouse-picker">
                         <label>Kho xuất <span>*</span></label>
 
-                        <select
+                        <x-ui.select
                             name="items[{{ $index }}][warehouse_id]"
-                            class="form-select warehouse-select @error("items.$index.warehouse_id") is-invalid @enderror"
+                            class="ego-input warehouse-select @error('items.'.$index.'.warehouse_id') is-invalid @enderror"
                             required
-                            {{ $productId ? '' : 'disabled' }}
+                            :disabled="! $productId"
                         >
                             <option value="">Chọn sản phẩm trước</option>
 
@@ -132,7 +132,7 @@
                                     {{ $warehouseName !== '' ? $warehouseName : ('Kho #'.$warehouseId) }}
                                 </option>
                             @endif
-                        </select>
+                        </x-ui.select>
 
                         <div class="oc-stock-line" data-stock-line>
                             <span class="oc-stock-status" data-stock-status>Chưa chọn sản phẩm</span>
@@ -159,9 +159,9 @@
                 <div class="oc-product-row-bottom">
                     <div class="oc-product-field">
                         <label>Loại giá</label>
-                        <select
+                        <x-ui.select
                             name="items[{{ $index }}][price_tier_id]"
-                            class="form-select price-tier-select @error("items.$index.price_tier_id") is-invalid @enderror"
+                            class="ego-input price-tier-select @error('items.'.$index.'.price_tier_id') is-invalid @enderror"
                         >
                             <option value="">Theo loại khách hàng</option>
                             @foreach(($priceTiers ?? []) as $tier)
@@ -173,18 +173,17 @@
                                     {{ $tier->name }}
                                 </option>
                             @endforeach
-                        </select>
+                        </x-ui.select>
                     </div>
 
                     <div class="oc-product-field">
                         <label>Đơn giá sau VAT</label>
-                        <input
+                        <x-ui.input
                             type="text"
                             name="items[{{ $index }}][unit_price]"
-                            class="form-control unit-price text-end @error("items.$index.unit_price") is-invalid @enderror"
+                            class="ego-input unit-price text-end @error('items.'.$index.'.unit_price') is-invalid @enderror"
                             value="{{ $unitPrice > 0 ? (int) $unitPrice : '' }}"
-                            readonly
-                        >
+                            readonly />
                         @error("items.$index.unit_price")
                             <div class="oc-invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -194,14 +193,13 @@
                         <label>Số lượng <span>*</span></label>
                         <div class="oc-qty-control">
                             <button type="button" class="oc-qty-btn" data-qty-action="decrease" aria-label="Giảm số lượng">−</button>
-                            <input
+                            <x-ui.input
                                 type="number"
                                 name="items[{{ $index }}][quantity]"
-                                class="form-control quantity text-center @error("items.$index.quantity") is-invalid @enderror"
+                                class="ego-input quantity tw:text-center @error('items.'.$index.'.quantity') is-invalid @enderror"
                                 value="{{ $quantity }}"
                                 min="1"
-                                required
-                            >
+                                required />
                             <button type="button" class="oc-qty-btn" data-qty-action="increase" aria-label="Tăng số lượng">+</button>
                         </div>
                         <small data-qty-help>Chọn kho để kiểm tra tồn.</small>
@@ -213,15 +211,14 @@
                     <div class="oc-product-field">
                         <label>Giảm %</label>
                         <div class="oc-input-suffix">
-                            <input
+                            <x-ui.input
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 max="100"
                                 name="items[{{ $index }}][discount_percent]"
-                                class="form-control discount-percent text-end @error("items.$index.discount_percent") is-invalid @enderror"
-                                value="{{ (float) ($itemData['discount_percent'] ?? 0) }}"
-                            >
+                                class="ego-input discount-percent text-end @error('items.'.$index.'.discount_percent') is-invalid @enderror"
+                                value="{{ (float) ($itemData['discount_percent'] ?? 0) }}" />
                             <span>%</span>
                         </div>
                     </div>
@@ -229,27 +226,25 @@
                     <div class="oc-product-field">
                         <label>Giảm tiền / SP</label>
                         <div class="oc-input-suffix">
-                            <input
+                            <x-ui.input
                                 type="number"
                                 step="1"
                                 min="0"
                                 name="items[{{ $index }}][discount_amount]"
-                                class="form-control discount-per-unit text-end @error("items.$index.discount_amount") is-invalid @enderror"
-                                value="{{ (float) ($itemData['discount_amount'] ?? 0) }}"
-                            >
+                                class="ego-input discount-per-unit text-end @error('items.'.$index.'.discount_amount') is-invalid @enderror"
+                                value="{{ (float) ($itemData['discount_amount'] ?? 0) }}" />
                             <span>đ</span>
                         </div>
                     </div>
 
                     <div class="oc-product-field oc-total-field">
                         <label>Thành tiền</label>
-                        <input
+                        <x-ui.input
                             type="text"
                             name="items[{{ $index }}][line_total]"
-                            class="form-control line-total text-end"
+                            class="ego-input line-total text-end"
                             value="{{ $lineTotal > 0 ? number_format($lineTotal, 0, ',', '.') : '' }}"
-                            readonly
-                        >
+                            readonly />
                     </div>
                 </div>
 

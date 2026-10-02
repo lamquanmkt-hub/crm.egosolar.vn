@@ -2,16 +2,23 @@
 
 namespace App\Http\Controllers\Marketing;
 
+use App\DTOs\Marketing\MarketingDashboardInput;
 use App\Http\Controllers\Controller;
+use App\View\Presenters\Marketing\MarketingDashboardPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Controller dashboard marketing với các tab Ads/SEO/Content/Email.
+ *
+ * Mọi giá trị suy ra cho view (cờ nền tảng, KPI kỳ trước, phễu, tiến độ ngân sách, dòng bảng
+ * chuẩn hoá) do {@see MarketingDashboardPresenter} tính; controller chỉ truy vấn và lọc ngày.
  */
 class MarketingDashboardController extends Controller
 {
+    public function __construct(private readonly MarketingDashboardPresenter $presenter) {}
+
     /**
      * Điều phối render dashboard theo tab và khoảng ngày lọc.
      */
@@ -24,13 +31,13 @@ class MarketingDashboardController extends Controller
         }
 
         // ===== FILTER DATE =====
-        $fromRaw = $request->input('from');
-        $toRaw = $request->input('to');
+        [$startDate, $endDate, $from, $to] = $this->resolveDateRange($request->input('from'), $request->input('to'));
 
-        [$startDate, $endDate, $from, $to] = $this->resolveDateRange($fromRaw, $toRaw);
+        // Tab con của SEO: report|plan (link đổi nền tảng ở mọi tab đều mang theo giá trị này)
+        $seoTab = is_string($request->input('seo_tab')) ? $request->input('seo_tab') : 'report';
 
         // ===== Platform filter (chỉ thực sự dùng trong ADS tab) =====
-        $platform = $request->input('platform');
+        $platform = is_string($request->input('platform')) ? $request->input('platform') : null;
 
         $platformMap = [
             'facebook' => 'Facebook',
@@ -47,37 +54,27 @@ class MarketingDashboardController extends Controller
 
         // Render theo tab
         if ($tab === 'seo') {
-            return $this->renderSeo($request, $startDate, $endDate, $from, $to, $tab);
+            return $this->renderSeo($from, $to, $seoTab);
         }
-        if ($tab === 'content') {
-            return $this->renderContent($request, $startDate, $endDate, $from, $to, $tab);
-        }
-        if ($tab === 'email') {
-            return $this->renderEmail($request, $startDate, $endDate, $from, $to, $tab);
+        if ($tab === 'content' || $tab === 'email') {
+            return $this->renderPlaceholder($from, $to, $seoTab);
         }
 
         // Default: ADS
-        return $this->renderAds($request, $startDate, $endDate, $from, $to, $tab, $platform, $platformDb);
+        return $this->renderAds($startDate, $endDate, $from, $to, $seoTab, $platform, $platformDb);
     }
 
     // =========================================================
     // ADS TAB (Facebook/Google/Tiktok...)
     // =========================================================
     /**
-     * Render tab Ads: KPI, trend theo ngày, tổng hợp theo tháng/kênh, top chiến dịch và demographics.
+     * Render tab Ads: KPI, trend theo ngày, tổng hợp theo tháng và top chiến dịch.
+     *
+     * Trước 2026-09-07 còn tổng hợp theo nền tảng và 3 breakdown nhân khẩu học (3 truy vấn)
+     * nhưng view chưa bao giờ hiển thị — đã bỏ.
      */
-    private function renderAds(Request $request, Carbon $startDate, Carbon $endDate, string $from, string $to, string $tab, ?string $platform, ?string $platformDb)
+    private function renderAds(Carbon $startDate, Carbon $endDate, string $from, string $to, string $seoTab, ?string $platform, ?string $platformDb)
     {
-        $platformMap = [
-            'facebook' => 'Facebook',
-            'google' => 'Google',
-            'google_search' => 'Google',
-            'tiktok' => 'Tiktok',
-            'website' => 'Website',
-            'youtube' => 'Youtube',
-        ];
-        $platforms = array_values($platformMap);
-
         // Budgets: dùng created_at như bạn đang làm
         $budgetsQ = DB::table('marketing_budgets')
             ->whereBetween('created_at', [$startDate, $endDate]);
@@ -168,50 +165,6 @@ class MarketingDashboardController extends Controller
             ];
         });
 
-        // ===== BY PLATFORM =====
-        $budgetByPlatform = DB::table('marketing_budgets as b')
-            ->select('b.platform')
-            ->selectRaw('SUM(COALESCE(b.actual_spent,0)) as budget_spend')
-            ->whereBetween('b.created_at', [$startDate, $endDate])
-            ->when($platformDb, fn ($q) => $q->where('b.platform', $platformDb))
-            ->groupBy('b.platform')
-            ->get()
-            ->keyBy('platform');
-
-        $metricByPlatform = DB::table('marketing_metrics as m')
-            ->select('m.platform')
-            ->selectRaw('SUM(COALESCE(m.spend,0)) as metric_spend')
-            ->selectRaw('SUM(COALESCE(m.reach,0)) as reach')
-            ->selectRaw('SUM(COALESCE(m.leads,0)) as leads')
-            ->whereDate('m.date_from', '>=', $startDate->toDateString())
-            ->whereDate('m.date_from', '<=', $endDate->toDateString())
-            ->when($platformDb, fn ($q) => $q->where('m.platform', $platformDb))
-            ->groupBy('m.platform')
-            ->get()
-            ->keyBy('platform');
-
-        $plats = collect($budgetByPlatform->keys())
-            ->merge($metricByPlatform->keys())
-            ->unique()
-            ->values();
-
-        $byPlatform = $plats->map(function ($p) use ($budgetByPlatform, $metricByPlatform) {
-            $b = $budgetByPlatform->get($p);
-            $m = $metricByPlatform->get($p);
-
-            $budgetSpend = (float) ($b->budget_spend ?? 0);
-            $metricSpend = (float) ($m->metric_spend ?? 0);
-
-            return (object) [
-                'platform' => $p ?: '—',
-                'spend' => max($budgetSpend, $metricSpend),
-                'reach' => (float) ($m->reach ?? 0),
-                'leads' => (int) ($m->leads ?? 0),
-            ];
-        })
-            ->sortByDesc(fn ($r) => (float) $r->spend)
-            ->values();
-
         // ===== TOP CAMPAIGNS =====
         $budgetAgg = DB::table('marketing_budgets as b')
             ->selectRaw('b.campaign_id, SUM(COALESCE(b.actual_spent,0)) as spend')
@@ -240,28 +193,12 @@ class MarketingDashboardController extends Controller
             ->limit(8)
             ->get();
 
-        // ===== DEMOGRAPHICS (JSON breakdown) =====
-        $metricsRows = DB::table('marketing_metrics')
-            ->select('gender_breakdown', 'age_breakdown', 'region_breakdown')
-            ->whereDate('date_from', '<=', $endDate->toDateString())
-            ->whereDate('date_to', '>=', $startDate->toDateString())
-            ->when($platformDb, fn ($q) => $q->where('platform', $platformDb))
-            ->get();
-
-        $demoGender = $this->aggregateJsonBreakdown($metricsRows, 'gender_breakdown', 10);
-        $demoAge = $this->aggregateJsonBreakdown($metricsRows, 'age_breakdown', 10);
-        $demoRegion = $this->aggregateJsonBreakdown($metricsRows, 'region_breakdown', 10);
-
-        return view('marketing.dashboard', [
-            'tab' => $tab,
-            'from' => $from,
-            'to' => $to,
-
-            'platform' => $platform,
-            'platformDb' => $platformDb,
-            'platforms' => $platforms,
-
-            'kpi' => [
+        return view('marketing.dashboard', $this->presenter->viewData(new MarketingDashboardInput(
+            from: $from,
+            to: $to,
+            seoTab: $seoTab,
+            platform: $platform,
+            kpi: [
                 'spend' => $spendTotal,
                 'reach' => $reachSum,
                 'leads' => $leadsSum,
@@ -274,176 +211,32 @@ class MarketingDashboardController extends Controller
                 'frequency' => $frequency,
                 'cpm' => $cpm,
             ],
-
-            'trend' => $trend,
-
-            'byMonth' => $byMonth,
-            'byPlatform' => $byPlatform,
-            'topCampaigns' => $topCampaigns,
-
-            'demoAge' => $demoAge,
-            'demoGender' => $demoGender,
-            'demoRegion' => $demoRegion,
-
-            // placeholders để blade không lỗi
-            'seoKpi' => [],
-            'seoTrend' => [],
-            'seoTopQueries' => collect(),
-            'seoTopPages' => collect(),
-            'seoIssues' => collect(),
-            'seoPlanKpi' => [],
-            'seoPlanItems' => collect(),
-
-            'byDevice' => collect(),
-            'byGeo' => collect(),
-            'topKeywords' => collect(),
-            'topAds' => collect(),
-            'funnel' => [],
-            'budget' => [],
-            'insights' => [],
-        ]);
+            trend: $trend,
+            byMonth: $byMonth,
+            topCampaigns: $topCampaigns,
+        )));
     }
 
     // =========================================================
     // SEO TAB (wireframe ready)
     // =========================================================
     /**
-     * Render tab SEO (wireframe, dữ liệu placeholder).
+     * Render tab SEO (wireframe, chưa có nguồn số liệu — presenter điền 0 và bảng rỗng).
      */
-    private function renderSeo(Request $request, Carbon $startDate, Carbon $endDate, string $from, string $to, string $tab)
+    private function renderSeo(string $from, string $to, string $seoTab)
     {
-        $seoTab = $request->input('seo_tab', 'report');
-
-        return view('marketing.dashboard', [
-            'tab' => $tab,
-            'from' => $from,
-            'to' => $to,
-            'platform' => 'seo',
-            'platformDb' => 'SEO Organic',
-            'platforms' => ['SEO Organic'],
-
-            'seoKpi' => [
-                'sessions' => 0, 'users' => 0, 'clicks' => 0, 'impressions' => 0, 'ctr' => 0, 'avg_position' => 0,
-                'leads' => 0, 'cvr' => 0, 'top10' => 0, 'top3' => 0, 'value_equivalent' => 0,
-            ],
-            'seoTrend' => [
-                'labels' => [], 'sessions' => [], 'clicks' => [], 'impressions' => [], 'ctr' => [],
-                'position' => [], 'leads' => [], 'top10' => [],
-            ],
-            'seoTopQueries' => collect(),
-            'seoTopPages' => collect(),
-            'seoIssues' => collect(),
-            'seoPlanKpi' => [],
-            'seoPlanItems' => collect(),
-
-            'kpi' => ['spend' => 0, 'reach' => 0, 'leads' => 0, 'cpl' => 0, 'impressions' => 0, 'clicks' => 0, 'ctr' => 0, 'cpc' => 0, 'frequency' => 0, 'cpm' => 0],
-            'trend' => ['labels' => [], 'spend' => [], 'leads' => [], 'cpl' => [], 'clicks' => [], 'cpc' => []],
-            'byMonth' => collect(),
-            'byPlatform' => collect(),
-            'topCampaigns' => collect(),
-            'demoAge' => collect(),
-            'demoGender' => collect(),
-            'demoRegion' => collect(),
-            'byDevice' => collect(),
-            'byGeo' => collect(),
-            'topKeywords' => collect(),
-            'topAds' => collect(),
-            'funnel' => [],
-            'budget' => [],
-            'insights' => [],
-        ]);
+        return view('marketing.dashboard', $this->presenter->viewData(new MarketingDashboardInput(from: $from, to: $to, seoTab: $seoTab, platform: 'seo')));
     }
 
     // =========================================================
-    // CONTENT TAB (placeholder)
+    // CONTENT / EMAIL TAB (placeholder)
     // =========================================================
     /**
-     * Render tab Content (placeholder).
+     * Render tab Content và Email (placeholder: bố cục Ads với số liệu 0).
      */
-    private function renderContent(Request $request, Carbon $startDate, Carbon $endDate, string $from, string $to, string $tab)
+    private function renderPlaceholder(string $from, string $to, string $seoTab)
     {
-        return view('marketing.dashboard', [
-            'tab' => $tab,
-            'from' => $from,
-            'to' => $to,
-            'platform' => null,
-            'platformDb' => null,
-            'platforms' => [],
-
-            'contentKpi' => [],
-            'contentTrend' => [],
-            'contentItems' => collect(),
-
-            'kpi' => ['spend' => 0, 'reach' => 0, 'leads' => 0, 'cpl' => 0, 'impressions' => 0, 'clicks' => 0, 'ctr' => 0, 'cpc' => 0, 'frequency' => 0, 'cpm' => 0],
-            'trend' => ['labels' => [], 'spend' => [], 'leads' => [], 'cpl' => [], 'clicks' => [], 'cpc' => []],
-            'byMonth' => collect(),
-            'byPlatform' => collect(),
-            'topCampaigns' => collect(),
-            'demoAge' => collect(),
-            'demoGender' => collect(),
-            'demoRegion' => collect(),
-
-            'seoKpi' => [],
-            'seoTrend' => [],
-            'seoTopQueries' => collect(),
-            'seoTopPages' => collect(),
-            'seoIssues' => collect(),
-            'seoPlanKpi' => [],
-            'seoPlanItems' => collect(),
-            'byDevice' => collect(),
-            'byGeo' => collect(),
-            'topKeywords' => collect(),
-            'topAds' => collect(),
-            'funnel' => [],
-            'budget' => [],
-            'insights' => [],
-        ]);
-    }
-
-    // =========================================================
-    // EMAIL TAB (placeholder)
-    // =========================================================
-    /**
-     * Render tab Email (placeholder).
-     */
-    private function renderEmail(Request $request, Carbon $startDate, Carbon $endDate, string $from, string $to, string $tab)
-    {
-        return view('marketing.dashboard', [
-            'tab' => $tab,
-            'from' => $from,
-            'to' => $to,
-            'platform' => null,
-            'platformDb' => null,
-            'platforms' => [],
-
-            'emailKpi' => [],
-            'emailTrend' => [],
-            'emailFlows' => collect(),
-
-            'kpi' => ['spend' => 0, 'reach' => 0, 'leads' => 0, 'cpl' => 0, 'impressions' => 0, 'clicks' => 0, 'ctr' => 0, 'cpc' => 0, 'frequency' => 0, 'cpm' => 0],
-            'trend' => ['labels' => [], 'spend' => [], 'leads' => [], 'cpl' => [], 'clicks' => [], 'cpc' => []],
-            'byMonth' => collect(),
-            'byPlatform' => collect(),
-            'topCampaigns' => collect(),
-            'demoAge' => collect(),
-            'demoGender' => collect(),
-            'demoRegion' => collect(),
-
-            'seoKpi' => [],
-            'seoTrend' => [],
-            'seoTopQueries' => collect(),
-            'seoTopPages' => collect(),
-            'seoIssues' => collect(),
-            'seoPlanKpi' => [],
-            'seoPlanItems' => collect(),
-            'byDevice' => collect(),
-            'byGeo' => collect(),
-            'topKeywords' => collect(),
-            'topAds' => collect(),
-            'funnel' => [],
-            'budget' => [],
-            'insights' => [],
-        ]);
+        return view('marketing.dashboard', $this->presenter->viewData(new MarketingDashboardInput(from: $from, to: $to, seoTab: $seoTab)));
     }
 
     // =========================================================
@@ -540,59 +333,6 @@ class MarketingDashboardController extends Controller
             'clicks' => $zeros,
             'cpc' => $zeros,
         ];
-    }
-
-    // =========================================================
-    // Aggregate JSON breakdown
-    // =========================================================
-    /**
-     * Cộng dồn breakdown dạng JSON (giới tính/tuổi/khu vực) và lấy top N nhãn.
-     */
-    private function aggregateJsonBreakdown($rows, string $field, int $limit = 10)
-    {
-        $sum = [];
-
-        foreach ($rows as $r) {
-            $raw = $r->{$field} ?? null;
-            if ($raw === null) {
-                continue;
-            }
-
-            $arr = is_string($raw) ? json_decode($raw, true) : (array) $raw;
-            if (! is_array($arr)) {
-                continue;
-            }
-
-            foreach ($arr as $k => $v) {
-                $label = trim((string) $k);
-                if ($label === '') {
-                    $label = 'Không rõ';
-                }
-                $val = (int) ($v ?? 0);
-                if (! isset($sum[$label])) {
-                    $sum[$label] = 0;
-                }
-                $sum[$label] += $val;
-            }
-        }
-
-        arsort($sum);
-
-        $out = collect();
-        $i = 0;
-        foreach ($sum as $label => $val) {
-            $out->push((object) [
-                'label' => $label,
-                'reach' => 0,
-                'leads' => (int) $val,
-            ]);
-            $i++;
-            if ($i >= $limit) {
-                break;
-            }
-        }
-
-        return $out;
     }
 
     // =========================================================

@@ -1,3 +1,13 @@
+{{--
+    EGO_VIEW_CHET — VIEW CHẾT, KHÔNG AI RENDER (rà soát 2026-10-02)
+
+    Route `marketing.plan.overview` (GET `marketing/plan`) trỏ tới `MarketingPlanController@index`,
+    mà method đó render `marketing.plans.index` — KHÔNG render tệp này. Rà đủ 4 cách viết tên:
+    0 tham chiếu.
+
+    CHƯA XOÁ theo yêu cầu: chỉ đánh dấu. Nếu nối dây lại thì xoá dấu này —
+    tests/Feature/View/DeadViewsMarkedTest.php sẽ báo đỏ để nhắc.
+--}}
 @extends('layouts.app')
 
 @section('content')
@@ -156,7 +166,7 @@ textarea.egomp-control{min-height:130px;resize:vertical;line-height:1.7}
         </div>
 
         @if(session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
+            <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
         @endif
 
         <div class="egomp-card">

@@ -8,31 +8,33 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('marketing_plans', function (Blueprint $table) {
-            $table->id();
+        if (! Schema::hasTable('marketing_plans')) {
+            Schema::create('marketing_plans', function (Blueprint $table) {
+                $table->id();
 
-            // Tên kế hoạch: VD "Kế hoạch Marketing - T01/2026"
-            $table->string('name');
+                // Tên kế hoạch: VD "Kế hoạch Marketing - T01/2026"
+                $table->string('name');
 
-            // Thời gian kế hoạch (toàn kỳ)
-            $table->date('start_date');
-            $table->date('end_date');
+                // Thời gian kế hoạch (toàn kỳ)
+                $table->date('start_date');
+                $table->date('end_date');
 
-            // draft | active | done
-            $table->string('status', 20)->default('draft');
+                // draft | active | done
+                $table->string('status', 20)->default('draft');
 
-            // Tuỳ chọn: mục tiêu chung + note
-            $table->text('objective')->nullable();
-            $table->text('note')->nullable();
+                // Tuỳ chọn: mục tiêu chung + note
+                $table->text('objective')->nullable();
+                $table->text('note')->nullable();
 
-            // Tuỳ chọn: lưu tổng ngân sách plan (có thể tính từ items cũng được)
-            $table->decimal('budget_plan_total', 14, 2)->nullable();
+                // Tuỳ chọn: lưu tổng ngân sách plan (có thể tính từ items cũng được)
+                $table->decimal('budget_plan_total', 14, 2)->nullable();
 
-            $table->timestamps();
+                $table->timestamps();
 
-            $table->index(['start_date', 'end_date']);
-            $table->index('status');
-        });
+                $table->index(['start_date', 'end_date']);
+                $table->index('status');
+            });
+        }
     }
 
     public function down(): void

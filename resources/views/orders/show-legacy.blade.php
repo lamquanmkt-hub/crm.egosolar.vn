@@ -1,22 +1,15 @@
+{{--
+    EGO_VIEW_CHET — VIEW CHẾT, KHÔNG AI RENDER (rà soát 2026-09-04)
 
-@php
-    $egoPendingOrdersCount = $egoPendingOrdersCount ?? 0;
-    $egoPendingMaterialRequestsCount = $egoPendingMaterialRequestsCount ?? 0;
+    Không controller/route nào render view này; chỉ xuất hiện ở commit đầu 8a2fa03.
 
-    try {
-        $egoPendingOrdersCount = (int) \Illuminate\Support\Facades\DB::table('crm_order_approvals')
-            ->where('status', 'pending')
-            ->distinct()
-            ->count('order_id');
+    Bản đơn hàng cũ, đã bị orders/show thay thế.
 
-        $egoPendingMaterialRequestsCount = (int) \Illuminate\Support\Facades\DB::table('material_requests')
-            ->whereIn('status', ['SUBMITTED', 'ADMIN_APPROVED'])
-            ->count();
-    } catch (\Throwable $e) {
-        $egoPendingOrdersCount = 0;
-        $egoPendingMaterialRequestsCount = 0;
-    }
-@endphp
+    CHƯA XOÁ theo yêu cầu: chỉ đánh dấu để lần sau khỏi rà lại.
+    Nếu bạn đấu view này vào một route/@include, hãy XOÁ dấu này —
+    tests/Feature/View/DeadViewsMarkedTest.php sẽ báo đỏ để nhắc.
+--}}
+
 
 @php
     use Carbon\Carbon;
@@ -886,7 +879,10 @@
 
 </style>
 
-<div class="container-fluid px-4 order-show">
+{{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+     thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+     quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+<div class="container-fluid tw:px-6 order-show tw:py-4">
     <div class="order-show-shell">
 
         <div class="page-head">
@@ -894,7 +890,7 @@
                 <div class="title-badge"><i class="bi bi-receipt-cutoff"></i></div>
 
                 <div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <div class="tw:flex tw:items-center tw:gap-2 flex-wrap">
                         <h1 class="order-title">
                             Đơn hàng <span class="text-muted">#</span>
                             <span class="order-code">{{ $order->order_code }}</span>
@@ -930,7 +926,7 @@
                 </div>
             </div>
 
-            <div class="d-flex flex-wrap gap-2 no-print">
+            <div class="tw:flex flex-wrap tw:gap-2 no-print">
                 <a href="{{ route('orders.index') }}" class="btn-ghost">
                     <i class="bi bi-arrow-left"></i> Quay lại
                 </a>
@@ -959,25 +955,23 @@
         </div>
 
         @if(session('success'))
-            <div class="alert alert-success alert-dismissible fade show shadow-sm mx-1 no-print">
+            <x-ui.alert variant="success" :dismissible="true" class="tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mx-1 no-print">
                 <i class="bi bi-check-circle-fill"></i> {{ session('success') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
+            </x-ui.alert>
         @endif
 
         @if(session('error'))
-            <div class="alert alert-danger alert-dismissible fade show shadow-sm mx-1 no-print">
+            <x-ui.alert variant="danger" :dismissible="true" class="tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mx-1 no-print">
                 <i class="bi bi-exclamation-triangle-fill"></i> {!! nl2br(e(session('error'))) !!}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
+            </x-ui.alert>
         @endif
 
-        <div class="glass mb-4">
+        <div class="glass tw:mb-6">
             <div class="step-card">
                 <div class="step-top">
                     <div>
                         <div class="k">Trạng thái hiện tại</div>
-                        <div class="v d-flex align-items-center gap-2 flex-wrap">
+                        <div class="v tw:flex tw:items-center tw:gap-2 flex-wrap">
                             <span class="badge-modern" style="background: {{ $statusColor }};">
                                 <span class="dot"></span> {{ $statusName }}
                             </span>
@@ -1006,14 +1000,14 @@
                 </div>
 
                 @if($isCancelled)
-                    <div class="mt-3">
-                        <div class="alert alert-danger mb-0" style="border-radius: 16px;">
-                            <i class="bi bi-x-circle-fill me-2"></i>
+                    <div class="tw:mt-4">
+                        <x-ui.alert variant="danger" class="tw:mb-0" style="border-radius: 16px;">
+                            <i class="bi bi-x-circle-fill tw:mr-2"></i>
                             Đơn hàng này đã được hủy.
-                        </div>
+                        </x-ui.alert>
                     </div>
                 @else
-                    <div class="ego-stepper mt-3 {{ $currentKey === 'completed' ? 'is-done' : '' }}">
+                    <div class="ego-stepper tw:mt-4 {{ $currentKey === 'completed' ? 'is-done' : '' }}">
                         <div class="ego-track"></div>
 
                         @foreach($flow as $k => $label)
@@ -1039,8 +1033,8 @@
             </div>
         </div>
 
-        <div class="row g-3 mb-4">
-            <div class="col-12 col-md-6 col-xl-3">
+        <div class="tw:row tw:g-3 tw:mb-6">
+            <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
                 <div class="kpi">
                     <div class="ic"><i class="bi bi-activity"></i></div>
                     <div>
@@ -1051,7 +1045,7 @@
                 </div>
             </div>
 
-            <div class="col-12 col-md-6 col-xl-3">
+            <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
                 <div class="kpi">
                     <div class="ic"><i class="bi bi-building"></i></div>
                     <div>
@@ -1062,7 +1056,7 @@
                 </div>
             </div>
 
-            <div class="col-12 col-md-6 col-xl-3">
+            <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
                 <div class="kpi">
                     <div class="ic"><i class="bi bi-truck"></i></div>
                     <div>
@@ -1071,7 +1065,7 @@
                             @if($hasEstimated)
                                 {{ Carbon::parse($order->estimated_delivery)->format('d/m/Y') }}
                             @else
-                                <span class="text-muted fst-italic">Chưa xác định</span>
+                                <span class="text-muted tw:italic">Chưa xác định</span>
                             @endif
                         </div>
                         <div class="s">
@@ -1085,19 +1079,19 @@
                 </div>
             </div>
 
-            <div class="col-12 col-md-6 col-xl-3">
+            <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
                 <div class="kpi">
                     <div class="ic"><i class="bi bi-lightning-charge"></i></div>
                     <div style="width:100%;">
                         <div class="k">Hành động</div>
-                        <div class="d-grid gap-2 mt-2 no-print">
+                        <div class="d-grid tw:gap-2 tw:mt-2 no-print">
                             @if($isCancelled)
-                                <div class="alert alert-danger mb-0" style="border-radius: 14px;">
+                                <x-ui.alert variant="danger" class="tw:mb-0" style="border-radius: 14px;">
                                     <i class="bi bi-x-circle me-1"></i> Đơn hàng đã hủy, không còn hành động khả dụng.
-                                </div>
+                                </x-ui.alert>
                             @else
                                 @if($isCompleted && \Illuminate\Support\Facades\Route::has('orders.returns.create'))
-                                    <a href="{{ route('orders.returns.create', $order->id) }}" class="btn btn-outline-warning w-100">
+                                    <a href="{{ route('orders.returns.create', $order->id) }}" class="btn btn-outline-warning tw:w-full">
                                         <i class="bi bi-arrow-repeat"></i> Đổi / Trả hàng
                                     </a>
                                 @endif
@@ -1105,7 +1099,7 @@
                                 @can('submit', $order)
                                     <form action="{{ route('orders.submit', $order->id) }}" method="POST">
                                         @csrf
-                                        <button type="submit" class="btn btn-primary w-100"
+                                        <button type="submit" class="btn btn-primary tw:w-full"
                                                 onclick="return confirm('Bạn có chắc chắn muốn gửi đơn hàng này đi duyệt?')"
                                                 style="border-radius: 14px; font-weight: 750; font-size: 12.5px;">
                                             <i class="bi bi-send"></i> Gửi duyệt
@@ -1114,7 +1108,7 @@
                                 @endcan
 
                                 @can('approve', $order)
-                                    <a href="{{ route('orders.approval-form', $order->id) }}" class="btn btn-success w-100 pulse"
+                                    <a href="{{ route('orders.approval-form', $order->id) }}" class="btn btn-success tw:w-full pulse"
                                        style="border-radius: 14px; font-weight: 750; font-size: 12.5px;">
                                         <i class="bi bi-clipboard-check"></i> Xử lý duyệt
                                     </a>
@@ -1134,11 +1128,11 @@
             </div>
         </div>
 
-        <div class="row g-4">
-            <div class="col-lg-8">
-                <div class="glass mb-4">
+        <div class="tw:row tw:g-4">
+            <div class="tw:min-[62rem]:col12-8">
+                <div class="glass tw:mb-6">
                     <div class="section-head">
-                        <p class="section-title mb-0">
+                        <p class="section-title tw:mb-0">
                             <span class="section-ic"><i class="bi bi-person-vcard"></i></span>
                             Thông tin khách hàng
                         </p>
@@ -1159,7 +1153,7 @@
                                 </div>
                             </div>
 
-                            <div class="ms-auto d-flex gap-2 no-print">
+                            <div class="tw:ml-auto tw:flex tw:gap-2 no-print">
                                 <button type="button" class="btn-icon"
                                         onclick="copyText({{ json_encode($customerPhone) }}, this)" title="Copy SĐT">
                                     <i class="bi bi-clipboard"></i>
@@ -1171,8 +1165,8 @@
                             </div>
                         </div>
 
-                        <div class="row g-3">
-                            <div class="col-md-6">
+                        <div class="tw:row tw:g-3">
+                            <div class="tw:md:col12-6">
                                 <div class="meta">
                                     <div class="meta-label">Email</div>
                                     <div class="meta-value">{{ $customerEmail }}</div>
@@ -1180,14 +1174,14 @@
                                 <div class="meta">
                                     <div class="meta-label">Số điện thoại</div>
                                     <div class="meta-value">
-                                        <a href="tel:{{ $customerPhone }}" class="text-decoration-none" style="font-weight:750;">
+                                        <a href="tel:{{ $customerPhone }}" class="tw:no-underline" style="font-weight:750;">
                                             {{ $customerPhone }}
                                         </a>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="col-md-6">
+                            <div class="tw:md:col12-6">
                                 <div class="meta">
                                     <div class="meta-label">Khu vực</div>
                                     <div class="meta-value">{{ $customerRegion }}</div>
@@ -1201,9 +1195,9 @@
                     </div>
                 </div>
 
-                <div class="glass mb-4">
+                <div class="glass tw:mb-6">
                     <div class="section-head">
-                        <p class="section-title mb-0">
+                        <p class="section-title tw:mb-0">
                             <span class="section-ic"><i class="bi bi-box-seam"></i></span>
                             Chi tiết sản phẩm
                         </p>
@@ -1218,20 +1212,20 @@
                         $sumAfterVat  = 0;
                     @endphp
 
-                    <div class="section-body p-0">
+                    <div class="section-body tw:p-0">
                         <div class="table-wrap">
                             <div class="table-responsive">
-                                <table class="table table-modern table-hover align-middle mb-0">
+                                <table class="table table-modern table-hover align-middle tw:mb-0">
                                     <thead>
                                         <tr class="small">
-                                            <th class="text-center" style="width: 56px;">#</th>
+                                            <th class="tw:text-center" style="width: 56px;">#</th>
                                             <th style="min-width: 160px;">Kho</th>
                                             <th style="min-width: 280px;">Sản phẩm</th>
                                             <th class="text-end" style="min-width: 130px;">Giá trước VAT</th>
-                                            <th class="text-center" style="min-width: 90px;">VAT</th>
+                                            <th class="tw:text-center" style="min-width: 90px;">VAT</th>
                                             <th class="text-end" style="min-width: 140px;">Đơn giá (SAU VAT)</th>
-                                            <th class="text-center" style="width: 90px;">SL</th>
-                                            <th class="text-center" style="min-width: 90px;">Giảm %</th>
+                                            <th class="tw:text-center" style="width: 90px;">SL</th>
+                                            <th class="tw:text-center" style="min-width: 90px;">Giảm %</th>
                                             <th class="text-end" style="min-width: 120px;">Giảm (đ)</th>
                                             <th class="text-end" style="min-width: 150px;">Thành tiền</th>
                                         </tr>
@@ -1273,23 +1267,23 @@
                                             @endphp
 
                                             <tr>
-                                                <td class="text-center">{{ $loop->iteration }}</td>
+                                                <td class="tw:text-center">{{ $loop->iteration }}</td>
                                                 <td>
                                                     <span class="pill" style="background: rgba(6,182,212,.10); border-color: rgba(6,182,212,.18); color: var(--ego2);">
                                                         <i class="bi bi-building"></i> {{ $item->warehouse->name ?? 'N/A' }}
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <div class="text-primary" style="font-weight:750;">{{ $pName }}</div>
+                                                    <div class="tw:text-[#0d6efd]" style="font-weight:750;">{{ $pName }}</div>
                                                     <div class="small" style="color: var(--muted2); font-weight: 650;">
                                                         SKU: <span class="font-monospace">{{ $pSku }}</span>
                                                     </div>
                                                 </td>
                                                 <td class="text-end font-monospace">{{ number_format($unitBefore, 0, ',', '.') }}</td>
-                                                <td class="text-center"><span class="pill">{{ $vatText }}%</span></td>
+                                                <td class="tw:text-center"><span class="pill">{{ $vatText }}%</span></td>
                                                 <td class="text-end font-monospace">{{ number_format($unitAfter, 0, ',', '.') }}</td>
-                                                <td class="text-center" style="font-weight:750;">{{ $qty }}</td>
-                                                <td class="text-center">
+                                                <td class="tw:text-center" style="font-weight:750;">{{ $qty }}</td>
+                                                <td class="tw:text-center">
                                                     <span class="pill">{{ rtrim(rtrim(number_format($discPercent, 2), '0'), '.') }}%</span>
                                                 </td>
                                                 <td class="text-end" style="font-weight:750;">{{ number_format($discount, 0, ',', '.') }}</td>
@@ -1301,29 +1295,29 @@
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colspan="9" class="text-end fw-bold text-uppercase py-3 text-nowrap" style="background: rgba(15,23,42,.03); font-weight:800;">
+                                            <td colspan="9" class="text-end fw-bold tw:uppercase tw:py-4 tw:whitespace-nowrap" style="background: rgba(15,23,42,.03); font-weight:800;">
                                                 Tổng tiền:
                                             </td>
-                                            <td class="text-end py-3 text-nowrap" style="background: rgba(15,23,42,.03);">
+                                            <td class="text-end tw:py-4 tw:whitespace-nowrap" style="background: rgba(15,23,42,.03);">
                                                 <span class="fs-6 text-danger" style="font-weight:850;">{{ number_format($sumAfterVat, 0, ',', '.') }} đ</span>
                                             </td>
                                         </tr>
 
                                         <tr>
-                                            <td colspan="9" class="text-end fw-bold py-2 text-nowrap" style="background: rgba(34,197,94,.05); font-weight:800; color: rgba(22,163,74,1);">
+                                            <td colspan="9" class="text-end fw-bold tw:py-2 tw:whitespace-nowrap" style="background: rgba(34,197,94,.05); font-weight:800; color: rgba(22,163,74,1);">
                                                 Khách hàng đã thanh toán:
                                             </td>
-                                            <td class="text-end py-2 text-nowrap" style="background: rgba(34,197,94,.05);">
+                                            <td class="text-end tw:py-2 tw:whitespace-nowrap" style="background: rgba(34,197,94,.05);">
                                                 <span class="fs-6" style="font-weight:850; color: rgba(22,163,74,1);">
                                                     {{ number_format($paid, 0, ',', '.') }} đ
                                                 </span>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td colspan="9" class="text-end fw-bold py-3 text-nowrap" style="background: rgba(239,68,68,.05); font-weight:800; color: rgba(220,38,38,1);">
+                                            <td colspan="9" class="text-end fw-bold tw:py-4 tw:whitespace-nowrap" style="background: rgba(239,68,68,.05); font-weight:800; color: rgba(220,38,38,1);">
                                                 Số tiền còn lại:
                                             </td>
-                                            <td class="text-end py-3 text-nowrap" style="background: rgba(239,68,68,.05);">
+                                            <td class="text-end tw:py-4 tw:whitespace-nowrap" style="background: rgba(239,68,68,.05);">
                                                 <span class="fs-6" style="font-weight:850; color: rgba(220,38,38,1);">
                                                     {{ number_format(max(0, $sumAfterVat - $paid), 0, ',', '.') }} đ
                                                 </span>
@@ -1336,9 +1330,9 @@
                     </div>
                 </div>
 
-                <div class="glass mb-4">
+                <div class="glass tw:mb-6">
                     <div class="section-head">
-                        <p class="section-title mb-0">
+                        <p class="section-title tw:mb-0">
                             <span class="section-ic"><i class="bi bi-wallet2"></i></span>
                             Lịch sử thanh toán
                         </p>
@@ -1350,7 +1344,7 @@
                             $percentPayment = $totalPayment > 0 ? min(100, ($paidPayment / $totalPayment) * 100) : 0;
                         @endphp
 
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="tw:flex tw:items-center tw:gap-2 flex-wrap">
                             <span class="pill" style="background: rgba(34,197,94,.10); border-color: rgba(34,197,94,.18); color: rgba(22,163,74,1);">
                                 <i class="bi bi-check2-circle"></i>
                                 Đã TT: {{ number_format($paidPayment, 0, ',', '.') }} đ
@@ -1371,21 +1365,21 @@
                     </div>
 
                     <div class="section-body">
-                        <div class="progress mb-3" style="height: 10px;">
+                        <div class="progress tw:mb-4" style="height: 10px;">
                             <div class="progress-bar bg-success" role="progressbar" style="width: {{ $percentPayment }}%"></div>
                         </div>
 
                         @if($order->payments->count() > 0)
                             <div class="table-responsive">
-                                <table class="table table-sm align-middle mb-0" style="min-width: 980px;">
+                                <table class="table table-sm align-middle tw:mb-0" style="min-width: 980px;">
                                     <thead class="table-light">
-                                        <tr class="small text-uppercase" style="color: var(--muted2); font-weight: 800;">
+                                        <tr class="small tw:uppercase" style="color: var(--muted2); font-weight: 800;">
                                             <th>Ngày TT</th>
                                             <th>Số tiền</th>
                                             <th>Phương thức</th>
                                             <th>Người ghi nhận</th>
                                             <th>Ghi chú</th>
-                                            <th class="text-center" style="min-width: 170px;">Thao tác</th>
+                                            <th class="tw:text-center" style="min-width: 170px;">Thao tác</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1396,8 +1390,8 @@
                                                 <td><span class="pill">{{ $payment->method->method_name ?? 'N/A' }}</span></td>
                                                 <td><small style="font-weight:750;">{{ $payment->recordedBy->name ?? 'System' }}</small></td>
                                                 <td style="color: var(--muted); font-weight: 650;">{{ $payment->note ?? '-' }}</td>
-                                                <td class="text-center">
-                                                    <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                                <td class="tw:text-center">
+                                                    <div class="tw:flex tw:justify-center tw:gap-2 flex-wrap">
                                                         <button type="button"
                                                                 class="btn btn-sm btn-outline-primary"
                                                                 style="border-radius: 10px;"
@@ -1424,7 +1418,7 @@
                                 </table>
                             </div>
                         @else
-                            <div class="text-center text-muted py-3">Chưa có giao dịch thanh toán nào.</div>
+                            <div class="tw:text-center text-muted tw:py-4">Chưa có giao dịch thanh toán nào.</div>
                         @endif
                     </div>
                 </div>
@@ -1445,7 +1439,7 @@
                                     </div>
 
                                     <div class="modal-body">
-                                        <div class="mb-3">
+                                        <div class="tw:mb-4">
                                             <label class="form-label" style="font-weight:750;">Ngày thanh toán</label>
                                             <input type="date"
                                                    name="payment_date"
@@ -1454,7 +1448,7 @@
                                                    required>
                                         </div>
 
-                                        <div class="mb-3">
+                                        <div class="tw:mb-4">
                                             <label class="form-label" style="font-weight:750;">Số tiền</label>
                                             <div class="input-group">
                                                 <input type="number" name="amount" class="form-control" step="any" value="{{ $payment->amount ?? 0 }}" required>
@@ -1462,7 +1456,7 @@
                                             </div>
                                         </div>
 
-                                        <div class="mb-3">
+                                        <div class="tw:mb-4">
                                             <label class="form-label" style="font-weight:750;">Phương thức thanh toán</label>
                                             <select name="method_id" class="form-select" required>
                                                 <option value="">-- Chọn phương thức --</option>
@@ -1474,7 +1468,7 @@
                                             </select>
                                         </div>
 
-                                        <div class="mb-0">
+                                        <div class="tw:mb-0">
                                             <label class="form-label" style="font-weight:750;">Ghi chú</label>
                                             <textarea name="note" class="form-control" rows="2">{{ $payment->note ?? '' }}</textarea>
                                         </div>
@@ -1492,9 +1486,9 @@
                     </div>
                 @endforeach
 
-                <div class="glass mb-4">
+                <div class="glass tw:mb-6">
                     <div class="section-head">
-                        <p class="section-title mb-0">
+                        <p class="section-title tw:mb-0">
                             <span class="section-ic"><i class="bi bi-clock-history"></i></span>
                             Nhật ký xử lý
                         </p>
@@ -1502,10 +1496,10 @@
 
                     <div class="section-body">
                         @if($isCancelled)
-                            <div class="alert alert-danger mb-3">
-                                <i class="bi bi-x-circle-fill me-2"></i>
+                            <x-ui.alert variant="danger" class="tw:mb-4">
+                                <i class="bi bi-x-circle-fill tw:mr-2"></i>
                                 Đơn hàng đã bị hủy.
-                            </div>
+                            </x-ui.alert>
                         @endif
 
                         @forelse($timeline as $item)
@@ -1513,14 +1507,14 @@
                                 <div class="timeline-dot"><i class="bi bi-check-lg"></i></div>
 
                                 <div style="width:100%;">
-                                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                                    <div class="tw:flex flex-wrap tw:justify-between tw:gap-2">
                                         <div style="font-weight:750;">{{ $item->statusType->name ?? 'Thay đổi trạng thái' }}</div>
                                         <div class="small" style="color: var(--muted); font-weight: 650;">
                                             {{ $item->changed_at ? Carbon::parse($item->changed_at)->format('d/m/Y H:i') : '' }}
                                         </div>
                                     </div>
 
-                                    <div class="small mt-1" style="color: var(--muted); font-weight: 650;">
+                                    <div class="small tw:mt-1" style="color: var(--muted); font-weight: 650;">
                                         @if($item->from_department)
                                             {{ ucfirst($item->from_department) }} <i class="bi bi-arrow-right"></i>
                                         @endif
@@ -1529,20 +1523,20 @@
                                         <i class="bi bi-person"></i> {{ $item->changedBy->name ?? 'Hệ thống' }}
                                     </div>
 
-                                    <div class="timeline-note mt-2">{{ $item->note ?? 'Không có ghi chú' }}</div>
+                                    <div class="timeline-note tw:mt-2">{{ $item->note ?? 'Không có ghi chú' }}</div>
                                 </div>
                             </div>
                         @empty
-                            <div class="text-center text-muted">Chưa có lịch sử ghi nhận.</div>
+                            <div class="tw:text-center text-muted">Chưa có lịch sử ghi nhận.</div>
                         @endforelse
                     </div>
                 </div>
             </div>
 
-            <div class="col-lg-4">
-                <div class="glass mb-4">
+            <div class="tw:min-[62rem]:col12-4">
+                <div class="glass tw:mb-6">
                     <div class="section-head" style="background: rgba(15,23,42,.92); color:#fff;">
-                        <p class="section-title mb-0" style="color:#fff;">
+                        <p class="section-title tw:mb-0" style="color:#fff;">
                             <span class="section-ic" style="background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.20); color:#fff;">
                                 <i class="bi bi-info-square"></i>
                             </span>
@@ -1578,14 +1572,14 @@
                     </div>
                 </div>
 
-                <div class="glass mb-4">
+                <div class="glass tw:mb-6">
                     <div class="section-head">
-                        <p class="section-title mb-0">
+                        <p class="section-title tw:mb-0">
                             <span class="section-ic"><i class="bi bi-receipt"></i></span>
                             Thông tin xuất hoá đơn
                         </p>
 
-                        <div class="ms-auto">
+                        <div class="tw:ml-auto">
                             @if($invoiceStatus === 'issued')
                                 <span class="pill" style="background: rgba(34,197,94,.10); border-color: rgba(34,197,94,.18); color: rgba(22,163,74,1);">
                                     <i class="bi bi-check2-circle"></i> Đã xuất
@@ -1634,9 +1628,9 @@
                             </div>
                         @endif
 
-                        <div class="mt-3 no-print d-grid gap-2">
+                        <div class="tw:mt-4 no-print d-grid tw:gap-2">
                             <button type="button"
-                                    class="btn-ghost w-100"
+                                    class="btn-ghost tw:w-full"
                                     data-bs-toggle="modal"
                                     data-bs-target="#invoiceModal">
                                 <i class="bi bi-pencil-square"></i>
@@ -1646,14 +1640,14 @@
                     </div>
                 </div>
 
-                <div class="glass mb-4">
+                <div class="glass tw:mb-6">
                     <div class="section-head">
-                        <p class="section-title mb-0">
+                        <p class="section-title tw:mb-0">
                             <span class="section-ic"><i class="bi bi-truck"></i></span>
                             Vận chuyển
                         </p>
 
-                        <div class="ms-auto">
+                        <div class="tw:ml-auto">
                             @php
                                 $hasShippingInfo = filled($order->shipping_carrier)
                                     || filled($order->tracking_number)
@@ -1703,14 +1697,14 @@
                             <div class="meta-value">{{ !empty($order->estimated_delivery) ? \Carbon\Carbon::parse($order->estimated_delivery)->format('d/m/Y') : '—' }}</div>
                         </div>
 
-                        <div class="row g-2">
-                            <div class="col-6">
+                        <div class="tw:row tw:g-2">
+                            <div class="tw:col12-6">
                                 <div class="meta">
                                     <div class="meta-label">Người nhận</div>
                                     <div class="meta-value">{{ $order->receiver_name ?: '—' }}</div>
                                 </div>
                             </div>
-                            <div class="col-6">
+                            <div class="tw:col12-6">
                                 <div class="meta">
                                     <div class="meta-label">SĐT</div>
                                     <div class="meta-value">{{ $order->receiver_phone ?: '—' }}</div>
@@ -1783,13 +1777,13 @@
                             </div>
                         </div>
 
-                        <div class="mt-3 no-print d-grid gap-2">
+                        <div class="tw:mt-4 no-print d-grid tw:gap-2">
                             @if($isCancelled)
-                                <button class="btn btn-outline-danger w-100" disabled style="border-radius: 14px; font-weight: 750; font-size: 12.5px;">
+                                <button class="btn btn-outline-danger tw:w-full" disabled style="border-radius: 14px; font-weight: 750; font-size: 12.5px;">
                                     <i class="bi bi-x-circle me-1"></i> Đơn hàng đã hủy
                                 </button>
                             @else
-                                <button type="button" class="btn-ghost w-100" data-bs-toggle="modal" data-bs-target="#shippingModal">
+                                <button type="button" class="btn-ghost tw:w-full" data-bs-toggle="modal" data-bs-target="#shippingModal">
                                     <i class="bi bi-pencil-square me-1"></i>
                                     {{ $hasShippingInfo ? 'Cập nhật thông tin vận chuyển' : 'Nhập thông tin vận chuyển' }}
                                 </button>
@@ -1798,18 +1792,18 @@
                                     <form action="{{ route('orders.markShipped', $order->id) }}" method="POST">
                                         @csrf
                                         <button type="submit"
-                                                class="btn btn-success w-100"
+                                                class="btn btn-success tw:w-full"
                                                 style="border-radius: 14px; font-weight: 750; font-size: 12.5px;"
                                                 onclick="return confirm('Xác nhận đơn hàng này đã vận chuyển?')">
                                             <i class="bi bi-check2-circle me-1"></i> Đánh dấu đã vận chuyển
                                         </button>
                                     </form>
                                 @elseif($isActuallyShipped)
-                                    <button class="btn-ghost w-100" disabled style="opacity:.75;">
+                                    <button class="btn-ghost tw:w-full" disabled style="opacity:.75;">
                                         <i class="bi bi-check2-circle me-1"></i> Đã vận chuyển
                                     </button>
                                 @else
-                                    <button class="btn btn-outline-secondary w-100" disabled style="border-radius: 14px; font-weight: 750; font-size: 12.5px;">
+                                    <button class="btn btn-outline-secondary tw:w-full" disabled style="border-radius: 14px; font-weight: 750; font-size: 12.5px;">
                                         <i class="bi bi-lock me-1"></i> Nhập thông tin vận chuyển trước
                                     </button>
                                 @endif
@@ -1820,18 +1814,18 @@
 
                 <div class="glass sticky-card no-print">
                     <div class="section-head">
-                        <p class="section-title mb-0">
+                        <p class="section-title tw:mb-0">
                             <span class="section-ic"><i class="bi bi-gear"></i></span>
                             Bảng điều khiển
                         </p>
                     </div>
 
                     <div class="section-body">
-                        <div class="d-grid gap-2">
+                        <div class="d-grid tw:gap-2">
                             @if($isCancelled)
-                                <div class="alert alert-danger mb-0" style="border-radius: 14px;">
+                                <x-ui.alert variant="danger" class="tw:mb-0" style="border-radius: 14px;">
                                     <i class="bi bi-x-circle me-1"></i> Đơn hàng đã hủy.
-                                </div>
+                                </x-ui.alert>
                             @else
                                 @can('recordPayment', $order)
                                     @php
@@ -1839,15 +1833,15 @@
                                     @endphp
 
                                     @if($remainingDebt > 0)
-                                        <button class="btn-ghost text-start w-100" type="button"
+                                        <button class="btn-ghost tw:text-left tw:w-full" type="button"
                                                 data-bs-toggle="modal" data-bs-target="#paymentModal">
-                                            <i class="bi bi-cash-coin me-2"></i> Ghi nhận thanh toán
-                                            <small class="d-block mt-1" style="color: var(--muted); font-weight: 650;">
+                                            <i class="bi bi-cash-coin tw:mr-2"></i> Ghi nhận thanh toán
+                                            <small class="tw:block tw:mt-1" style="color: var(--muted); font-weight: 650;">
                                                 Còn nợ: {{ number_format($remainingDebt, 0, ',', '.') }} đ
                                             </small>
                                         </button>
                                     @else
-                                        <div class="pill w-100 d-flex align-items-center gap-2"
+                                        <div class="pill tw:w-full tw:flex tw:items-center tw:gap-2"
                                              style="background: rgba(34,197,94,.10); border: 1px solid rgba(34,197,94,.18); color: rgba(22,163,74,1);
                                                     padding: 10px 12px; border-radius: 12px; font-weight: 750;">
                                             <i class="bi bi-check2-circle"></i>
@@ -1857,8 +1851,8 @@
                                 @endcan
 
                                 @can('ship', $order)
-                                    <button class="btn-ghost text-start" type="button" data-bs-toggle="modal" data-bs-target="#stockModal">
-                                        <i class="bi bi-box-seam-fill me-2"></i> Xác nhận xuất kho
+                                    <button class="btn-ghost tw:text-left" type="button" data-bs-toggle="modal" data-bs-target="#stockModal">
+                                        <i class="bi bi-box-seam-fill tw:mr-2"></i> Xác nhận xuất kho
                                     </button>
                                 @endcan
 
@@ -1866,10 +1860,10 @@
                                     <hr class="my-2">
                                     <form action="{{ route('orders.cancel', $order->id) }}" method="POST">
                                         @csrf
-                                        <button type="submit" class="btn btn-warning w-100"
+                                        <button type="submit" class="btn btn-warning tw:w-full"
                                                 onclick="return confirm('Bạn có chắc chắn muốn hủy đơn hàng này?\n\n(Dữ liệu vẫn sẽ được giữ lại)')"
                                                 style="border-radius: 14px; font-weight: 750; font-size: 12.5px;">
-                                            <i class="bi bi-x-circle me-2"></i> Hủy đơn hàng
+                                            <i class="bi bi-x-circle tw:mr-2"></i> Hủy đơn hàng
                                         </button>
                                     </form>
                                 @endcan
@@ -1878,9 +1872,9 @@
                     </div>
                 </div>
 
-                <div class="glass mt-3 no-print">
+                <div class="glass tw:mt-4 no-print">
                     <div class="section-head">
-                        <p class="section-title mb-0">
+                        <p class="section-title tw:mb-0">
                             <span class="section-ic"><i class="bi bi-pencil-square"></i></span>
                             Lịch sử chỉnh sửa
                         </p>
@@ -1966,18 +1960,18 @@
                     </div>
 
                     <div class="modal-body">
-                        <div class="alert alert-light border mb-3">
+                        <x-ui.alert variant="light" class="tw:border tw:border-[#dee2e6] tw:mb-4">
                             Tổng tiền: <strong>{{ number_format($order->total_amount ?? 0, 0, ',', '.') }} đ</strong><br>
                             Đã TT: <strong class="text-success">{{ number_format($paid, 0, ',', '.') }} đ</strong><br>
                             Còn lại: <strong class="text-danger">{{ number_format(max(0,$remain), 0, ',', '.') }} đ</strong>
-                        </div>
+                        </x-ui.alert>
 
-                        <div class="mb-3">
+                        <div class="tw:mb-4">
                             <label class="form-label" style="font-weight:750;">Ngày thanh toán</label>
                             <input type="date" name="payment_date" class="form-control" value="{{ date('Y-m-d') }}" required>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="tw:mb-4">
                             <label class="form-label" style="font-weight:750;">Số tiền thực nhận</label>
                             <div class="input-group">
                                 <input type="number" name="amount" class="form-control" step="any" value="{{ max(0,$remain) }}" required>
@@ -1985,7 +1979,7 @@
                             </div>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="tw:mb-4">
                             <label class="form-label" style="font-weight:750;">Phương thức thanh toán <span class="text-danger">*</span></label>
                             <select name="method_id" class="form-select" required>
                                 <option value="">-- Chọn phương thức --</option>
@@ -1999,7 +1993,7 @@
                             </select>
                         </div>
 
-                        <div class="mb-0">
+                        <div class="tw:mb-0">
                             <label class="form-label" style="font-weight:750;">Ghi chú giao dịch</label>
                             <textarea name="note" class="form-control" rows="2" placeholder="Mã GD ngân hàng, người nộp tiền..."></textarea>
                         </div>
@@ -2030,7 +2024,7 @@
                     </div>
 
                     <div class="modal-body">
-    <div class="mb-2">
+    <div class="tw:mb-2">
         <label class="form-label" style="font-weight:750;">Trạng thái</label>
         <select name="invoice_status" class="form-select">
             <option value="none" {{ $invoiceStatus == 'none' ? 'selected' : '' }}>Không yêu cầu</option>
@@ -2039,33 +2033,33 @@
         </select>
     </div>
 
-    <div class="mb-2">
+    <div class="tw:mb-2">
         <label class="form-label" style="font-weight:750;">Tên công ty</label>
         <input name="invoice_company_name" class="form-control" value="{{ old('invoice_company_name', $invoiceCompanyName) }}">
     </div>
 
-    <div class="mb-2">
+    <div class="tw:mb-2">
         <label class="form-label" style="font-weight:750;">MST</label>
         <input name="invoice_tax_code" class="form-control" value="{{ old('invoice_tax_code', $invoiceTaxCode) }}">
     </div>
 
-    <div class="mb-2">
+    <div class="tw:mb-2">
         <label class="form-label" style="font-weight:750;">Địa chỉ</label>
         <textarea name="invoice_address" class="form-control">{{ old('invoice_address', $invoiceAddress) }}</textarea>
     </div>
 
-    <div class="mb-2">
+    <div class="tw:mb-2">
         <label class="form-label" style="font-weight:750;">Email nhận HĐ</label>
         <input name="invoice_email" class="form-control" value="{{ old('invoice_email', $invoiceEmail) }}">
     </div>
 
-    <div class="mb-2">
+    <div class="tw:mb-2">
         <label class="form-label" style="font-weight:750;">Upload chứng từ</label>
         <input type="file" name="invoice_file" class="form-control">
     </div>
     @if(!empty($order->invoice_file))
-    <div class="mt-2">
-        <a href="{{ asset('storage/' . $order->invoice_file) }}" target="_blank" class="text-decoration-none">
+    <div class="tw:mt-2">
+        <a href="{{ asset('storage/' . $order->invoice_file) }}" target="_blank" class="tw:no-underline">
             <i class="bi bi-file-earmark-text"></i> Xem file hiện tại
         </a>
     </div>
@@ -2096,50 +2090,50 @@
                     </div>
 
                     <div class="modal-body">
-                        <div class="mb-2">
+                        <div class="tw:mb-2">
                             <label class="form-label" style="font-weight:750;">Đơn vị VC</label>
                             <input class="form-control" name="shipping_carrier" value="{{ old('shipping_carrier', $order->shipping_carrier) }}">
                         </div>
 
-                        <div class="mb-2">
+                        <div class="tw:mb-2">
                             <label class="form-label" style="font-weight:750;">Mã vận đơn</label>
                             <input class="form-control" name="tracking_number" value="{{ old('tracking_number', $order->tracking_number) }}">
                         </div>
 
-                        <div class="mb-2">
+                        <div class="tw:mb-2">
                             <label class="form-label" style="font-weight:750;">Ngày giao hàng</label>
                             <input type="date" class="form-control" name="estimated_delivery" value="{{ old('estimated_delivery', !empty($order->estimated_delivery) ? \Carbon\Carbon::parse($order->estimated_delivery)->format('Y-m-d') : '') }}">
                         </div>
 
-                        <div class="row g-2">
-                            <div class="col-6">
+                        <div class="tw:row tw:g-2">
+                            <div class="tw:col12-6">
                                 <label class="form-label" style="font-weight:750;">Người nhận</label>
                                 <input class="form-control" name="receiver_name" value="{{ old('receiver_name', $order->receiver_name) }}">
                             </div>
-                            <div class="col-6">
+                            <div class="tw:col12-6">
                                 <label class="form-label" style="font-weight:750;">SĐT</label>
                                 <input class="form-control" name="receiver_phone" value="{{ old('receiver_phone', $order->receiver_phone) }}">
                             </div>
                         </div>
 
-                        <div class="mt-2">
+                        <div class="tw:mt-2">
                             <label class="form-label" style="font-weight:750;">Địa chỉ</label>
                             <textarea class="form-control" rows="2" name="shipping_address">{{ old('shipping_address', $order->shipping_address) }}</textarea>
                         </div>
 
-                        <div class="mt-2">
+                        <div class="tw:mt-2">
                             <label class="form-label" style="font-weight:750;">Ghi chú giao hàng</label>
                             <textarea class="form-control" rows="2" name="shipping_note">{{ old('shipping_note', $order->shipping_note) }}</textarea>
                         </div>
 
-                        <div class="shipping-fee-box mt-3">
+                        <div class="shipping-fee-box tw:mt-4">
                             <div class="shipping-fee-title">
                                 <i class="bi bi-cash-coin"></i>
                                 Chi phí vận chuyển
                             </div>
 
-                            <div class="row g-2">
-                                <div class="col-6">
+                            <div class="tw:row tw:g-2">
+                                <div class="tw:col12-6">
                                     <label class="form-label" style="font-weight:750;">Phí kho → chành</label>
                                     <div class="input-group">
                                         <input type="number"
@@ -2152,7 +2146,7 @@
                                     </div>
                                 </div>
 
-                                <div class="col-6">
+                                <div class="tw:col12-6">
                                     <label class="form-label" style="font-weight:750;">Phí chành → khách</label>
                                     <div class="input-group">
                                         <input type="number"
@@ -2166,8 +2160,8 @@
                                 </div>
                             </div>
 
-                            <div class="mt-3">
-                                <label class="form-label d-block" style="font-weight:750;">Ai chịu phí vận chuyển?</label>
+                            <div class="tw:mt-4">
+                                <label class="form-label tw:block" style="font-weight:750;">Ai chịu phí vận chuyển?</label>
 
                                 <div class="shipping-payer-options">
                                     <input class="btn-check"
@@ -2201,9 +2195,9 @@
                             </div>
                         </div>
 
-                        <div class="alert alert-info mt-3 mb-0">
+                        <x-ui.alert variant="info" class="tw:mt-4 tw:mb-0">
                             Khi bấm <b>Lưu thông tin</b>, hệ thống chỉ lưu thông tin và chuyển trạng thái sang <b>Chờ vận chuyển</b>.
-                        </div>
+                        </x-ui.alert>
                     </div>
 
                     <div class="modal-footer">
@@ -2228,23 +2222,23 @@
                     </div>
 
                     <div class="modal-body">
-                        <div class="alert alert-warning">
+                        <x-ui.alert variant="warning">
                             <i class="bi bi-exclamation-triangle"></i>
                             Hành động này sẽ trừ tồn kho và hoàn tất đơn hàng.
-                        </div>
+                        </x-ui.alert>
 
-                        <div class="row g-2 mb-3">
-                            <div class="col-md-6">
+                        <div class="tw:row tw:g-2 tw:mb-4">
+                            <div class="tw:md:col12-6">
                                 <label class="form-label" style="font-weight:750;">Ngày xuất kho</label>
                                 <input type="date" class="form-control" name="actual_ship_date" value="{{ date('Y-m-d') }}" required>
                             </div>
-                            <div class="col-md-6">
+                            <div class="tw:md:col12-6">
                                 <label class="form-label" style="font-weight:750;">Bảo hành sau khi xuất (tháng)</label>
                                 <input type="number" class="form-control" name="warranty_months" value="60" min="1" max="240" required>
                             </div>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="tw:mb-4">
                             <label class="form-label" style="font-weight:750;">Ghi chú xuất kho (tùy chọn)</label>
                             <textarea name="shipping_note" class="form-control" rows="2" placeholder="Thông tin xuất kho..."></textarea>
                         </div>
@@ -2252,8 +2246,8 @@
                         <hr class="my-3">
 
                         <div id="ship-serials-wrapper" style="display:none;">
-                            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                                <div class="fw-semibold">
+                            <div class="tw:flex tw:justify-between tw:items-center tw:mb-2 flex-wrap tw:gap-2">
+                                <div class="tw:font-semibold">
                                     <i class="bi bi-upc-scan"></i> Chọn Serial/IMEI để xuất
                                 </div>
                                 <input type="text" class="form-control form-control-sm" id="serialSearch"
@@ -2261,9 +2255,9 @@
                             </div>
 
                             <div id="ship-serials-container"></div>
-                            <div id="ship-serials-error" class="alert alert-danger mt-2" style="display:none;"></div>
+                            <x-ui.alert variant="danger" class="tw:mt-2" id="ship-serials-error" style="display:none;"></x-ui.alert>
 
-                            <div class="text-muted small mt-2">
+                            <div class="text-muted small tw:mt-2">
                                 * Sản phẩm quản lý Serial/IMEI: phải chọn đúng số lượng serial theo số lượng trong đơn.
                             </div>
                         </div>
@@ -2298,9 +2292,9 @@
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-danger mb-0" style="border-radius: 14px; line-height: 1.55;">
+                        <x-ui.alert variant="danger" class="tw:mb-0" style="border-radius: 14px; line-height: 1.55;">
                             {!! nl2br(e(session('stock_error_popup'))) !!}
-                        </div>
+                        </x-ui.alert>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light border" data-bs-dismiss="modal" style="border-radius: 14px; font-weight: 750;">
@@ -2321,17 +2315,17 @@
                 </div>
 
                 <div class="modal-body">
-                    <div class="alert alert-danger">
+                    <x-ui.alert variant="danger">
                         <i class="bi bi-exclamation-circle"></i>
                         <strong>Cảnh báo:</strong> Hành động này <strong>KHÔNG THỂ PHỤC HỒI</strong>.
-                    </div>
+                    </x-ui.alert>
 
-                    <p class="mb-2" style="font-weight:750;">Bạn sắp xóa đơn hàng:</p>
-                    <div class="card p-3 bg-light" style="border-radius: 16px; border: 1px solid rgba(15,23,42,.08);">
-                        <strong class="text-primary">{{ $order->order_code }}</strong><br>
+                    <p class="tw:mb-2" style="font-weight:750;">Bạn sắp xóa đơn hàng:</p>
+                    <x-ui.card class="tw:p-4 bg-light" style="border-radius: 16px; border: 1px solid rgba(15,23,42,.08);">
+                        <strong class="tw:text-[#0d6efd]">{{ $order->order_code }}</strong><br>
                         <small class="text-muted">Khách: {{ $customerName }}</small><br>
                         <small class="text-muted">Tổng: {{ number_format($order->total_amount ?? 0, 0, ',', '.') }} đ</small>
-                    </div>
+                    </x-ui.card>
                 </div>
 
                 <div class="modal-footer">
@@ -2353,10 +2347,10 @@
             <div class="modal-content" style="border-radius: 18px !important; overflow: hidden;">
                 <div class="modal-header">
                     <h5 class="modal-title" style="font-weight:800;">
-                        <i class="bi bi-printer me-2"></i> Xem trước khi in
+                        <i class="bi bi-printer tw:mr-2"></i> Xem trước khi in
                     </h5>
 
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                         <button type="button"
                                 class="btn btn-primary"
                                 onclick="printPdfInIframe()"
@@ -2368,7 +2362,7 @@
                     </div>
                 </div>
 
-                <div class="modal-body p-0" style="height: 80vh; background: #f3f4f6;">
+                <div class="modal-body tw:p-0" style="height: 80vh; background: #f3f4f6;">
                     <iframe
                         id="pdfPreviewFrame"
                         src="{{ route('orders.pdf.preview', $order->id) }}"

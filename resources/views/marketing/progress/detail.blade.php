@@ -80,7 +80,11 @@
     border-top: 1px solid rgba(15,23,42,.06);
     vertical-align: middle;
   }
-  .statusSel{
+  /* Nhân đôi bộ chọn (0,2,0) là CỐ Ý: khối này nằm trong khối đẩy vào "styles",
+   layout đặt trước Vite nên app.css nạp SAU. `background` viết tắt ở đây xoá
+   mũi tên của ô chọn; để độ đặc hiệu 0,1,0 thì utility Tailwind thắng và mũi
+   tên hiện lại (đo được). */
+.statusSel.statusSel{
     border-radius: 12px;
     border: 1px solid rgba(15,23,42,.12);
     background: rgba(255,255,255,.86);
@@ -95,7 +99,7 @@
   $label = strtoupper($channel);
 @endphp
 
-<div class="container-fluid py-3">
+<div class="container-fluid tw:py-4">
   <div class="wrap">
 
     <div class="top">
@@ -104,32 +108,32 @@
         <div class="sub">Đổi trạng thái task sẽ tự cập nhật tiến độ.</div>
       </div>
 
-      <div class="d-flex gap-2 align-items-center flex-wrap">
-        <a class="btn btnx" href="{{ route('marketing.progress.index', ['plan_id'=>$planId]) }}">← Về tổng quan</a>
+      <div class="tw:flex tw:gap-2 tw:items-center flex-wrap">
+        <x-ui.button variant="none" size="none" class="btnx tw:text-[#212529]" href="{{ route('marketing.progress.index', ['plan_id'=>$planId]) }}">← Về tổng quan</x-ui.button>
 
-        <form method="GET" action="{{ route('marketing.progress.monthly') }}" class="d-flex gap-2 align-items-center">
+        <form method="GET" action="{{ route('marketing.progress.monthly') }}" class="tw:flex tw:gap-2 tw:items-center">
           <input type="hidden" name="channel" value="{{ $channel }}">
-          <select name="plan_id" class="form-select statusSel" style="min-width:260px;">
+          <x-ui.select name="plan_id" class="statusSel" style="min-width:260px;">
             @foreach($plans as $p)
               <option value="{{ $p->id }}" {{ (int)$planId === (int)$p->id ? 'selected' : '' }}>
                 {{ \Carbon\Carbon::parse($p->month)->format('m/Y') }} — {{ $p->name }}
               </option>
             @endforeach
-          </select>
-          <button class="btn btnx">Xem</button>
+          </x-ui.select>
+          <x-ui.button variant="none" size="none" type="submit" class="btnx tw:text-[#212529]">Xem</x-ui.button>
         </form>
       </div>
     </div>
 
     @if(session('success'))
-      <div class="alert alert-success">{{ session('success') }}</div>
+      <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
     @endif
 
     <div class="cardx">
       <div class="filters">
         <span class="tag" data-ch="{{ $channel }}"><span class="dot"></span>{{ $label }}</span>
-        <span class="mini ms-2">Plan: <b>{{ $monthText }}</b> • Tổng: <b id="rowCount">{{ count($tasks ?? []) }}</b> task • Tiến độ: <b>{{ $summary['progressPct'] ?? 0 }}%</b></span>
-        <span class="ms-auto mini">Lọc trạng thái:</span>
+        <span class="mini tw:ml-2">Plan: <b>{{ $monthText }}</b> • Tổng: <b id="rowCount">{{ count($tasks ?? []) }}</b> task • Tiến độ: <b>{{ $summary['progressPct'] ?? 0 }}%</b></span>
+        <span class="tw:ml-auto mini">Lọc trạng thái:</span>
 
         <span class="pill active" data-st="todo,doing">Đang làm</span>
         <span class="pill" data-st="todo">Todo</span>
@@ -138,48 +142,48 @@
         <span class="pill" data-st="done">Done</span>
       </div>
 
-      <div class="p-3">
+      <div class="tw:p-4">
         <div class="bar"><div style="width: {{ $summary['progressPct'] ?? 0 }}%"></div></div>
-        <div class="mini mt-2">doing=50%, done=100% (theo weight)</div>
+        <div class="mini tw:mt-2">doing=50%, done=100% (theo weight)</div>
       </div>
 
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle tw:mb-0">
           <thead>
             <tr>
               <th>Task</th>
               <th style="width:120px;">Due</th>
               <th style="width:220px;">Trạng thái</th>
-              <th class="text-end" style="width:90px;">Weight</th>
+              <th class="tw:text-right" style="width:90px;">Weight</th>
             </tr>
           </thead>
           <tbody id="tbodyTasks">
           @forelse($tasks as $t)
             @php $st = (string)($t->status ?? 'todo'); @endphp
             <tr data-st="{{ $st }}">
-              <td class="fw-semibold">{{ $t->title }}</td>
+              <td class="tw:font-semibold">{{ $t->title }}</td>
               <td>{{ $t->due_date ? \Carbon\Carbon::parse($t->due_date)->format('d/m') : '—' }}</td>
               <td>
-                <form method="POST" action="{{ route('marketing.progress.tasks.status', $t->id) }}" class="js-status-form d-flex gap-2 align-items-center">
+                <form method="POST" action="{{ route('marketing.progress.tasks.status', $t->id) }}" class="js-status-form tw:flex tw:gap-2 tw:items-center">
                   @csrf
-                  <select name="status" class="form-select form-select-sm statusSel js-status">
+                  <x-ui.select size="sm" name="status" class="statusSel js-status">
                     @foreach(['todo','doing','blocked','done'] as $x)
                       <option value="{{ $x }}" {{ $st===$x?'selected':'' }}>{{ strtoupper($x) }}</option>
                     @endforeach
-                  </select>
+                  </x-ui.select>
                   <span class="mini">Tự lưu</span>
                 </form>
               </td>
-              <td class="text-end fw-bold">{{ (int)($t->weight ?? 1) }}</td>
+              <td class="tw:text-right tw:font-bold">{{ (int)($t->weight ?? 1) }}</td>
             </tr>
           @empty
-            <tr><td colspan="4" class="text-center text-muted py-4">Chưa có task. Về tổng quan bấm “Tạo task từ kế hoạch”.</td></tr>
+            <tr><td colspan="4" class="tw:text-center tw:text-[rgba(33,37,41,0.75)]! tw:py-6">Chưa có task. Về tổng quan bấm “Tạo task từ kế hoạch”.</td></tr>
           @endforelse
           </tbody>
         </table>
       </div>
 
-      <div class="p-3 mini">
+      <div class="tw:p-4 mini">
         Gợi ý: Todo = chưa làm • Doing = đang làm • Done = xong. Chỉ cần đổi trạng thái là tiến độ tự chạy.
       </div>
     </div>

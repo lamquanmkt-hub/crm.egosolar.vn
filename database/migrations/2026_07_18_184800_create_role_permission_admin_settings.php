@@ -13,31 +13,31 @@ return new class extends Migration
         $permissionsTable = config('permission.table_names.permissions', 'permissions');
         $rolePermissionTable = config('permission.table_names.role_has_permissions', 'role_has_permissions');
 
-        if (!Schema::hasColumn($rolesTable, 'display_name')) {
+        if (! Schema::hasColumn($rolesTable, 'display_name')) {
             Schema::table($rolesTable, function (Blueprint $table) {
                 $table->string('display_name', 120)->nullable()->after('name');
             });
         }
 
-        if (!Schema::hasColumn($rolesTable, 'description')) {
+        if (! Schema::hasColumn($rolesTable, 'description')) {
             Schema::table($rolesTable, function (Blueprint $table) {
                 $table->text('description')->nullable()->after('display_name');
             });
         }
 
-        if (!Schema::hasColumn($rolesTable, 'is_system')) {
+        if (! Schema::hasColumn($rolesTable, 'is_system')) {
             Schema::table($rolesTable, function (Blueprint $table) {
                 $table->boolean('is_system')->default(false)->after('description');
             });
         }
 
-        if (!Schema::hasColumn($rolesTable, 'page_access_enabled')) {
+        if (! Schema::hasColumn($rolesTable, 'page_access_enabled')) {
             Schema::table($rolesTable, function (Blueprint $table) {
                 $table->boolean('page_access_enabled')->default(false)->after('is_system');
             });
         }
 
-        if (!Schema::hasTable('role_permission_audits')) {
+        if (! Schema::hasTable('role_permission_audits')) {
             Schema::create('role_permission_audits', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('actor_id')->nullable()->constrained('users')->nullOnDelete();
@@ -85,7 +85,7 @@ return new class extends Migration
             DB::table($rolesTable)
                 ->where('name', $name)
                 ->update([
-                    'display_name' => DB::raw('COALESCE(display_name, ' . DB::getPdo()->quote($displayName) . ')'),
+                    'display_name' => DB::raw('COALESCE(display_name, '.DB::getPdo()->quote($displayName).')'),
                     'is_system' => true,
                     'updated_at' => now(),
                 ]);

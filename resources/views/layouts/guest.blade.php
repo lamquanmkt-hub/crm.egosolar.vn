@@ -51,7 +51,7 @@
                 Kho, Nhân sự và Ban điều hành.
             </p>
 
-            <div class="ego-login-story__points" aria-label="Năng lực hệ thống">
+            <div class="ego-login-story__points" role="group" aria-label="Năng lực hệ thống">
                 <span><b>01</b> Quy trình liên phòng ban</span>
                 <span><b>02</b> Dữ liệu theo thời gian thực</span>
                 <span><b>03</b> Phân quyền theo vai trò</span>

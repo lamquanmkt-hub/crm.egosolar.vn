@@ -9,19 +9,19 @@
 
 <div class="solar-page">
     <div class="solar-shell">
-        <div class="hero card">
+        <x-ui.card class="hero">
             <div>
                 <div class="hero-badge">Solar Quick Quote</div>
                 <h1>Công cụ tính nhanh điện mặt trời có lưu trữ</h1>
                 <p>Nhập tiền điện hàng tháng, hệ thống tự quy đổi theo giá điện trung bình 3.000 VNĐ/kWh và ra full cấu hình: số tấm pin, inverter đúng pha, pin lưu trữ theo mức dùng điện, vật tư phụ, tủ điện, nhân công, giao hàng.</p>
             </div>
             <a href="{{ route('solar.settings') }}" class="top-link">Cài đặt công thức</a>
-        </div>
+        </x-ui.card>
 
         <div id="calc-toast" class="calc-toast"></div>
 
         <div class="main-grid">
-            <div class="left-panel card">
+            <x-ui.card class="left-panel">
                 <div class="panel-title">Nhập nhanh</div>
 
                 <div class="field big-field">
@@ -142,7 +142,7 @@
                     <button class="btn-primary" type="button" id="btnCalc" onclick="calculateSolar()">Tính báo giá nhanh</button>
                     <button class="btn-secondary" type="button" onclick="resetForm()">Nhập lại</button>
                 </div>
-            </div>
+            </x-ui.card>
 
             <div class="right-panel">
                 <div class="summary-grid">
@@ -175,7 +175,7 @@
                     <div class="info-card"><span>Giao hàng</span><strong id="shipping_cost">0 VNĐ</strong></div>
                 </div>
 
-                <div class="card quote-card">
+                <x-ui.card class="quote-card">
                     <div class="section-head">
                         <div>
                             <div class="section-title">Dự toán vật tư cơ bản</div>
@@ -200,21 +200,21 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </x-ui.card>
 
-                <div class="card compare-card">
+                <x-ui.card class="compare-card">
                     <div class="section-title">So sánh 3 gói gần nhất</div>
                     <div class="compare-grid" id="comparison_plans">
                         <div class="compare-item empty">Chưa có dữ liệu</div>
                     </div>
-                </div>
+                </x-ui.card>
 
-                <div class="card advice-card">
+                <x-ui.card class="advice-card">
                     <div class="section-title">Gợi ý tư vấn nhanh</div>
                     <ul id="advice_list">
                         <li>Nhập tiền điện hàng tháng để hệ thống tự đề xuất cấu hình.</li>
                     </ul>
-                </div>
+                </x-ui.card>
             </div>
         </div>
     </div>
@@ -223,7 +223,7 @@
 <style>
 .solar-page{padding:16px 18px;background:#f6f8fb;min-height:calc(100vh - 80px)}
 .solar-shell{max-width:1280px;margin:0 auto}
-.card,.summary-card,.info-card{background:#fff;border-radius:18px;box-shadow:0 8px 24px rgba(15,23,42,.06);border:1px solid #e2e8f0}
+.card,[data-ego-card],.summary-card,.info-card{background:#fff;border-radius:18px;box-shadow:0 8px 24px rgba(15,23,42,.06);border:1px solid #e2e8f0}
 .hero{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;padding:18px;margin-bottom:14px}
 .hero-badge{display:inline-block;background:#ecfeff;color:#0f766e;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:800;margin-bottom:8px}
 .hero h1{margin:0 0 6px;font-size:28px;line-height:1.15;color:#0f172a}

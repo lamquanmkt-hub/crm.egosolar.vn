@@ -2,6 +2,7 @@
 
 namespace App\Models\CRM\Orders;
 
+use App\Enums\OrderDepartment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -44,13 +45,6 @@ class OrderApproval extends Model
 
     public function getLevelName(): string
     {
-        return match ($this->level) {
-            'sales' => 'Sales',
-            'sales_manager' => 'Sales Manager',
-            'accounting' => 'Kế toán',
-            'management' => 'Ban Giám đốc',
-            'warehouse' => 'Kho',
-            default => (string) $this->level,
-        };
+        return OrderDepartment::fromLegacy((string) $this->level)?->label() ?? (string) $this->level;
     }
 }

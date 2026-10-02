@@ -3,10 +3,11 @@
 namespace App\Services\RolePermission;
 
 use App\Contracts\Services\PageAccessServiceInterface;
+use App\Enums\Role as RoleEnum;
 use App\Models\User;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -15,6 +16,10 @@ use Illuminate\Support\Str;
 class PageAccessService implements PageAccessServiceInterface
 {
     private ?bool $rolesHavePageFlag = null;
+
+    public function __construct(
+        private readonly BusinessPermissionCatalog $businessPermissions = new BusinessPermissionCatalog,
+    ) {}
 
     /**
      * Lấy định nghĩa các quyền trang từ config role_permissions.page_permissions.
@@ -74,6 +79,25 @@ class PageAccessService implements PageAccessServiceInterface
         $path = $path === '//' ? '/' : $path;
 
         foreach ($this->definitions() as $permission => $definition) {
+            /*
+             * EGO_FIX_EXCLUDE_PAGE_ACCESS_V2
+             * Cho phép khai báo các URL cá nhân không bị khóa bởi quyền module.
+             */
+            $excluded = false;
+
+            foreach ($definition['exclude_prefixes'] ?? [] as $rawPrefix) {
+                $excludePrefix = '/'.trim($rawPrefix, '/');
+
+                if ($path === $excludePrefix || str_starts_with($path, $excludePrefix.'/')) {
+                    $excluded = true;
+                    break;
+                }
+            }
+
+            if ($excluded) {
+                continue;
+            }
+
             foreach ($definition['routes'] ?? [] as $pattern) {
                 if ($routeName && Str::is($pattern, $routeName)) {
                     return $permission;
@@ -113,6 +137,19 @@ class PageAccessService implements PageAccessServiceInterface
         }
 
         $user->loadMissing('roles');
+
+        /*
+        | User KHÔNG có role nào -> luôn kiểm soát chặt.
+        |
+        | Trước đây nhánh này trả false ("chưa bật kiểm soát") nên canAccess()
+        | cho qua mọi trang: trên production có 20 tài khoản không role và họ
+        | vào được cả /finance, /nhan-su lẫn /cai-dat — chỉ /orders bị chặn nhờ
+        | nằm trong always_enforce_permissions. Không role thì không có quyền
+        | nào cả, nên đúng ra phải chặn hết.
+        */
+        if ($user->roles->isEmpty()) {
+            return (bool) config('role_permissions.enforce_users_without_role', true);
+        }
 
         if ($this->rolesHavePageFlag()) {
             return $user->roles->contains(
@@ -244,7 +281,11 @@ class PageAccessService implements PageAccessServiceInterface
     }
 
     /**
-     * Lấy tên hiển thị tiếng Việt của role (ưu tiên display_name).
+     * Lấy tên hiển thị tiếng Việt của role (ưu tiên display_name trong DB).
+     *
+     * Tên tiếng Việt lấy từ {@see \App\Enums\Role} chứ không chép tay ở đây nữa.
+     * Bảng `match` cũ đã bỏ sót vai trò mới thêm và làm giao diện hiện tên sinh
+     * tự động kiểu "Cskh" lạc lõng giữa các tên tiếng Việt khác.
      */
     public function displayRoleName($role): string
     {
@@ -252,20 +293,13 @@ class PageAccessService implements PageAccessServiceInterface
             return $role->display_name;
         }
 
-        return match ($role->name) {
-            'admin' => 'Quản trị viên',
-            'management' => 'Ban Giám đốc',
-            'accounting' => 'Kế toán',
-            'warehouse' => 'Kho',
-            'sales' => 'Nhân viên Sales',
-            'sales_manager' => 'Quản lý Sales',
-            'marketing' => 'Nhân viên Marketing',
-            'marketing_manager' => 'Quản lý Marketing',
-            'ky_thuat' => 'Kỹ thuật',
-            'technical_manager' => 'Quản lý Kỹ thuật',
-            'hr' => 'Nhân sự',
-            default => Str::headline(str_replace(['-', '.'], '_', $role->name)),
-        };
+        $known = RoleEnum::tryFromName($role->name ?? null);
+
+        if ($known !== null) {
+            return $known->label();
+        }
+
+        return Str::headline(str_replace(['-', '.'], '_', (string) $role->name));
     }
 
     /**
@@ -289,12 +323,16 @@ class PageAccessService implements PageAccessServiceInterface
             $actionLabel = config('role_permissions.action_labels.'.str_replace('-', '_', $last));
         }
 
+        // Nhãn viết sẵn trong config/permissions.php mô tả rõ nghiệp vụ hơn
+        // (vd "Duyệt đơn – Sales Manager (Bước 1)") nên được ưu tiên.
+        $declaredLabel = $this->businessPermissions->label($name);
+
         return [
             'group_key' => $prefix,
             'group_label' => $group['label'],
             'group_icon' => $group['icon'],
-            'label' => $actionLabel ?: $this->humanize($name),
-            'description' => $name,
+            'label' => $declaredLabel ?: ($actionLabel ?: $this->humanize($name)),
+            'description' => $declaredLabel ?: $name,
             'icon' => 'bi-check2-circle',
         ];
     }
@@ -313,7 +351,7 @@ class PageAccessService implements PageAccessServiceInterface
     private function rolesHavePageFlag(): bool
     {
         if ($this->rolesHavePageFlag === null) {
-            $this->rolesHavePageFlag = Schema::hasColumn(
+            $this->rolesHavePageFlag = SchemaCache::hasColumn(
                 config('permission.table_names.roles', 'roles'),
                 'page_access_enabled'
             );

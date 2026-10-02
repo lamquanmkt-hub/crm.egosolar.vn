@@ -24,14 +24,12 @@ class UpdateSolarMaintenanceRequest extends FormRequest
      */
     public function rules(): array
     {
-        $manualStatuses = array_values(array_diff(
-            array_keys(SolarMaintenanceSchedule::STATUSES),
-            ['pending_approval', 'approved', 'revision_requested', 'completed']
-        ));
-
         return [
             'type' => ['nullable', Rule::in(array_keys(SolarMaintenanceSchedule::TYPES))],
-            'status' => ['nullable', Rule::in($manualStatuses)],
+            'status' => ['nullable', Rule::in(array_values(array_diff(
+                array_keys(SolarMaintenanceSchedule::STATUSES),
+                ['pending_approval', 'approved', 'revision_requested', 'completed']
+            )))],
             'priority' => ['nullable', Rule::in(array_keys(SolarMaintenanceSchedule::PRIORITIES))],
             'scheduled_date' => ['nullable', 'date'],
             'assigned_user_ids' => ['nullable', 'array'],
@@ -44,7 +42,19 @@ class UpdateSolarMaintenanceRequest extends FormRequest
             'issue_note' => ['nullable', 'string', 'max:5000'],
             'technical_note' => ['nullable', 'string', 'max:5000'],
             'result_note' => ['nullable', 'string', 'max:10000'],
-            'report_conclusion' => ['nullable', 'string', 'max:50'],
+            'plan_checklist' => ['nullable', 'array'],
+            'plan_checklist.*' => ['string', Rule::in(['system', 'inverter', 'panels', 'electrical'])],
+            'external_labor_enabled' => ['nullable', 'boolean'],
+            'external_labor_name' => ['nullable', 'string', 'max:255'],
+            'external_labor_contact' => ['nullable', 'string', 'max:255'],
+            'external_labor_estimated_cost' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
+            'execution_fault_note' => ['nullable', 'string', 'max:10000'],
+            'incident_kind' => ['nullable', Rule::in(['none', 'warranty_free', 'maintenance_free', 'warranty_paid', 'maintenance_paid'])],
+            'incident_material_note' => ['nullable', 'string', 'max:5000'],
+            'incident_replacement_reason' => ['nullable', 'string', 'max:5000'],
+            'incident_estimated_cost' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
+            'completion_actual_cost' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
+            'completion_state' => ['nullable', Rule::in(['completed', 'needs_followup'])],
             'reason' => ['nullable', 'string', 'max:1000'],
         ];
     }

@@ -10,7 +10,7 @@ return new class extends Migration
     {
         if (Schema::hasTable('solar_maintenance_schedules')) {
             Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                if (!Schema::hasColumn('solar_maintenance_schedules', 'assigned_user_ids')) {
+                if (! Schema::hasColumn('solar_maintenance_schedules', 'assigned_user_ids')) {
                     $table->text('assigned_user_ids')->nullable()->after('assigned_name');
                 }
             });

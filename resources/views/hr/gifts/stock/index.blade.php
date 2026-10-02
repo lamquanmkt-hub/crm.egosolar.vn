@@ -107,7 +107,7 @@
         </aside>
     </div>
 
-    <section class="gift-card mt-3">
+    <section class="gift-card tw:mt-4">
         <div class="gift-card-head">
             <div>
                 <h2>Phiếu nhập gần đây</h2>

@@ -31,24 +31,6 @@
 @endpush
 
 @section('content')
-@php
-    $validDays = $records->filter(fn ($record) => filled($record->check_in_at))->count();
-    $lateDays = $records->filter(fn ($record) => (int) $record->late_minutes > 0)->count();
-    $completedDays = $records->where('status', 'completed')->count();
-    $totalHours = round($records->sum('work_minutes') / 60, 1);
-    $onTimeDays = $records->filter(fn ($record) => filled($record->check_in_at) && (int) $record->late_minutes === 0)->count();
-    $onTimeRate = $validDays > 0 ? round(($onTimeDays / $validDays) * 100) : 0;
-
-    $statusClass = static function ($status): string {
-        return match ((string) $status) {
-            'completed' => 'success',
-            'checked_in' => 'primary',
-            'late', 'early_leave' => 'warning',
-            'incomplete' => 'danger',
-            default => 'secondary',
-        };
-    };
-@endphp
 
 <div id="egoAttendancePromax">
     <div class="at-shell">
@@ -259,75 +241,71 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($records as $record)
-                                @php
-                                    $pendingCorrection = $record->correctionRequests->firstWhere('status', 'pending');
-                                    $isActiveToday = $record->work_date->isToday() && blank($record->check_out_at);
-                                @endphp
+                            @forelse($recordRows as $row)
                                 <tr>
-                                    <td><strong>{{ $record->work_date->format('d/m/Y') }}</strong></td>
-                                    <td>{{ optional($record->check_in_at)->format('H:i:s') ?? '—' }}</td>
-                                    <td><div class="at-address">{{ $record->check_in_address ?: '—' }}</div></td>
-                                    <td>{{ optional($record->check_out_at)->format('H:i:s') ?? '—' }}</td>
-                                    <td><div class="at-address">{{ $record->check_out_address ?: '—' }}</div></td>
-                                    <td>{{ (int) $record->late_minutes }} phút</td>
-                                    <td>{{ (int) $record->early_leave_minutes }} phút</td>
-                                    <td>{{ number_format($record->work_minutes / 60, 2, ',', '.') }} giờ</td>
+                                    <td><strong>{{ $row->record->work_date->format('d/m/Y') }}</strong></td>
+                                    <td>{{ optional($row->record->check_in_at)->format('H:i:s') ?? '—' }}</td>
+                                    <td><div class="at-address">{{ $row->record->check_in_address ?: '—' }}</div></td>
+                                    <td>{{ optional($row->record->check_out_at)->format('H:i:s') ?? '—' }}</td>
+                                    <td><div class="at-address">{{ $row->record->check_out_address ?: '—' }}</div></td>
+                                    <td>{{ (int) $row->record->late_minutes }} phút</td>
+                                    <td>{{ (int) $row->record->early_leave_minutes }} phút</td>
+                                    <td>{{ number_format($row->record->work_minutes / 60, 2, ',', '.') }} giờ</td>
                                     <td>
-                                        <span class="at-status-pill at-status-pill--{{ $statusClass($record->status) }}">
-                                            {{ $record->status_label }}
+                                        <span class="at-status-pill at-status-pill--{{ $row->statusClass }}">
+                                            {{ $row->record->status_label }}
                                         </span>
                                     </td>
                                     <td>
-                                        @if($pendingCorrection)
+                                        @if($row->pendingCorrection)
                                             <a class="at-correction-pending" href="{{ route('hr.attendance-corrections.index', ['tab' => 'mine']) }}">
                                                 <i class="bi bi-hourglass-split"></i>Đang chờ HR
                                             </a>
-                                        @elseif($isActiveToday)
+                                        @elseif($row->isActiveToday)
                                             <span class="tw:text-[rgba(33,37,41,0.75)]! small tw:whitespace-nowrap">Hoàn tất ca trước</span>
                                         @else
-                                            <button type="button" class="at-correction-btn" onclick="document.getElementById('attendance-correction-{{ $record->id }}').showModal()">
+                                            <button type="button" class="at-correction-btn" onclick="document.getElementById('attendance-correction-{{ $row->record->id }}').showModal()">
                                                 <i class="bi bi-pencil-square"></i> Yêu cầu sửa
                                             </button>
 
-                                            <dialog class="at-correction-dialog" id="attendance-correction-{{ $record->id }}">
+                                            <dialog class="at-correction-dialog" id="attendance-correction-{{ $row->record->id }}">
                                                 <form method="POST" action="{{ route('hr.attendance-corrections.store') }}" enctype="multipart/form-data">
                                                     @csrf
-                                                    <input type="hidden" name="attendance_record_id" value="{{ $record->id }}">
+                                                    <input type="hidden" name="attendance_record_id" value="{{ $row->record->id }}">
 
                                                     <div class="at-correction-dialog__head">
                                                         <div>
                                                             <h3>Yêu cầu sửa chấm công</h3>
-                                                            <p>Ngày {{ $record->work_date->format('d/m/Y') }} · HR sẽ kiểm tra trước khi cập nhật.</p>
+                                                            <p>Ngày {{ $row->record->work_date->format('d/m/Y') }} · HR sẽ kiểm tra trước khi cập nhật.</p>
                                                         </div>
                                                         <button type="button" class="at-correction-dialog__close" aria-label="Đóng" onclick="this.closest('dialog').close()">×</button>
                                                     </div>
 
                                                     <div class="at-correction-dialog__body">
                                                         <div class="at-correction-original">
-                                                            <div><span>Giờ vào hiện tại</span><strong>{{ optional($record->check_in_at)->format('H:i') ?? 'Chưa có' }}</strong></div>
-                                                            <div><span>Giờ ra hiện tại</span><strong>{{ optional($record->check_out_at)->format('H:i') ?? 'Chưa có' }}</strong></div>
+                                                            <div><span>Giờ vào hiện tại</span><strong>{{ optional($row->record->check_in_at)->format('H:i') ?? 'Chưa có' }}</strong></div>
+                                                            <div><span>Giờ ra hiện tại</span><strong>{{ optional($row->record->check_out_at)->format('H:i') ?? 'Chưa có' }}</strong></div>
                                                         </div>
 
                                                         <div class="at-correction-grid">
                                                             <div class="at-correction-field">
-                                                                <label for="correction-in-{{ $record->id }}">Giờ check-in đề nghị *</label>
-                                                                <input id="correction-in-{{ $record->id }}" type="time" name="requested_check_in_time" value="{{ optional($record->check_in_at)->format('H:i') }}" required>
+                                                                <label for="correction-in-{{ $row->record->id }}">Giờ check-in đề nghị *</label>
+                                                                <input id="correction-in-{{ $row->record->id }}" type="time" name="requested_check_in_time" value="{{ optional($row->record->check_in_at)->format('H:i') }}" required>
                                                             </div>
                                                             <div class="at-correction-field">
-                                                                <label for="correction-out-{{ $record->id }}">Giờ check-out đề nghị</label>
-                                                                <input id="correction-out-{{ $record->id }}" type="time" name="requested_check_out_time" value="{{ optional($record->check_out_at)->format('H:i') }}">
+                                                                <label for="correction-out-{{ $row->record->id }}">Giờ check-out đề nghị</label>
+                                                                <input id="correction-out-{{ $row->record->id }}" type="time" name="requested_check_out_time" value="{{ optional($row->record->check_out_at)->format('H:i') }}">
                                                             </div>
                                                         </div>
 
                                                         <div class="at-correction-field">
-                                                            <label for="correction-reason-{{ $record->id }}">Lý do điều chỉnh *</label>
-                                                            <textarea id="correction-reason-{{ $record->id }}" name="reason" rows="4" maxlength="2000" required placeholder="Ví dụ: Quên check-out, hệ thống ghi nhận sai giờ...">{{ old('attendance_record_id') == $record->id ? old('reason') : '' }}</textarea>
+                                                            <label for="correction-reason-{{ $row->record->id }}">Lý do điều chỉnh *</label>
+                                                            <textarea id="correction-reason-{{ $row->record->id }}" name="reason" rows="4" maxlength="2000" required placeholder="Ví dụ: Quên check-out, hệ thống ghi nhận sai giờ...">{{ old('attendance_record_id') == $row->record->id ? old('reason') : '' }}</textarea>
                                                         </div>
 
                                                         <div class="at-correction-field">
-                                                            <label for="correction-files-{{ $record->id }}">Ảnh/file giải trình</label>
-                                                            <input class="at-correction-file" id="correction-files-{{ $record->id }}" type="file" name="attachments[]" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx,.xls,.xlsx,.txt">
+                                                            <label for="correction-files-{{ $row->record->id }}">Ảnh/file giải trình</label>
+                                                            <input class="at-correction-file" id="correction-files-{{ $row->record->id }}" type="file" name="attachments[]" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx,.xls,.xlsx,.txt">
                                                             <small><i class="bi bi-paperclip"></i> Tối đa 5 file, mỗi file không quá 10 MB. Hỗ trợ ảnh, PDF, Word, Excel và TXT.</small>
                                                         </div>
 

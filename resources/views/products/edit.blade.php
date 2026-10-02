@@ -2,282 +2,6 @@
 
 @section('title', 'Sửa sản phẩm')
 
-@php
-    use Illuminate\Support\Facades\DB;
-    use Illuminate\Support\Facades\Schema;
-
-    $categories = $categories ?? collect();
-    $brands = $brands ?? collect();
-    $companies = $companies ?? collect();
-    $companyWarehouses = $companyWarehouses ?? [];
-    $priceTiers = $priceTiers ?? collect();
-
-    $productTable = $product->getTable();
-    $productId = (int) ($product->id ?? 0);
-
-    $companyOptions = $companies->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->values();
-
-    $warehouseOptions = collect($companyWarehouses)->flatMap(function ($list, $companyId) {
-        return collect($list)->map(fn($w) => [
-            'id' => $w->id,
-            'name' => $w->name,
-            'company_id' => (string) $companyId,
-        ]);
-    })->values();
-
-    $costExpr = "COALESCE(NULLIF(l.actual_cost_after_vat,0), NULLIF(l.cost_after_vat,0), COALESCE(l.cost_before_vat,p.price_agent,0) * (1 + COALESCE(l.cost_vat_percent,p.cost_vat_percent,p.vat_percent,0) / 100), COALESCE(p.price_agent_vat,0), 0)";
-
-    $groupRows = collect();
-
-    if (Schema::hasTable('crm_product_stock_lots')) {
-        $q = DB::table($productTable . ' as p')
-            ->leftJoin('crm_product_stock_lots as l', 'l.product_id', '=', 'p.id')
-            ->leftJoin('crm_warehouses as w', 'w.id', '=', 'l.warehouse_id')
-            ->leftJoin('companies as c', 'c.id', '=', 'l.company_id')
-            ->where('p.name', $product->name);
-
-        if (Schema::hasColumn($productTable, 'is_active')) {
-            $q->where(function ($qq) {
-                $qq->where('p.is_active', 1)->orWhereNull('p.is_active');
-            });
-        }
-
-        $groupRows = $q->select([
-                'p.id as product_id',
-                'p.name as product_name',
-                'p.sku',
-                'p.price_agent',
-                'p.price_agent_vat',
-                'p.vat_percent',
-                DB::raw('COALESCE(p.cost_vat_percent, p.vat_percent, 0) as product_cost_vat'),
-                'l.id as stock_lot_id',
-                'l.company_id',
-                'l.warehouse_id',
-                'l.received_at',
-                'l.qty_in',
-                'l.qty_remaining',
-                'l.cost_before_vat',
-                'l.cost_vat_percent',
-                'l.cost_after_vat',
-                'l.extra_cost',
-                'l.actual_cost_after_vat',
-                'l.note as lot_note',
-                'l.lot_name',
-                'w.name as warehouse_name',
-                'c.name as company_name',
-                DB::raw($costExpr . ' as actual_cost_calc'),
-            ])
-            ->orderBy('p.sku')
-            ->orderByRaw('COALESCE(l.received_at, l.created_at) ASC')
-            ->orderBy('l.id')
-            ->get();
-    }
-
-    if ($groupRows->isEmpty()) {
-        $groupRows = collect([(object)[
-            'product_id' => $product->id,
-            'product_name' => $product->name,
-            'sku' => $product->sku,
-            'price_agent' => $product->price_agent ?? 0,
-            'product_cost_vat' => $product->cost_vat_percent ?? $product->vat_percent ?? 0,
-            'stock_lot_id' => null,
-            'company_id' => null,
-            'warehouse_id' => null,
-            'received_at' => date('Y-m-d'),
-            'qty_in' => 1,
-            'qty_remaining' => 1,
-            'cost_before_vat' => $product->price_agent ?? 0,
-            'cost_vat_percent' => $product->cost_vat_percent ?? $product->vat_percent ?? 0,
-            'extra_cost' => 0,
-            'lot_note' => '',
-            'actual_cost_calc' => $product->price_agent_vat ?? 0,
-            'company_name' => '',
-            'warehouse_name' => '',
-        ]]);
-    }
-
-    $currentStockQty = (float) $groupRows->sum(fn($r) => (float) ($r->qty_remaining ?? 0));
-    $currentStockValue = (float) $groupRows->sum(function ($r) {
-        return (float) ($r->qty_remaining ?? 0) * (float) ($r->actual_cost_calc ?? 0);
-    });
-
-    $initialLines = $groupRows->map(function ($r, $idx) {
-        // EGO FIX: Form sửa phải hiển thị tồn hiện tại, không ép tồn 0 thành 1.
-        $qtyRemain = (float) ($r->qty_remaining ?? 0);
-        $qtyIn = (float) ($r->qty_in ?? $qtyRemain);
-        $qtySold = max(0, $qtyIn - $qtyRemain);
-
-        $cost = (float) ($r->cost_before_vat ?? $r->price_agent ?? 0);
-        $vat = (float) ($r->cost_vat_percent ?? $r->product_cost_vat ?? 0);
-
-        return [
-            'product_id' => (int) ($r->product_id ?? 0),
-            'stock_lot_id' => (int) ($r->stock_lot_id ?? 0),
-            'display_name' => (string) (($r->lot_name ?? '') ?: ('Dòng tồn / SKU ' . ($idx + 1))),
-            'sku' => (string) ($r->sku ?? ''),
-            'cost' => $cost,
-            'vat' => $vat,
-            'qty' => $qtyRemain,
-            'qty_in_original' => $qtyIn,
-            'qty_sold' => $qtySold,
-            'date' => $r->received_at ? date('Y-m-d', strtotime($r->received_at)) : date('Y-m-d'),
-            'extra' => (float) ($r->extra_cost ?? 0),
-            'note' => (string) ($r->lot_note ?? ''),
-            'company_id' => (string) ($r->company_id ?? ''),
-            'warehouse_id' => (string) ($r->warehouse_id ?? ''),
-        ];
-    })->values();
-
-    // EGO FIX: Lịch sử phải gồm cả nhập kho và xuất kho, không chỉ dòng tồn hiện tại.
-    $stockHistoryRows = collect();
-    $historyProductIds = $groupRows->pluck('product_id')->map(fn($id) => (int) $id)->filter()->unique()->values();
-
-    if ($historyProductIds->isNotEmpty()) {
-        $stockHistoryRows = $groupRows->filter(fn($r) => !empty($r->stock_lot_id))->map(function ($r) {
-            $qtyIn = (float) ($r->qty_in ?? 0);
-            $cost = (float) ($r->cost_before_vat ?? $r->price_agent ?? 0);
-            $vat = (float) ($r->cost_vat_percent ?? $r->product_cost_vat ?? 0);
-            $after = (float) ($r->actual_cost_calc ?? ($cost * (1 + $vat / 100)));
-
-            return [
-                'type' => 'Nhập kho',
-                'sign' => '+',
-                'product_id' => (int) ($r->product_id ?? 0),
-                'product_name' => (string) ($r->product_name ?? ''),
-                'sku' => (string) ($r->sku ?? ''),
-                'company_name' => (string) ($r->company_name ?? ''),
-                'warehouse_name' => (string) ($r->warehouse_name ?? ''),
-                'date' => $r->received_at ? date('Y-m-d', strtotime($r->received_at)) : '',
-                'sort_at' => $r->received_at ? strtotime($r->received_at) : 0,
-                'cost' => $cost,
-                'vat' => $vat,
-                'after' => $after,
-                'qty' => $qtyIn,
-                'extra' => (float) ($r->extra_cost ?? 0),
-                'actual' => $after,
-                'total' => $after * $qtyIn,
-                'note' => (string) (($r->lot_note ?? '') ?: 'Nhập kho'),
-            ];
-        });
-
-        if (Schema::hasTable('crm_order_item_stock_allocations')) {
-            $allocRows = DB::table('crm_order_item_stock_allocations as a')
-                ->leftJoin('crm_orders as o', 'o.id', '=', 'a.order_id')
-                ->leftJoin('crm_order_items as oi', 'oi.id', '=', 'a.order_item_id')
-                ->leftJoin($productTable . ' as p', 'p.id', '=', 'a.product_id')
-                ->leftJoin('crm_warehouses as w', 'w.id', '=', 'a.warehouse_id')
-                ->leftJoin('companies as c', 'c.id', '=', 'a.company_id')
-                ->whereIn('a.product_id', $historyProductIds->all())
-                ->select([
-                    'a.product_id',
-                    'a.qty',
-                    'a.unit_cost_before_vat',
-                    'a.unit_cost_after_vat',
-                    'a.total_cost_after_vat',
-                    'a.created_at',
-                    'p.name as product_name',
-                    'p.sku',
-                    'w.name as warehouse_name',
-                    'c.name as company_name',
-                    'o.order_code',
-                    'oi.vat_percent as order_vat_percent',
-                ])
-                ->get()
-                ->map(function ($a) {
-                    $qty = (float) ($a->qty ?? 0);
-                    $before = (float) ($a->unit_cost_before_vat ?? 0);
-                    $after = (float) ($a->unit_cost_after_vat ?? 0);
-                    $vat = (float) ($a->order_vat_percent ?? 0);
-
-                    if ($vat <= 0 && $before > 0 && $after > $before) {
-                        $vat = round((($after / $before) - 1) * 100, 2);
-                    }
-
-                    return [
-                        'type' => 'Xuất kho đơn ' . (string) ($a->order_code ?? ''),
-                        'sign' => '-',
-                        'product_id' => (int) ($a->product_id ?? 0),
-                        'product_name' => (string) ($a->product_name ?? ''),
-                        'sku' => (string) ($a->sku ?? ''),
-                        'company_name' => (string) ($a->company_name ?? ''),
-                        'warehouse_name' => (string) ($a->warehouse_name ?? ''),
-                        'date' => $a->created_at ? date('Y-m-d H:i', strtotime($a->created_at)) : '',
-                        'sort_at' => $a->created_at ? strtotime($a->created_at) : 0,
-                        'cost' => $before,
-                        'vat' => $vat,
-                        'after' => $after,
-                        'qty' => -1 * abs($qty),
-                        'extra' => 0,
-                        'actual' => $after,
-                        'total' => -1 * abs((float) ($a->total_cost_after_vat ?? ($after * $qty))),
-                        'note' => 'Xuất kho bán hàng',
-                    ];
-                });
-
-            $stockHistoryRows = $stockHistoryRows->concat($allocRows);
-        }
-
-        $stockHistoryRows = $stockHistoryRows->sortBy('sort_at')->values();
-    }
-
-
-    $serialRowsByProduct = collect();
-
-    if (
-        Schema::hasTable('crm_serial_units') &&
-        Schema::hasTable('crm_serial_unit_identifiers') &&
-        Schema::hasTable('crm_serial_identifiers') &&
-        Schema::hasTable('crm_serial_unit_states')
-    ) {
-        $serialProductIds = $initialLines->pluck('product_id')->map(fn($id) => (int) $id)->filter()->unique()->values();
-
-        if ($serialProductIds->isNotEmpty()) {
-            $serialRows = DB::table('crm_serial_units as su')
-                ->join('crm_serial_unit_identifiers as sui', function ($join) {
-                    $join->on('sui.serial_unit_id', '=', 'su.id')->where('sui.is_primary', 1);
-                })
-                ->join('crm_serial_identifiers as si', 'si.id', '=', 'sui.serial_identifier_id')
-                ->leftJoin('crm_serial_unit_states as st', 'st.serial_unit_id', '=', 'su.id')
-                ->leftJoin('crm_warehouses as w', 'w.id', '=', 'st.warehouse_id')
-                ->leftJoin('crm_serial_warranties as wa', 'wa.serial_unit_id', '=', 'su.id')
-                ->whereIn('su.product_id', $serialProductIds)
-                ->select([
-                    'su.id',
-                    'su.product_id',
-                    'si.code',
-                    'st.state',
-                    'st.warehouse_id',
-                    'w.name as warehouse_name',
-                    'wa.order_id',
-                    'wa.warranty_end_at',
-                ])
-                ->orderBy('si.code')
-                ->get();
-
-            $serialRowsByProduct = $serialRows
-                ->groupBy('product_id')
-                ->map(fn($rows) => $rows->values())
-                ->toArray();
-        }
-    }
-
-    $tierPriceMap = collect($tierPrices ?? []);
-    $savedTierPrices = collect($formData['tierPrices'] ?? []);
-
-    $fmtInput = function ($value) {
-        if ($value === null || $value === '') {
-            return '';
-        }
-
-        $number = (float) $value;
-
-        if (abs($number - round($number)) < 0.00001) {
-            return (string) (int) round($number);
-        }
-
-        return rtrim(rtrim(number_format($number, 2, '.', ''), '0'), '.');
-    };
-@endphp
 
 @section('content')
 <style>
@@ -410,25 +134,39 @@
     @media(max-width:992px){.top-grid,.line-grid-1,.line-grid-2,.line-grid-3,.summary-grid,.price-grid{grid-template-columns:1fr}}
 </style>
 
-<div class="container-fluid ego-page">
-    <div class="ego-head">
+{{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+     thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+     quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+<div class="container-fluid ego-page ego-inventory-enterprise tw:py-4">
+    @include('products.partials.module-nav', ['active' => 'input'])
+
+    <header class="ego-head ego-inventory-page-head">
         <div>
             <h1>Sửa sản phẩm</h1>
             <p>Đang gom {{ $groupRows->pluck('product_id')->unique()->count() }} SKU cùng tên: {{ $product->name }}</p>
         </div>
         <div class="ego-actions">
-            <a href="{{ route('products.input') }}" class="ego-btn ego-btn-light">Quay lại</a>
-            <button type="submit" form="productEditForm" class="ego-btn ego-btn-main">Lưu thay đổi</button>
+            <a href="{{ route('products.input') }}" class="ego-btn ego-btn-light">
+                <i class="bi bi-arrow-left"></i> Về sản phẩm
+            </a>
+            @if(\Illuminate\Support\Facades\Route::has('product-goods-receipts.index') && auth()->user()?->hasAnyRole(['admin', 'warehouse', 'accounting']))
+                <a href="{{ route('product-goods-receipts.index') }}" class="ego-btn ego-btn-light">
+                    <i class="bi bi-box-arrow-in-down"></i> Nhập hàng
+                </a>
+            @endif
+            <button type="submit" form="productEditForm" class="ego-btn ego-btn-main">
+                <i class="bi bi-check2-circle"></i> Lưu thay đổi
+            </button>
         </div>
-    </div>
+    </header>
 
-    @if(session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
-    @if(session('error')) <div class="alert alert-danger">{{ session('error') }}</div> @endif
+    @if(session('success')) <x-ui.alert variant="success" class="tw:rounded-[12px] tw:text-[12px] tw:[font-weight:650]">{{ session('success') }}</x-ui.alert> @endif
+    @if(session('error')) <x-ui.alert variant="danger" class="tw:rounded-[12px] tw:text-[12px] tw:[font-weight:650]">{{ session('error') }}</x-ui.alert> @endif
     @if($errors->any())
-        <div class="alert alert-danger">
+        <x-ui.alert variant="danger" class="tw:rounded-[12px] tw:text-[12px] tw:[font-weight:650]">
             <b>Có lỗi:</b>
-            <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
-        </div>
+            <ul class="tw:mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+        </x-ui.alert>
     @endif
 
     <form id="productEditForm" action="{{ route('products.update', $product->id) }}" method="POST">
@@ -496,88 +234,6 @@
 
 
 {{-- EGO_FORCE_SERIAL_PANEL_START --}}
-@php
-    $egoSerialProductIds = collect();
-
-    if (isset($initialLines)) {
-        $egoSerialProductIds = collect($initialLines)
-            ->map(function ($line) {
-                return is_array($line) ? ($line['product_id'] ?? null) : ($line->product_id ?? null);
-            })
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-    }
-
-    if ($egoSerialProductIds->isEmpty() && isset($groupRows)) {
-        $egoSerialProductIds = collect($groupRows)
-            ->pluck('product_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-    }
-
-    if ($egoSerialProductIds->isEmpty() && isset($product)) {
-        $egoSerialProductIds = collect([(int) $product->id])->filter()->values();
-    }
-
-    $egoSerialProducts = collect();
-
-    if ($egoSerialProductIds->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('crm_product_catalog')) {
-        $egoSerialProducts = \Illuminate\Support\Facades\DB::table('crm_product_catalog')
-            ->whereIn('id', $egoSerialProductIds)
-            ->select('id', 'name', 'sku')
-            ->get()
-            ->keyBy('id');
-    }
-
-    $egoSerialRowsByProduct = collect();
-
-    if (
-        $egoSerialProductIds->isNotEmpty() &&
-        \Illuminate\Support\Facades\Schema::hasTable('crm_serial_units') &&
-        \Illuminate\Support\Facades\Schema::hasTable('crm_serial_unit_identifiers') &&
-        \Illuminate\Support\Facades\Schema::hasTable('crm_serial_identifiers') &&
-        \Illuminate\Support\Facades\Schema::hasTable('crm_serial_unit_states')
-    ) {
-        $egoSerialRowsByProduct = \Illuminate\Support\Facades\DB::table('crm_serial_units as su')
-            ->join('crm_serial_unit_identifiers as sui', function ($join) {
-                $join->on('sui.serial_unit_id', '=', 'su.id')->where('sui.is_primary', 1);
-            })
-            ->join('crm_serial_identifiers as si', 'si.id', '=', 'sui.serial_identifier_id')
-            ->leftJoin('crm_serial_unit_states as st', 'st.serial_unit_id', '=', 'su.id')
-            ->leftJoin('crm_warehouses as w', 'w.id', '=', 'st.warehouse_id')
-            ->leftJoin('crm_serial_warranties as wa', 'wa.serial_unit_id', '=', 'su.id')
-            ->whereIn('su.product_id', $egoSerialProductIds)
-            ->select([
-                'su.id',
-                'su.product_id',
-                'si.code',
-                'st.state',
-                'st.warehouse_id',
-                'w.name as warehouse_name',
-                'wa.order_id',
-                'wa.warranty_end_at',
-            ])
-            ->orderBy('si.code')
-            ->get()
-            ->groupBy('product_id');
-    }
-
-    $egoSerialWarehouses = \Illuminate\Support\Facades\Schema::hasTable('crm_warehouses')
-        ? \Illuminate\Support\Facades\DB::table('crm_warehouses')->select('id', 'name')->orderBy('name')->get()
-        : collect();
-
-    $egoStateLabels = [
-        'in_stock' => 'Trong kho',
-        'sold' => 'Đã bán',
-        'delivered' => 'Đã giao',
-        'returned' => 'Hàng trả',
-        'removed' => 'Đã xóa',
-    ];
-@endphp
 
 <style>
     .ego-serial-clean{
@@ -816,20 +472,16 @@
     </div>
 
     <div class="ego-serial-clean-body">
-        @forelse($egoSerialProductIds as $egoPid)
-            @php
-                $egoProduct = $egoSerialProducts[$egoPid] ?? null;
-                $egoRows = collect($egoSerialRowsByProduct[$egoPid] ?? []);
-            @endphp
+        @forelse($serialGroups as $group)
 
             <div class="ego-serial-product-name">
-                {{ $egoProduct->name ?? ('Sản phẩm #' . $egoPid) }}
-                @if(!empty($egoProduct->sku))
-                    <span>— {{ $egoProduct->sku }}</span>
+                {{ $group->product->name ?? ('Sản phẩm #' . $group->productId) }}
+                @if(!empty($group->product->sku))
+                    <span>— {{ $group->product->sku }}</span>
                 @endif
             </div>
 
-            @if($egoRows->isNotEmpty())
+            @if($group->lines !== [])
                 <div class="ego-serial-table">
                     <div class="ego-serial-table-head">
                         <div class="ego-serial-th">Mã serial</div>
@@ -840,28 +492,24 @@
                         <div class="ego-serial-th">Xóa</div>
                     </div>
 
-                    @foreach($egoRows as $sr)
-                        @php
-                            $state = $sr->state ?: 'unknown';
-                            $locked = in_array($state, ['sold', 'delivered', 'warranty', 'warranty_claim'], true);
-                        @endphp
+                    @foreach($group->lines as $line)
 
-                        <div class="ego-serial-line" data-serial-row="{{ $sr->id }}">
+                        <div class="ego-serial-line" data-serial-row="{{ $line->serial->id }}">
                             <div class="ego-serial-td">
-                                <input class="ego-serial-input" data-serial-code value="{{ $sr->code }}">
+                                <input class="ego-serial-input" data-serial-code value="{{ $line->serial->code }}">
                             </div>
 
                             <div class="ego-serial-td">
-                                <span class="ego-serial-badge {{ $locked ? 'sold' : '' }}">
-                                    {{ $egoStateLabels[$state] ?? $state }}
+                                <span class="ego-serial-badge {{ $line->locked ? 'sold' : '' }}">
+                                    {{ $egoStateLabels[$line->state] ?? $line->state }}
                                 </span>
                             </div>
 
                             <div class="ego-serial-td">
-                                <select class="ego-serial-select" data-serial-warehouse @disabled($locked)>
+                                <select class="ego-serial-select" data-serial-warehouse @disabled($line->locked)>
                                     <option value="">-- Chọn kho --</option>
                                     @foreach($egoSerialWarehouses as $wh)
-                                        <option value="{{ $wh->id }}" @selected((int)$sr->warehouse_id === (int)$wh->id)>
+                                        <option value="{{ $wh->id }}" @selected((int)$line->serial->warehouse_id === (int)$wh->id)>
                                             {{ $wh->name }}
                                         </option>
                                     @endforeach
@@ -869,19 +517,19 @@
                             </div>
 
                             <div class="ego-serial-td">
-                                @if(!empty($sr->warranty_end_at))
-                                    <span class="ego-serial-warranty">đến {{ \Carbon\Carbon::parse($sr->warranty_end_at)->format('d/m/Y') }}</span>
+                                @if(!empty($line->serial->warranty_end_at))
+                                    <span class="ego-serial-warranty">đến {{ \Carbon\Carbon::parse($line->serial->warranty_end_at)->format('d/m/Y') }}</span>
                                 @else
                                     <span class="ego-serial-warranty">Chưa kích hoạt</span>
                                 @endif
                             </div>
 
                             <div class="ego-serial-td">
-                                <button type="button" class="ego-serial-btn save" onclick="egoSerialUpdateClean({{ $sr->id }}, this)">Sửa</button>
+                                <button type="button" class="ego-serial-btn save" onclick="egoSerialUpdateClean({{ $line->serial->id }}, this)">Sửa</button>
                             </div>
 
                             <div class="ego-serial-td">
-                                <button type="button" class="ego-serial-btn del" onclick="egoSerialDeleteClean({{ $sr->id }}, this)" @disabled($locked)>Xóa</button>
+                                <button type="button" class="ego-serial-btn del" onclick="egoSerialDeleteClean({{ $line->serial->id }}, this)" @disabled($line->locked)>Xóa</button>
                             </div>
                         </div>
                     @endforeach
@@ -894,7 +542,7 @@
                 <div class="ego-serial-add-grid">
                     <div>
                         <label>Kho nhập cho serial mới</label>
-                        <select id="ego-add-wh-{{ $egoPid }}">
+                        <select id="ego-add-wh-{{ $group->productId }}">
                             <option value="">Chọn kho</option>
                             @foreach($egoSerialWarehouses as $wh)
                                 <option value="{{ $wh->id }}">{{ $wh->name }}</option>
@@ -904,12 +552,12 @@
 
                     <div>
                         <label>Serial mới, mỗi dòng 1 mã</label>
-                        <textarea id="ego-add-serials-{{ $egoPid }}" placeholder="SN001&#10;SN002&#10;SN003"></textarea>
+                        <textarea id="ego-add-serials-{{ $group->productId }}" placeholder="SN001&#10;SN002&#10;SN003"></textarea>
                     </div>
 
                     <div>
                         <label>&nbsp;</label>
-                        <button type="button" class="ego-serial-btn save" onclick="egoSerialAddClean({{ $egoPid }}, this)">+ Thêm serial</button>
+                        <button type="button" class="ego-serial-btn save" onclick="egoSerialAddClean({{ $group->productId }}, this)">+ Thêm serial</button>
                     </div>
                 </div>
             </div>
@@ -923,8 +571,8 @@
 (function(){
     window.egoSerialCsrf = @json(csrf_token());
     window.egoSerialAddUrl = @json(url('/serial-warranty/product/__PRODUCT__/serials'));
-    window.egoSerialUpdateUrl = @json(url('/serial-warranty/serial/__SERIAL__/update'));
-    window.egoSerialDeleteUrl = @json(url('/serial-warranty/serial/__SERIAL__/delete'));
+    window.egoSerialUpdateUrl = @json(url('/serial-warranty/serial/__SERIAL__'));
+    window.egoSerialDeleteUrl = @json(url('/serial-warranty/serial/__SERIAL__'));
 
     function post(url, data, btn){
         const old = btn ? btn.textContent : '';
@@ -1062,77 +710,34 @@
                                     </tr>
                                 </thead>
                                 <tbody id="stockMovementHistoryBody">
-                                    @forelse($productStockLogs as $log)
-                                        @php
-                                            $changeQty = (int)($log->change_qty ?? 0);
-                                            $reason = (string)($log->reason ?? '');
-                                            $noteRaw = (string)($log->note_safe ?? $log->note ?? '');
-                                            $refType = (string)($log->reference_type_safe ?? $log->reference_type ?? '');
-
-                                            $reasonLower = mb_strtolower($reason, 'UTF-8');
-                                            $noteLower = mb_strtolower($noteRaw, 'UTF-8');
-                                            $refTypeLower = mb_strtolower($refType, 'UTF-8');
-
-                                            if (!empty($log->order_code) || str_contains($refTypeLower, 'order')) {
-                                                $sourceLabel = 'Đơn hàng ' . ($log->order_code ?: ('#' . ($log->reference_id ?? '—')));
-                                                $sourceClass = 'is-order';
-                                                $sourceIcon = 'bi-receipt-cutoff';
-                                            } elseif (!empty($log->site_name) || str_contains($refTypeLower, 'material') || str_contains($reasonLower, 'vật tư') || str_contains($reasonLower, 'công trình')) {
-                                                $sourceLabel = !empty($log->site_name)
-                                                    ? ('Công trình: ' . $log->site_name)
-                                                    : ('Đơn vật tư #' . ($log->reference_id ?? '—'));
-                                                $sourceClass = 'is-site';
-                                                $sourceIcon = 'bi-kanban';
-                                            } elseif (
-                                                str_contains($refTypeLower, 'manual') ||
-                                                str_contains($reasonLower, 'manual') ||
-                                                str_contains($reasonLower, 'nhập tay') ||
-                                                str_contains($reasonLower, 'nhập kho') ||
-                                                str_contains($reasonLower, 'sản phẩm đầu vào') ||
-                                                str_contains($noteLower, 'nhập tay')
-                                            ) {
-                                                $sourceLabel = $changeQty >= 0 ? 'Nhập kho / nhập tay' : 'Điều chỉnh tay';
-                                                $sourceClass = 'is-other';
-                                                $sourceIcon = 'bi-pencil-square';
-                                            } else {
-                                                $sourceLabel = $changeQty >= 0 ? 'Nhập kho' : 'Xuất kho / Điều chỉnh';
-                                                $sourceClass = 'is-other';
-                                                $sourceIcon = $changeQty >= 0 ? 'bi-box-arrow-in-down' : 'bi-arrow-left-right';
-                                            }
-
-                                            $before = $log->qty_before_safe ?? null;
-                                            $after = $log->qty_after_safe ?? null;
-                                            $createdAtText = !empty($log->created_at)
-                                                ? \Carbon\Carbon::parse($log->created_at)->format('d/m/Y H:i')
-                                                : '—';
-                                        @endphp
+                                    @forelse($stockLogRows as $row)
 
                                         <tr>
                                             <td>
-                                                <span class="tag {{ $sourceClass }}">
-                                                    <i class="bi {{ $sourceIcon }}"></i>
-                                                    {{ $sourceLabel }}
+                                                <span class="tag {{ $row->sourceClass }}">
+                                                    <i class="bi {{ $row->sourceIcon }}"></i>
+                                                    {{ $row->sourceLabel }}
                                                 </span>
                                             </td>
-                                            <td>{{ $log->warehouse_name ?? '—' }}</td>
-                                            <td>{{ $createdAtText }}</td>
+                                            <td>{{ $row->log->warehouse_name ?? '—' }}</td>
+                                            <td>{{ $row->createdAtText }}</td>
                                             <td class="text-end">
-                                                <span class="tag">{{ $before !== null ? number_format((int)$before) : '—' }}</span>
+                                                <span class="tag">{{ $row->beforeText }}</span>
                                             </td>
                                             <td class="text-end">
-                                                <span class="tag {{ $changeQty < 0 ? 'text-danger' : 'text-success' }}">
-                                                    {{ $changeQty > 0 ? '+' : '' }}{{ number_format($changeQty) }}
+                                                <span class="tag {{ $row->changeQty < 0 ? 'text-danger' : 'text-success' }}">
+                                                    {{ $row->changeText }}
                                                 </span>
                                             </td>
                                             <td class="text-end">
-                                                <span class="tag">{{ $after !== null ? number_format((int)$after) : '—' }}</span>
+                                                <span class="tag">{{ $row->afterText }}</span>
                                             </td>
-                                            <td>{{ $log->user_name ?? '—' }}</td>
-                                            <td>{{ $noteRaw !== '' ? $noteRaw : ($reason !== '' ? $reason : '—') }}</td>
+                                            <td>{{ $row->log->user_name ?? '—' }}</td>
+                                            <td>{{ $row->noteText }}</td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="8" class="text-center text-muted py-4">
+                                            <td colspan="8" class="tw:text-center tw:text-[rgba(33,37,41,0.75)]! tw:py-6!">
                                                 Chưa có lịch sử nhập / xuất kho cho sản phẩm này.
                                             </td>
                                         </tr>
@@ -1180,22 +785,17 @@
                             </div>
                         </div>
 
-                        @foreach($priceTiers as $tier)
-                            @php
-                                $saved = $savedTierPrices->get((int) $tier->id, []);
-                                $tierBefore = old('prices.' . $tier->id . '.before_vat', $fmtInput(data_get($saved, 'before_vat', data_get($saved, 'price', ''))));
-                                $tierVat = old('prices.' . $tier->id . '.vat_percent', $fmtInput(data_get($saved, 'vat_percent', $product->vat_percent ?? 0)));
-                            @endphp
+                        @foreach($tierPriceRows as $tierRow)
                             <div class="price-row sale-row tier-price-row">
-                                <div class="price-title">{{ $tier->name }}</div>
+                                <div class="price-title">{{ $tierRow->tier->name }}</div>
                                 <div class="price-grid">
                                     <div>
                                         <small>Trước VAT</small>
-                                        <input class="ego-input text-end sale-before" type="number" min="0" step="0.01" name="prices[{{ $tier->id }}][before_vat]" value="{{ $tierBefore }}" placeholder="0">
+                                        <input class="ego-input text-end sale-before" type="number" min="0" step="0.01" name="prices[{{ $tierRow->tier->id }}][before_vat]" value="{{ $tierRow->beforeVat }}" placeholder="0">
                                     </div>
                                     <div>
                                         <small>VAT</small>
-                                        <input class="ego-input text-end sale-vat" type="number" min="0" max="100" step="0.01" name="prices[{{ $tier->id }}][vat_percent]" value="{{ $tierVat }}" placeholder="0">
+                                        <input class="ego-input text-end sale-vat" type="number" min="0" max="100" step="0.01" name="prices[{{ $tierRow->tier->id }}][vat_percent]" value="{{ $tierRow->vatPercent }}" placeholder="0">
                                     </div>
                                     <div>
                                         <small>Sau VAT</small>
@@ -1225,8 +825,8 @@
     const serialRowsByProduct = @json($serialRowsByProduct);
     const serialCsrf = @json(csrf_token());
     const serialAddUrlTemplate = @json(url('/serial-warranty/product/__PRODUCT__/serials'));
-    const serialUpdateUrlTemplate = @json(url('/serial-warranty/serial/__SERIAL__/update'));
-    const serialDeleteUrlTemplate = @json(url('/serial-warranty/serial/__SERIAL__/delete'));
+    const serialUpdateUrlTemplate = @json(url('/serial-warranty/serial/__SERIAL__'));
+    const serialDeleteUrlTemplate = @json(url('/serial-warranty/serial/__SERIAL__'));
     const linesContainer = document.getElementById('linesContainer');
     const addLineBtn = document.getElementById('addLineBtn');
     const historyBody = document.getElementById('historyBody');
@@ -1252,7 +852,8 @@
     }
 
     function companyOptionsHtml(selected){
-        return '<option value="">Chọn công ty</option>' + companies.map(c => `<option value="${esc(c.id)}" ${String(selected) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+        const company = companies.find(c => String(c.id) === '1') || companies[0];
+        return company ? `<option value="${esc(company.id)}" selected>${esc(company.name)}</option>` : '<option value="1" selected>CÔNG TY TNHH EGO VIỆT NAM</option>';
     }
 
     function warehouseOptionsHtml(companyId, selected){
@@ -1317,7 +918,12 @@
         `;
     }
 
-    function egoSerialPost(url, data, btn){
+    /*
+     * Route serial nay dùng PUT (sửa) và DELETE (xoá) thay vì POST /update,
+     * /delete. Trình duyệt không gửi được PUT/DELETE từ form nên dùng cách giả
+     * lập method của Laravel: vẫn POST, kèm trường `_method`.
+     */
+    function egoSerialPost(url, data, btn, method){
         const oldText = btn ? btn.textContent : '';
         if (btn) {
             btn.disabled = true;
@@ -1331,7 +937,7 @@
                 'Accept': 'application/json',
                 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
             },
-            body: new URLSearchParams(data)
+            body: new URLSearchParams(method ? Object.assign({_method: method}, data) : data)
         })
         .then(async res => {
             const json = await res.json().catch(() => ({}));
@@ -1360,7 +966,7 @@
 
         const url = serialUpdateUrlTemplate.replace('__SERIAL__', serialId);
 
-        egoSerialPost(url, {code}, btn)
+        egoSerialPost(url, {code}, btn, 'PUT')
             .then(json => {
                 alert(json.message || 'Đã sửa serial.');
                 location.reload();
@@ -1375,7 +981,7 @@
 
         const url = serialDeleteUrlTemplate.replace('__SERIAL__', serialId);
 
-        egoSerialPost(url, {}, btn)
+        egoSerialPost(url, {}, btn, 'DELETE')
             .then(json => {
                 alert(json.message || 'Đã xóa serial.');
                 location.reload();
@@ -1478,7 +1084,7 @@
 
                     <div class="line-grid-3">
                         <div><label class="ego-label">Chọn công ty <b>*</b></label><select class="ego-select line-company" name="v2_lines[${index}][company_id]" required>${companyOptionsHtml(val.company_id || '')}</select></div>
-                        <div><label class="ego-label">Chọn kho <b>*</b></label><select class="ego-select line-warehouse" name="v2_lines[${index}][warehouse_id]" required>${warehouseOptionsHtml(val.company_id || '', val.warehouse_id || '')}</select></div>
+                        <div><label class="ego-label">Chọn kho <b>*</b></label><select class="ego-select line-warehouse" name="v2_lines[${index}][warehouse_id]" required>${warehouseOptionsHtml('1', val.warehouse_id || '')}</select></div>
                     </div>
 
                     <div class="line-foot">
@@ -1681,3 +1287,5 @@
 })();
 </script>
 @endsection
+
+@include('products.partials.enterprise-assets')

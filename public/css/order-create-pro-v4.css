@@ -242,11 +242,10 @@
 .oc-product-cell > label span,
 .oc-product-field > label span {
     color: var(--oc-danger);
-}
-
-.oc-shell .form-control,
+}.oc-shell .form-control,
 .oc-shell .form-select,
-.oc-shell .ts-control {
+.oc-shell .ts-control,
+.oc-shell .ego-input{
     min-height: 42px;
     border: 1px solid #d4dee7;
     border-radius: 8px;
@@ -254,27 +253,23 @@
     color: var(--oc-text);
     box-shadow: none !important;
     font-size: 13px;
-}
-
-.oc-shell .form-control,
-.oc-shell .form-select {
+}.oc-shell .form-control,
+.oc-shell .form-select,
+.oc-shell .ego-input{
     padding-top: 8px;
     padding-bottom: 8px;
-}
-
-.oc-shell .form-control:focus,
+}.oc-shell .form-control:focus,
 .oc-shell .form-select:focus,
-.oc-shell .ts-control.focus {
+.oc-shell .ts-control.focus,
+.oc-shell .ego-input:focus{
     border-color: #69afd4;
     box-shadow: 0 0 0 3px rgba(22, 143, 199, .09) !important;
-}
-
-.oc-shell .form-control[readonly] {
+}.oc-shell .form-control[readonly],
+.oc-shell .ego-input[readonly]{
     background: #f7f9fb;
     color: #233b50;
-}
-
-.oc-shell .form-control.is-editable {
+}.oc-shell .form-control.is-editable,
+.oc-shell .ego-input.is-editable{
     background: #fffdf4;
     border-color: #e4c46c;
 }
@@ -587,9 +582,8 @@
 .oc-qty-control {
     display: grid;
     grid-template-columns: 34px minmax(48px, 1fr) 34px;
-}
-
-.oc-qty-control .form-control {
+}.oc-qty-control .form-control,
+.oc-qty-control .ego-input{
     min-width: 0;
     border-radius: 0;
     border-left: 0;
@@ -620,9 +614,8 @@
 
 .oc-input-suffix {
     position: relative;
-}
-
-.oc-input-suffix .form-control {
+}.oc-input-suffix .form-control,
+.oc-input-suffix .ego-input{
     padding-right: 27px;
 }
 
@@ -634,9 +627,8 @@
     font-size: 10.5px;
     transform: translateY(-50%);
     pointer-events: none;
-}
-
-.oc-total-field .form-control {
+}.oc-total-field .form-control,
+.oc-total-field .ego-input{
     background: #f2faf8;
     color: #08735d;
     font-weight: 800;

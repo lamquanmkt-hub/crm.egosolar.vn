@@ -6,11 +6,13 @@ use App\Contracts\Services\PageAccessServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Models\RolePermissionAudit;
 use App\Models\User;
+use App\Services\RolePermission\ActionPermissionRegistry;
+use App\Support\SchemaCache;
+use App\View\Presenters\Admin\SettingsPagePresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Permission;
@@ -27,7 +29,11 @@ use Spatie\Permission\PermissionRegistrar;
  */
 class RolePermissionController extends Controller
 {
-    public function __construct(private readonly PageAccessServiceInterface $pageAccess) {}
+    public function __construct(
+        private readonly PageAccessServiceInterface $pageAccess,
+        private readonly ActionPermissionRegistry $actionPermissions,
+        private readonly SettingsPagePresenter $settingsPresenter,
+    ) {}
 
     public function overview(Request $request)
     {
@@ -67,6 +73,39 @@ class RolePermissionController extends Controller
         return $this->roles($request);
     }
 
+    /**
+     * Id vai trò đang xem, lấy từ ĐƯỜNG DẪN trước, rồi mới tới query string.
+     *
+     * ## Lỗi đã xảy ra thật (2026-08-05 → 2026-08-06)
+     * Khi chuyển màn này sang REST, URL đổi từ `?role=22` thành
+     * `/cai-dat/roles/22/quyen-thao-tac`. Chỗ này vẫn dùng
+     * `$request->integer('role')` — hàm đó CHỈ đọc query string và body, KHÔNG
+     * đọc tham số đường dẫn. Kết quả: mọi URL dạng mới đều rơi về vai trò
+     * `admin`, tức trang hiện quyền của admin dưới tên vai trò khác.
+     *
+     * Hậu quả nặng hơn "không tô sáng đúng mục": các ô tick hiển thị là của
+     * admin, nên bấm Lưu là ghi TOÀN BỘ quyền admin sang vai trò đang mở (route
+     * lưu dùng route-model binding nên nhắm đúng vai trò, chỉ dữ liệu hiển thị
+     * là sai).
+     *
+     * Vẫn đọc query string để URL cũ `/cai-dat/quyen-trang?role=22` còn dùng
+     * được — dạng không kèm vai trò trong đường dẫn vẫn tồn tại cho link sidebar.
+     */
+    private function selectedRoleId(Request $request): int
+    {
+        $fromPath = $request->route('role');
+
+        if ($fromPath instanceof Role) {
+            return (int) $fromPath->getKey();
+        }
+
+        if (is_numeric($fromPath)) {
+            return (int) $fromPath;
+        }
+
+        return $request->integer('role');
+    }
+
     private function renderSettings(Request $request, string $section)
     {
         $modelRoleTable = config('permission.table_names.model_has_roles', 'model_has_roles');
@@ -87,7 +126,7 @@ class RolePermissionController extends Controller
                 $role->setAttribute('ui_name', $this->pageAccess->displayRoleName($role));
             });
 
-        $selectedRole = $roles->firstWhere('id', (int) $request->integer('role'))
+        $selectedRole = $roles->firstWhere('id', $this->selectedRoleId($request))
             ?? $roles->firstWhere('name', 'admin')
             ?? $roles->first();
 
@@ -100,14 +139,27 @@ class RolePermissionController extends Controller
         $pagePermissions = $permissions->whereIn('name', $pageNames)->values();
         $menuPermissions = $permissions->whereIn('name', $menuNames)->values();
         $businessPermissions = $permissions
-            ->reject(fn (Permission $permission): bool =>
-                in_array($permission->name, $pageNames, true)
+            ->reject(fn (Permission $permission): bool => in_array($permission->name, $pageNames, true)
                 || in_array($permission->name, $menuNames, true)
                 || str_starts_with($permission->name, 'settings.')
             )
             ->values();
 
-        $businessGroups = $this->pageAccess->permissionGroups($businessPermissions);
+        /*
+        | Quyền thao tác chia làm hai loại:
+        | - CRUD chuẩn do ActionPermissionRegistry sinh cho từng trang -> render
+        |   thành MA TRẬN (hàng = trang, cột = Xem/Thêm/Sửa/Xoá) để đối chiếu được.
+        | - Quyền nghiệp vụ chuyên biệt (duyệt đơn, chốt công nợ, phân công...) —
+        |   CRUD không diễn tả được, giữ nguyên dạng nhóm như cũ.
+        */
+        $actionMatrix = $this->actionPermissions->matrix();
+        $managedActionNames = $this->actionPermissions->permissionNames();
+
+        $specialisedPermissions = $businessPermissions
+            ->reject(fn (Permission $permission): bool => in_array($permission->name, $managedActionNames, true))
+            ->values();
+
+        $businessGroups = $this->pageAccess->permissionGroups($specialisedPermissions);
 
         $selectedPermissionNames = $selectedRole
             ? $selectedRole->permissions->pluck('name')->all()
@@ -129,7 +181,7 @@ class RolePermissionController extends Controller
             ->orderBy('name')
             ->get();
 
-        $audits = Schema::hasTable('role_permission_audits')
+        $audits = SchemaCache::hasTable('role_permission_audits')
             ? RolePermissionAudit::query()->with('actor')->latest()->limit(100)->get()
             : collect();
 
@@ -143,11 +195,13 @@ class RolePermissionController extends Controller
             'managed_roles' => $roles->filter(fn (Role $role) => (bool) ($role->page_access_enabled ?? false))->count(),
         ];
 
-        return view('admin.settings.index', compact(
+        return view('admin.settings.index', array_merge(compact(
             'section',
             'roles',
             'selectedRole',
             'permissions',
+            'actionMatrix',
+            'managedActionNames',
             'pageDefinitions',
             'menuDefinitions',
             'pagePermissions',
@@ -161,7 +215,14 @@ class RolePermissionController extends Controller
             'users',
             'audits',
             'stats'
-        ));
+        ), $this->settingsPresenter->viewData(
+            $section,
+            $selectedRole,
+            $selectedPageNames,
+            $selectedMenuNames,
+            $selectedBusinessNames,
+            $actionMatrix,
+        )));
     }
 
     public function storeRole(Request $request): RedirectResponse
@@ -326,8 +387,7 @@ class RolePermissionController extends Controller
 
         $allowed = Permission::query()
             ->pluck('name')
-            ->reject(fn (string $name): bool =>
-                in_array($name, $pageNames, true)
+            ->reject(fn (string $name): bool => in_array($name, $pageNames, true)
                 || in_array($name, $menuNames, true)
                 || str_starts_with($name, 'settings.')
             )
@@ -544,7 +604,7 @@ class RolePermissionController extends Controller
         ?array $before,
         ?array $after
     ): void {
-        if (! Schema::hasTable('role_permission_audits')) {
+        if (! SchemaCache::hasTable('role_permission_audits')) {
             return;
         }
 

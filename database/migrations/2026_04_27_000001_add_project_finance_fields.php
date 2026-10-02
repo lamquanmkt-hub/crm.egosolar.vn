@@ -15,15 +15,15 @@ return new class extends Migration
         */
         if (Schema::hasTable('sites')) {
             Schema::table('sites', function (Blueprint $table) {
-                if (!Schema::hasColumn('sites', 'contract_amount')) {
+                if (! Schema::hasColumn('sites', 'contract_amount')) {
                     $table->decimal('contract_amount', 15, 2)->default(0);
                 }
 
-                if (!Schema::hasColumn('sites', 'contract_signed_at')) {
+                if (! Schema::hasColumn('sites', 'contract_signed_at')) {
                     $table->date('contract_signed_at')->nullable();
                 }
 
-                if (!Schema::hasColumn('sites', 'finance_note')) {
+                if (! Schema::hasColumn('sites', 'finance_note')) {
                     $table->text('finance_note')->nullable();
                 }
             });
@@ -34,7 +34,7 @@ return new class extends Migration
         | 2. Bảng đợt thanh toán của công trình
         |--------------------------------------------------------------------------
         */
-        if (!Schema::hasTable('site_payment_terms')) {
+        if (! Schema::hasTable('site_payment_terms')) {
             Schema::create('site_payment_terms', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('site_id');
@@ -57,12 +57,12 @@ return new class extends Migration
         */
         if (Schema::hasTable('receipts')) {
             Schema::table('receipts', function (Blueprint $table) {
-                if (!Schema::hasColumn('receipts', 'site_id')) {
+                if (! Schema::hasColumn('receipts', 'site_id')) {
                     $table->unsignedBigInteger('site_id')->nullable();
                     $table->index('site_id');
                 }
 
-                if (!Schema::hasColumn('receipts', 'site_payment_term_id')) {
+                if (! Schema::hasColumn('receipts', 'site_payment_term_id')) {
                     $table->unsignedBigInteger('site_payment_term_id')->nullable();
                     $table->index('site_payment_term_id');
                 }
@@ -76,12 +76,12 @@ return new class extends Migration
         */
         if (Schema::hasTable('payments')) {
             Schema::table('payments', function (Blueprint $table) {
-                if (!Schema::hasColumn('payments', 'site_id')) {
+                if (! Schema::hasColumn('payments', 'site_id')) {
                     $table->unsignedBigInteger('site_id')->nullable();
                     $table->index('site_id');
                 }
 
-                if (!Schema::hasColumn('payments', 'cost_type')) {
+                if (! Schema::hasColumn('payments', 'cost_type')) {
                     $table->string('cost_type', 100)->nullable();
                 }
             });
@@ -94,12 +94,12 @@ return new class extends Migration
         */
         if (Schema::hasTable('payment_requests')) {
             Schema::table('payment_requests', function (Blueprint $table) {
-                if (!Schema::hasColumn('payment_requests', 'site_id')) {
+                if (! Schema::hasColumn('payment_requests', 'site_id')) {
                     $table->unsignedBigInteger('site_id')->nullable();
                     $table->index('site_id');
                 }
 
-                if (!Schema::hasColumn('payment_requests', 'cost_type')) {
+                if (! Schema::hasColumn('payment_requests', 'cost_type')) {
                     $table->string('cost_type', 100)->nullable();
                 }
             });
@@ -112,7 +112,7 @@ return new class extends Migration
         */
         if (Schema::hasTable('material_requests')) {
             Schema::table('material_requests', function (Blueprint $table) {
-                if (!Schema::hasColumn('material_requests', 'total_cost')) {
+                if (! Schema::hasColumn('material_requests', 'total_cost')) {
                     $table->decimal('total_cost', 15, 2)->default(0);
                 }
             });
@@ -125,19 +125,19 @@ return new class extends Migration
         */
         if (Schema::hasTable('material_request_items')) {
             Schema::table('material_request_items', function (Blueprint $table) {
-                if (!Schema::hasColumn('material_request_items', 'unit')) {
+                if (! Schema::hasColumn('material_request_items', 'unit')) {
                     $table->string('unit', 50)->nullable();
                 }
 
-                if (!Schema::hasColumn('material_request_items', 'unit_cost')) {
+                if (! Schema::hasColumn('material_request_items', 'unit_cost')) {
                     $table->decimal('unit_cost', 15, 2)->default(0);
                 }
 
-                if (!Schema::hasColumn('material_request_items', 'vat_percent')) {
+                if (! Schema::hasColumn('material_request_items', 'vat_percent')) {
                     $table->decimal('vat_percent', 8, 2)->default(0);
                 }
 
-                if (!Schema::hasColumn('material_request_items', 'line_total')) {
+                if (! Schema::hasColumn('material_request_items', 'line_total')) {
                     $table->decimal('line_total', 15, 2)->default(0);
                 }
             });

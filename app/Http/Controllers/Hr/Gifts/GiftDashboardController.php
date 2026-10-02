@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Hr\Gift;
 use App\Models\Hr\GiftReceipt;
 use App\Models\Hr\GiftRequest;
-use App\Support\EgoCompanyLock;
+use App\Support\EgoCompanyScope;
 use App\Support\GiftAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -19,7 +19,7 @@ final class GiftDashboardController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
         $canHandleStock = GiftAccess::canHandleStock($user);
         $canSeeAllRequests = GiftAccess::canSeeAllRequests($user);
 

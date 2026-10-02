@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('crm_brands', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 255)->unique();
-            $table->string('slug', 255)->unique();
-            $table->text('description')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('crm_brands')) {
+            Schema::create('crm_brands', function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 255)->unique();
+                $table->string('slug', 255)->unique();
+                $table->text('description')->nullable();
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+            });
+        }
     }
 
     /**

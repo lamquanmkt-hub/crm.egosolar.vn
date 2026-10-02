@@ -20,13 +20,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ==========================================
     // 1) AUTO WRAP tables (để mọi trang đều có wrapper cuộn ngang)
-    // - Nếu table chưa nằm trong .table-responsive thì bọc lại
+    // - Nếu table chưa nằm trong vỏ cuộn thì bọc lại
+    //
+    // `[data-ego-table-wrap]` / `[data-ego-table]` là móc của <x-ui.table-wrap> / <x-ui.table>;
+    // `.table-responsive` / `table.table` giữ cho các view CHƯA chuyển. Thiếu móc mới thì bảng
+    // đã có vỏ vẫn bị bọc THÊM một div nữa — hỏng im lặng, chỉ lộ ra khi đếm phần tử DOM.
+    // Cùng cách `bs-compat/alert.js` nhận `[data-ego-alert], .alert`.
     // ==========================================
     function autoWrapTables() {
-        const tables = Array.from(document.querySelectorAll('table.table'));
+        const tables = Array.from(document.querySelectorAll('table.table, table[data-ego-table]'));
         tables.forEach((tbl) => {
-            // bỏ qua nếu đã có table-responsive gần đó
-            if (tbl.closest('.table-responsive')) return;
+            // bỏ qua nếu đã có vỏ cuộn gần đó
+            if (tbl.closest('.table-responsive, [data-ego-table-wrap]')) return;
 
             // tạo wrapper
             const wrap = document.createElement('div');
@@ -49,7 +54,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!sticky || !inner) return;
 
     const getWrappers = () =>
-        Array.from(document.querySelectorAll('.table-responsive, .ego-table-wrap, .ego-auto-wrap'));
+        Array.from(document.querySelectorAll(
+            '.table-responsive, [data-ego-table-wrap], .ego-table-wrap, .ego-auto-wrap'));
 
     let activeWrap = null;
     let lockFromSticky = false;

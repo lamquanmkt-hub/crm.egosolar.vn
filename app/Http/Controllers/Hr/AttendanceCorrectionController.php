@@ -28,7 +28,7 @@ class AttendanceCorrectionController extends Controller
     ) {}
 
     /**
-     * Mọi tài khoản đăng nhập theo dõi đơn của mình; chỉ HR xem hàng chờ và lịch sử xử lý.
+     * Nhân viên theo dõi đơn của mình; HR/admin xem hàng chờ và lịch sử xử lý.
      */
     public function index(Request $request)
     {
@@ -239,8 +239,7 @@ class AttendanceCorrectionController extends Controller
      */
     public function approve(Request $request, AttendanceCorrectionRequest $correction)
     {
-        abort_unless($this->access->canReview($request->user()), 403, 'Chỉ HR được duyệt sửa chấm công.');
-        abort_if((int) $correction->user_id === (int) $request->user()->id, 403, 'HR không được tự duyệt yêu cầu sửa công của chính mình.');
+        abort_unless($this->access->canReview($request->user()), 403, 'Chỉ HR hoặc admin được duyệt sửa chấm công.');
 
         $validated = $request->validate([
             'approved_check_in_time' => ['required', 'date_format:H:i'],
@@ -299,8 +298,7 @@ class AttendanceCorrectionController extends Controller
 
     public function reject(Request $request, AttendanceCorrectionRequest $correction)
     {
-        abort_unless($this->access->canReview($request->user()), 403, 'Chỉ HR được từ chối yêu cầu.');
-        abort_if((int) $correction->user_id === (int) $request->user()->id, 403, 'HR không được tự xử lý yêu cầu sửa công của chính mình.');
+        abort_unless($this->access->canReview($request->user()), 403, 'Chỉ HR hoặc admin được từ chối yêu cầu.');
 
         $validated = $request->validate([
             'review_note' => ['required', 'string', 'max:1500'],

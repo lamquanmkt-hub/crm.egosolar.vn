@@ -10,87 +10,87 @@ return new class extends Migration
     {
         if (Schema::hasTable('sites')) {
             Schema::table('sites', function (Blueprint $table) {
-                if (!Schema::hasColumn('sites', 'quote_no')) {
+                if (! Schema::hasColumn('sites', 'quote_no')) {
                     $table->string('quote_no', 50)->nullable()->after('id');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_date')) {
+                if (! Schema::hasColumn('sites', 'quote_date')) {
                     $table->date('quote_date')->nullable()->after('status');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_valid_until')) {
+                if (! Schema::hasColumn('sites', 'quote_valid_until')) {
                     $table->date('quote_valid_until')->nullable()->after('status');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_status')) {
+                if (! Schema::hasColumn('sites', 'quote_status')) {
                     $table->string('quote_status', 50)->nullable()->default('draft')->after('status');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_customer_company')) {
+                if (! Schema::hasColumn('sites', 'quote_customer_company')) {
                     $table->string('quote_customer_company')->nullable()->after('contact_phone');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_customer_email')) {
+                if (! Schema::hasColumn('sites', 'quote_customer_email')) {
                     $table->string('quote_customer_email')->nullable()->after('contact_phone');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_customer_tax_code')) {
+                if (! Schema::hasColumn('sites', 'quote_customer_tax_code')) {
                     $table->string('quote_customer_tax_code', 50)->nullable()->after('contact_phone');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_config_summary')) {
+                if (! Schema::hasColumn('sites', 'quote_config_summary')) {
                     $table->text('quote_config_summary')->nullable()->after('note');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_application_note')) {
+                if (! Schema::hasColumn('sites', 'quote_application_note')) {
                     $table->text('quote_application_note')->nullable()->after('note');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_scope')) {
+                if (! Schema::hasColumn('sites', 'quote_scope')) {
                     $table->longText('quote_scope')->nullable()->after('finance_note');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_commercial_terms')) {
+                if (! Schema::hasColumn('sites', 'quote_commercial_terms')) {
                     $table->longText('quote_commercial_terms')->nullable()->after('finance_note');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_warranty_terms')) {
+                if (! Schema::hasColumn('sites', 'quote_warranty_terms')) {
                     $table->longText('quote_warranty_terms')->nullable()->after('finance_note');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_om_terms')) {
+                if (! Schema::hasColumn('sites', 'quote_om_terms')) {
                     $table->longText('quote_om_terms')->nullable()->after('finance_note');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_subtotal')) {
+                if (! Schema::hasColumn('sites', 'quote_subtotal')) {
                     $table->decimal('quote_subtotal', 15, 2)->default(0)->after('contract_amount');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_discount_amount')) {
+                if (! Schema::hasColumn('sites', 'quote_discount_amount')) {
                     $table->decimal('quote_discount_amount', 15, 2)->default(0)->after('contract_amount');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_vat_percent')) {
+                if (! Schema::hasColumn('sites', 'quote_vat_percent')) {
                     $table->decimal('quote_vat_percent', 6, 2)->default(0)->after('contract_amount');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_vat_amount')) {
+                if (! Schema::hasColumn('sites', 'quote_vat_amount')) {
                     $table->decimal('quote_vat_amount', 15, 2)->default(0)->after('contract_amount');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_grand_total')) {
+                if (! Schema::hasColumn('sites', 'quote_grand_total')) {
                     $table->decimal('quote_grand_total', 15, 2)->default(0)->after('contract_amount');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_pdf_path')) {
+                if (! Schema::hasColumn('sites', 'quote_pdf_path')) {
                     $table->string('quote_pdf_path')->nullable()->after('finance_note');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_sent_at')) {
+                if (! Schema::hasColumn('sites', 'quote_sent_at')) {
                     $table->timestamp('quote_sent_at')->nullable()->after('updated_at');
                 }
 
-                if (!Schema::hasColumn('sites', 'quote_approved_at')) {
+                if (! Schema::hasColumn('sites', 'quote_approved_at')) {
                     $table->timestamp('quote_approved_at')->nullable()->after('updated_at');
                 }
             });
@@ -98,51 +98,51 @@ return new class extends Migration
 
         if (Schema::hasTable('site_planned_materials')) {
             Schema::table('site_planned_materials', function (Blueprint $table) {
-                if (!Schema::hasColumn('site_planned_materials', 'source')) {
+                if (! Schema::hasColumn('site_planned_materials', 'source')) {
                     $table->string('source', 50)->default('planned')->after('site_id');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'sort_order')) {
+                if (! Schema::hasColumn('site_planned_materials', 'sort_order')) {
                     $table->integer('sort_order')->default(0)->after('source');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'section_code')) {
+                if (! Schema::hasColumn('site_planned_materials', 'section_code')) {
                     $table->string('section_code', 20)->nullable()->after('sort_order');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'section_title')) {
+                if (! Schema::hasColumn('site_planned_materials', 'section_title')) {
                     $table->string('section_title')->nullable()->after('section_code');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'brand')) {
+                if (! Schema::hasColumn('site_planned_materials', 'brand')) {
                     $table->string('brand')->nullable()->after('name');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'model')) {
+                if (! Schema::hasColumn('site_planned_materials', 'model')) {
                     $table->string('model')->nullable()->after('brand');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'specs_text')) {
+                if (! Schema::hasColumn('site_planned_materials', 'specs_text')) {
                     $table->longText('specs_text')->nullable()->after('model');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'qty_decimal')) {
+                if (! Schema::hasColumn('site_planned_materials', 'qty_decimal')) {
                     $table->decimal('qty_decimal', 12, 2)->nullable()->after('qty');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'unit_price')) {
+                if (! Schema::hasColumn('site_planned_materials', 'unit_price')) {
                     $table->decimal('unit_price', 15, 2)->default(0)->after('qty_decimal');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'line_total')) {
+                if (! Schema::hasColumn('site_planned_materials', 'line_total')) {
                     $table->decimal('line_total', 15, 2)->default(0)->after('unit_price');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'image_path')) {
+                if (! Schema::hasColumn('site_planned_materials', 'image_path')) {
                     $table->string('image_path')->nullable()->after('line_total');
                 }
 
-                if (!Schema::hasColumn('site_planned_materials', 'quote_note')) {
+                if (! Schema::hasColumn('site_planned_materials', 'quote_note')) {
                     $table->text('quote_note')->nullable()->after('image_path');
                 }
             });

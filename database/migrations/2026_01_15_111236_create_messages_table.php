@@ -8,15 +8,17 @@ class CreateMessagesTable extends Migration
 {
     public function up(): void
     {
-        Schema::create('messages', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('conversation_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->text('body');
-            $table->timestamps();
+        if (! Schema::hasTable('messages')) {
+            Schema::create('messages', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('conversation_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+                $table->text('body');
+                $table->timestamps();
 
-            $table->index(['conversation_id', 'created_at']);
-        });
+                $table->index(['conversation_id', 'created_at']);
+            });
+        }
     }
 
     public function down(): void

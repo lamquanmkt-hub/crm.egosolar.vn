@@ -47,29 +47,60 @@ class LoginController extends Controller
 
         RateLimiter::clear($this->throttleKey($request));
 
+        /*
+        | Tài khoản đã vô hiệu hoá KHÔNG được vào hệ thống.
+        |
+        | Trước đây đoạn kiểm tra này bị comment, nên 20 tài khoản is_active=0
+        | trên production vẫn đăng nhập được — và vì chúng cũng không được gán
+        | role nào, EnforcePageAccess coi như "chưa bật kiểm soát quyền trang"
+        | và mở gần hết hệ thống cho họ (kể cả trang Cài đặt).
+        |
+        | Kiểm tra sau attempt (không nhét vào credentials) để phân biệt được
+        | "sai mật khẩu" với "tài khoản bị khoá" trong thông báo.
+        */
+        if ($this->isDeactivated(Auth::user())) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            throw ValidationException::withMessages([
+                'login' => 'Tài khoản đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.',
+            ]);
+        }
+
         $request->session()->regenerate();
 
-        //        $user = Auth::user();
+        return redirect('/workspace');
+    }
 
-        // BẮT BUỘC cho CRM: email phải được xác thực
-        //        if (! $user->hasVerifiedEmail()) {
-        //            Auth::logout();
-        //
-        //            throw ValidationException::withMessages([
-        //                'email' => 'Tài khoản chưa xác thực email.',
-        //            ]);
-        //        }
-        //
-        //        // (Tuỳ chọn) Check trạng thái tài khoản
-        //        if ($user->is_active === false) {
-        //            Auth::logout();
-        //
-        //            throw ValidationException::withMessages([
-        //                'email' => 'Tài khoản đã bị vô hiệu hoá.',
-        //            ]);
-        //        }
+    /**
+     * Tài khoản có bị vô hiệu hoá không.
+     *
+     * ⚠️ MẶC ĐỊNH TẮT (`enforce_active_account_on_login` = false).
+     *
+     * Lý do: dữ liệu `is_active` trên production KHÔNG đáng tin. Rà ngày
+     * 2026-08-05 thấy 4 tài khoản có role nhưng `is_active = 0`, trong đó tài
+     * khoản "Admin" (role=admin) vẫn đang dùng hệ thống (last_seen cùng ngày).
+     * Bật cờ này ngay lập tức sẽ KHOÁ một quản trị viên đang làm việc.
+     *
+     * Quy trình bật đúng: dọn dữ liệu `is_active` cho các tài khoản còn dùng
+     * (xem `permissions:audit-users`) -> xác nhận danh sách với nghiệp vụ ->
+     * đặt EGO_ENFORCE_ACTIVE_LOGIN=true.
+     *
+     * Cột `is_active` chỉ có trên một số phiên bản schema nên kiểm tra trước;
+     * thiếu cột thì coi như mọi tài khoản đều hoạt động.
+     */
+    private function isDeactivated(?\App\Models\User $user): bool
+    {
+        if (! config('role_permissions.enforce_active_account_on_login', false)) {
+            return false;
+        }
 
-        return redirect()->intended(route('workspace.index'));
+        if ($user === null || ! \App\Support\SchemaCache::hasColumn($user->getTable(), 'is_active')) {
+            return false;
+        }
+
+        return ! (bool) $user->is_active;
     }
 
     /**

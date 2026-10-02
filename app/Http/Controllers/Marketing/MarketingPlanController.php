@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Marketing;
 
 use App\Http\Controllers\Controller;
+use App\Support\ProbeFailureLog;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -19,7 +20,7 @@ class MarketingPlanController extends Controller
      */
     private function planTable(): string
     {
-        if (Schema::hasTable('mkt_plans')) {
+        if (SchemaCache::hasTable('mkt_plans')) {
             return 'mkt_plans';
         }
 
@@ -32,8 +33,10 @@ class MarketingPlanController extends Controller
     private function hasCol(string $table, string $col): bool
     {
         try {
-            return Schema::hasColumn($table, $col);
+            return SchemaCache::hasColumn($table, $col);
         } catch (\Throwable $e) {
+            ProbeFailureLog::warn('MarketingPlanController::hasCol', $e);
+
             return false;
         }
     }
@@ -43,11 +46,11 @@ class MarketingPlanController extends Controller
      */
     private function filterCols(string $table, array $data): array
     {
-        if (! Schema::hasTable($table)) {
+        if (! SchemaCache::hasTable($table)) {
             return $data;
         }
 
-        return collect($data)->only(Schema::getColumnListing($table))->toArray();
+        return collect($data)->only(SchemaCache::columns($table))->toArray();
     }
 
     /**
@@ -115,7 +118,7 @@ class MarketingPlanController extends Controller
 
         $plans = $query->paginate(12)->withQueryString();
 
-        $attachmentCounts = Schema::hasTable('mkt_plan_attachments')
+        $attachmentCounts = SchemaCache::hasTable('mkt_plan_attachments')
             ? DB::table('mkt_plan_attachments')
                 ->selectRaw('plan_id, COUNT(*) as total')
                 ->groupBy('plan_id')
@@ -271,7 +274,7 @@ class MarketingPlanController extends Controller
             Storage::disk('public')->delete($file->file_path);
         }
 
-        if (Schema::hasTable('mkt_plan_attachments')) {
+        if (SchemaCache::hasTable('mkt_plan_attachments')) {
             DB::table('mkt_plan_attachments')->where('plan_id', $id)->delete();
         }
 
@@ -306,7 +309,7 @@ class MarketingPlanController extends Controller
      */
     public function file(int $file)
     {
-        abort_unless(Schema::hasTable('mkt_plan_attachments'), 404);
+        abort_unless(SchemaCache::hasTable('mkt_plan_attachments'), 404);
 
         $att = DB::table('mkt_plan_attachments')->where('id', $file)->first();
         abort_if(! $att, 404);
@@ -328,7 +331,7 @@ class MarketingPlanController extends Controller
      */
     private function attachments(int $planId)
     {
-        if (! Schema::hasTable('mkt_plan_attachments')) {
+        if (! SchemaCache::hasTable('mkt_plan_attachments')) {
             return collect();
         }
 
@@ -343,7 +346,7 @@ class MarketingPlanController extends Controller
      */
     private function storeAttachments(Request $request, int $planId): void
     {
-        if (! $request->hasFile('attachments') || ! Schema::hasTable('mkt_plan_attachments')) {
+        if (! $request->hasFile('attachments') || ! SchemaCache::hasTable('mkt_plan_attachments')) {
             return;
         }
 
@@ -372,7 +375,7 @@ class MarketingPlanController extends Controller
      */
     private function deleteAttachments(array $ids, int $planId): void
     {
-        if (empty($ids) || ! Schema::hasTable('mkt_plan_attachments')) {
+        if (empty($ids) || ! SchemaCache::hasTable('mkt_plan_attachments')) {
             return;
         }
 

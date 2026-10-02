@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Marketing;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tasks\WeeklyTask;
+use App\Support\SchemaCache;
+use App\View\Presenters\Marketing\WeeklyTaskListPresenter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -14,6 +15,10 @@ use Illuminate\Support\Facades\Storage;
  */
 class WeeklyTaskController extends Controller
 {
+    public function __construct(
+        private readonly WeeklyTaskListPresenter $listPresenter,
+    ) {}
+
     /**
      * Chuẩn hoá trạng thái về pending/doing/done (todo được quy về pending).
      */
@@ -159,8 +164,9 @@ class WeeklyTaskController extends Controller
             'low' => $tasks->where('priority', 'low')->count(),
         ];
 
-        return view('marketing.reports.weekly_tasks', compact(
-            'tasks', 'total', 'done', 'doing', 'overdue', 'priorityCount', 'categories'
+        return view('marketing.reports.weekly_tasks', array_merge(
+            compact('tasks', 'total', 'done', 'doing', 'overdue', 'priorityCount', 'categories'),
+            $this->listPresenter->viewData($tasks),
         ));
     }
 
@@ -215,13 +221,13 @@ class WeeklyTaskController extends Controller
         ];
 
         // ✅ tránh lỗi thiếu cột (tự tương thích DB)
-        if (Schema::hasColumn('weekly_tasks', 'assignees')) {
+        if (SchemaCache::hasColumn('weekly_tasks', 'assignees')) {
             $payload['assignees'] = $assignees;
         }
-        if (Schema::hasColumn('weekly_tasks', 'links')) {
+        if (SchemaCache::hasColumn('weekly_tasks', 'links')) {
             $payload['links'] = $links;
         }
-        if (Schema::hasColumn('weekly_tasks', 'attachments')) {
+        if (SchemaCache::hasColumn('weekly_tasks', 'attachments')) {
             $payload['attachments'] = $attachments;
         }
 
@@ -298,13 +304,13 @@ class WeeklyTaskController extends Controller
             'note' => $data['note'] ?? null,
         ];
 
-        if (Schema::hasColumn('weekly_tasks', 'assignees')) {
+        if (SchemaCache::hasColumn('weekly_tasks', 'assignees')) {
             $payload['assignees'] = $assignees;
         }
-        if (Schema::hasColumn('weekly_tasks', 'links')) {
+        if (SchemaCache::hasColumn('weekly_tasks', 'links')) {
             $payload['links'] = $links;
         }
-        if (Schema::hasColumn('weekly_tasks', 'attachments')) {
+        if (SchemaCache::hasColumn('weekly_tasks', 'attachments')) {
             $payload['attachments'] = $attachments;
         }
 

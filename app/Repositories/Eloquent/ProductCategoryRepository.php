@@ -71,7 +71,11 @@ class ProductCategoryRepository implements ProductCategoryRepositoryInterface
      */
     public function findWithProducts(int $id): ?ProductCategory
     {
-        return ProductCategory::with('products')->find($id);
+        // `parent` và `children` trước đây lazy load ở view, và view còn gọi
+        // `$child->products()->count()` cho TỪNG con — mỗi con một COUNT(*). Nạp sẵn ở đây:
+        // `withCount` cho ra `products_count` trong một truy vấn cho cả danh sách con.
+        return ProductCategory::with(['products', 'parent', 'children' => fn ($q) => $q->withCount('products')])
+            ->find($id);
     }
 
     /**

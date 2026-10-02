@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('crm_serial_warranties')) {
+        if (! Schema::hasTable('crm_serial_warranties')) {
             Schema::create('crm_serial_warranties', function (Blueprint $table) {
                 $table->bigIncrements('id');
                 $table->unsignedBigInteger('serial_unit_id')->unique();

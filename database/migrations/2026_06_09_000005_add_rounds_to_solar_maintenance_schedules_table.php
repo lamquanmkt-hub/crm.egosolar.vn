@@ -10,15 +10,15 @@ return new class extends Migration
     {
         if (Schema::hasTable('solar_maintenance_schedules')) {
             Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                if (!Schema::hasColumn('solar_maintenance_schedules', 'round_no')) {
+                if (! Schema::hasColumn('solar_maintenance_schedules', 'round_no')) {
                     $table->unsignedInteger('round_no')->default(1)->after('priority');
                 }
 
-                if (!Schema::hasColumn('solar_maintenance_schedules', 'total_rounds')) {
+                if (! Schema::hasColumn('solar_maintenance_schedules', 'total_rounds')) {
                     $table->unsignedInteger('total_rounds')->default(1)->after('round_no');
                 }
 
-                if (!Schema::hasColumn('solar_maintenance_schedules', 'round_group')) {
+                if (! Schema::hasColumn('solar_maintenance_schedules', 'round_group')) {
                     $table->string('round_group', 80)->nullable()->index()->after('total_rounds');
                 }
             });

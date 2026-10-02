@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('hr_document_handovers')) {
+        if (! Schema::hasTable('hr_document_handovers')) {
             Schema::create('hr_document_handovers', function (Blueprint $table) {
                 $table->id();
                 $table->string('code', 80)->nullable()->index();
@@ -37,7 +37,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_document_handover_histories')) {
+        if (! Schema::hasTable('hr_document_handover_histories')) {
             Schema::create('hr_document_handover_histories', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('handover_id')->index();

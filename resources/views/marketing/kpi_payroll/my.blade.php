@@ -211,7 +211,7 @@
   <div class="k-hero">
     <div class="k-hero-top">
       <div>
-        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <div class="tw:flex flex-wrap tw:gap-2 tw:items-center tw:mb-2">
           <span class="pill">KPI & Lương</span>
           <span class="pill">Kỳ: {{ $period }}</span>
           <span class="pill">Tự lấy từ lịch biên tập</span>
@@ -224,31 +224,31 @@
 
       {{-- GET filter: period + (manager) user --}}
       <form method="GET" action="{{ route('marketing.kpi-payroll.my') }}" class="k-controls">
-        <div class="d-flex flex-column">
-          <div class="mini mb-1">Kỳ</div>
-          <input type="month" class="form-control form-42" name="period" value="{{ $period }}">
+        <div class="tw:flex flex-column">
+          <div class="mini tw:mb-1">Kỳ</div>
+          <x-ui.input type="month" class="form-42" name="period" value="{{ $period }}" />
         </div>
 
         @if(!empty($users) && $users->count())
-          <div class="d-flex flex-column">
-            <div class="mini mb-1">Nhân viên</div>
-            <select class="form-select form-42" name="user_id">
+          <div class="tw:flex flex-column">
+            <div class="mini tw:mb-1">Nhân viên</div>
+            <x-ui.select class="form-42" name="user_id">
               @foreach($users as $u)
                 <option value="{{ $u->id }}" {{ (int)($targetUser->id ?? auth()->id()) === (int)$u->id ? 'selected' : '' }}>
                   #{{ $u->id }} - {{ $u->name }}
                 </option>
               @endforeach
-            </select>
+            </x-ui.select>
           </div>
         @endif
 
-        <button class="btn btn-primary btn-round" type="submit">👀 Xem</button>
-        <a class="btn btn-outline-secondary btn-round" href="{{ url()->previous() }}">↩ Quay lại</a>
+        <x-ui.button variant="primary" type="submit" class="btn-round">👀 Xem</x-ui.button>
+        <x-ui.button variant="outline-secondary" class="btn-round" href="{{ url()->previous() }}">↩ Quay lại</x-ui.button>
 
         @if(auth()->user()->hasAnyRole(['admin','marketing_manager']))
-          <a class="btn btn-outline-secondary btn-round" href="{{ route('marketing.kpi-payroll.settings', ['period' => $period]) }}">
+          <x-ui.button variant="outline-secondary" class="btn-round" href="{{ route('marketing.kpi-payroll.settings', ['period' => $period]) }}">
             ⚙️ Settings
-          </a>
+          </x-ui.button>
         @endif
       </form>
     </div>
@@ -275,7 +275,7 @@
 
       <div class="grid">
         {{-- LEFT --}}
-        <div class="d-flex flex-column gap-3">
+        <div class="tw:flex flex-column tw:gap-4">
 
           <div class="cardx">
             <div class="cardx-hd">
@@ -302,7 +302,7 @@
                 <div class="k-vl" id="valReview">{{ number_format($aReview) }}</div>
               </div>
 
-              <div class="mini mt-2">
+              <div class="mini tw:mt-2">
                 Nếu thấy sai số: kiểm tra lại <b>status = posted</b>, <b>assignee_user_id</b>, và <b>content_type</b> trong Lịch biên tập.
               </div>
             </div>
@@ -317,7 +317,7 @@
               <span class="badge-soft">Auto</span>
             </div>
 
-            <div class="cardx-bd p-0">
+            <div class="cardx-bd tw:p-0">
               <div class="table-responsive">
                 <table class="tbl" id="tblVideos">
                   <thead>
@@ -339,7 +339,7 @@
                           $eng = (int)($v['engagement'] ?? 0);
                         @endphp
                         <tr>
-                          <td class="fw-bold">{{ $title ?: '—' }}</td>
+                          <td class="tw:font-bold">{{ $title ?: '—' }}</td>
                           <td>
                             @if($url)
                               <a class="linkx" href="{{ $url }}" target="_blank" rel="noopener">Mở link</a>
@@ -349,12 +349,12 @@
                           </td>
                           <td data-views>{{ $views }}</td>
                           <td data-eng>{{ $eng }}</td>
-                          <td class="fw-bold" data-video-reward>0 đ</td>
+                          <td class="tw:font-bold" data-video-reward>0 đ</td>
                         </tr>
                       @endforeach
                     @else
                       <tr>
-                        <td colspan="5" class="p-3 text-center mini">Không có Trend Video trong kỳ.</td>
+                        <td colspan="5" class="tw:p-4 tw:text-center mini">Không có Trend Video trong kỳ.</td>
                       </tr>
                     @endif
                   </tbody>
@@ -372,7 +372,7 @@
               <span class="badge-soft">Auto</span>
             </div>
 
-            <div class="cardx-bd p-0">
+            <div class="cardx-bd tw:p-0">
               <div class="table-responsive">
                 <table class="tbl" id="tblLives">
                   <thead>
@@ -398,7 +398,7 @@
                           $leads = (int)($l['lead_count'] ?? 0);
                         @endphp
                         <tr>
-                          <td class="fw-bold">{{ $title ?: '—' }}</td>
+                          <td class="tw:font-bold">{{ $title ?: '—' }}</td>
                           <td>
                             @if($url)
                               <a class="linkx" href="{{ $url }}" target="_blank" rel="noopener">Mở link</a>
@@ -410,12 +410,12 @@
                           <td data-views>{{ $views }}</td>
                           <td data-eng>{{ $eng }}</td>
                           <td data-leads>{{ $leads }}</td>
-                          <td class="fw-bold" data-live-reward>0 đ</td>
+                          <td class="tw:font-bold" data-live-reward>0 đ</td>
                         </tr>
                       @endforeach
                     @else
                       <tr>
-                        <td colspan="7" class="p-3 text-center mini">Không có Livestream trong kỳ.</td>
+                        <td colspan="7" class="tw:p-4 tw:text-center mini">Không có Livestream trong kỳ.</td>
                       </tr>
                     @endif
                   </tbody>
@@ -433,10 +433,10 @@
               <span class="pill" id="pillKeep"></span>
             </div>
             <div class="cardx-bd">
-              <div class="d-flex flex-wrap gap-2 align-items-center">
+              <div class="tw:flex flex-wrap tw:gap-2 tw:items-center">
                 <span class="badge-soft">{{ $isFraud ? 'Fraud ON' : 'Fraud OFF' }}</span>
                 <span class="mini">Ghi chú:</span>
-                <span class="fw-bold">{{ $actual->note ?? '—' }}</span>
+                <span class="tw:font-bold">{{ $actual->note ?? '—' }}</span>
               </div>
             </div>
           </div>
@@ -444,7 +444,7 @@
         </div>
 
         {{-- RIGHT --}}
-        <div class="d-flex flex-column gap-3">
+        <div class="tw:flex flex-column tw:gap-4">
 
           <div class="cardx">
             <div class="cardx-hd">
@@ -455,57 +455,57 @@
               <span class="pill">User: {{ $targetUser->name ?? '—' }}</span>
             </div>
             <div class="cardx-bd">
-              <div class="d-flex justify-content-between mb-2">
+              <div class="tw:flex tw:justify-between tw:mb-2">
                 <div class="mini">KPI%</div>
-                <div class="fw-bold" id="sumKpiPct">{{ number_format((float)($payroll['kpi_percent'] ?? 0), 2) }}%</div>
+                <div class="tw:font-bold" id="sumKpiPct">{{ number_format((float)($payroll['kpi_percent'] ?? 0), 2) }}%</div>
               </div>
-              <div class="d-flex justify-content-between mb-2">
+              <div class="tw:flex tw:justify-between tw:mb-2">
                 <div class="mini">Lương KPI</div>
-                <div class="fw-bold" id="sumKpiSalary">{{ number_format((int)($payroll['kpi_salary'] ?? 0)) }} đ</div>
+                <div class="tw:font-bold" id="sumKpiSalary">{{ number_format((int)($payroll['kpi_salary'] ?? 0)) }} đ</div>
               </div>
 
               <hr>
 
-              <div class="d-flex justify-content-between mb-2">
+              <div class="tw:flex tw:justify-between tw:mb-2">
                 <div class="mini">Thưởng Trend Video</div>
-                <div class="fw-bold" id="sumTrend">{{ number_format((int)($payroll['bonus_trend'] ?? 0)) }} đ</div>
+                <div class="tw:font-bold" id="sumTrend">{{ number_format((int)($payroll['bonus_trend'] ?? 0)) }} đ</div>
               </div>
-              <div class="d-flex justify-content-between mb-2">
+              <div class="tw:flex tw:justify-between tw:mb-2">
                 <div class="mini">Thưởng Livestream</div>
-                <div class="fw-bold" id="sumLive">{{ number_format((int)($payroll['bonus_livestream'] ?? 0)) }} đ</div>
+                <div class="tw:font-bold" id="sumLive">{{ number_format((int)($payroll['bonus_livestream'] ?? 0)) }} đ</div>
               </div>
-              <div class="d-flex justify-content-between mb-2">
+              <div class="tw:flex tw:justify-between tw:mb-2">
                 <div class="mini">Thưởng Lead</div>
-                <div class="fw-bold" id="sumLead">{{ number_format((int)($payroll['bonus_lead'] ?? 0)) }} đ</div>
+                <div class="tw:font-bold" id="sumLead">{{ number_format((int)($payroll['bonus_lead'] ?? 0)) }} đ</div>
               </div>
-              <div class="d-flex justify-content-between mb-2">
+              <div class="tw:flex tw:justify-between tw:mb-2">
                 <div class="mini">Tổng thưởng</div>
-                <div class="fw-bold" id="sumBonus">{{ number_format((int)($payroll['bonus_total'] ?? 0)) }} đ</div>
+                <div class="tw:font-bold" id="sumBonus">{{ number_format((int)($payroll['bonus_total'] ?? 0)) }} đ</div>
               </div>
 
               <hr>
 
-              <div class="d-flex justify-content-between mb-2">
+              <div class="tw:flex tw:justify-between tw:mb-2">
                 <div class="mini">KPI + Thưởng</div>
-                <div class="fw-bold" id="sumBeforePenalty">{{ number_format((int)($payroll['kpi_plus_bonus'] ?? 0)) }} đ</div>
+                <div class="tw:font-bold" id="sumBeforePenalty">{{ number_format((int)($payroll['kpi_plus_bonus'] ?? 0)) }} đ</div>
               </div>
-              <div class="d-flex justify-content-between mb-2">
+              <div class="tw:flex tw:justify-between tw:mb-2">
                 <div class="mini">Phạt (nếu gian lận)</div>
-                <div class="fw-bold text-danger" id="sumPenalty">{{ number_format((int)($payroll['penalty'] ?? 0)) }} đ</div>
+                <div class="tw:font-bold tw:text-[#dc3545]" id="sumPenalty">{{ number_format((int)($payroll['penalty'] ?? 0)) }} đ</div>
               </div>
 
               <hr>
 
-              <div class="d-flex justify-content-between mb-2">
+              <div class="tw:flex tw:justify-between tw:mb-2">
                 <div class="mini">Lương cơ bản</div>
-                <div class="fw-bold" id="sumBase">{{ number_format($baseSalary) }} đ</div>
+                <div class="tw:font-bold" id="sumBase">{{ number_format($baseSalary) }} đ</div>
               </div>
-              <div class="d-flex justify-content-between">
+              <div class="tw:flex tw:justify-between">
                 <div class="mini">Thực nhận</div>
-                <div class="fw-bold fs-5" id="sumTakeHome">{{ number_format((int)($payroll['take_home'] ?? $baseSalary)) }} đ</div>
+                <div class="tw:font-bold fs-5" id="sumTakeHome">{{ number_format((int)($payroll['take_home'] ?? $baseSalary)) }} đ</div>
               </div>
 
-              <div class="mini mt-3">
+              <div class="mini tw:mt-4">
                 Lưu ý: Nếu “Quỹ lương KPI” = 0 thì lương KPI = 0 (cần cấu hình pool trong Settings).
               </div>
             </div>

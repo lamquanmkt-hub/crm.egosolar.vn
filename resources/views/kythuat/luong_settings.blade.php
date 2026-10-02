@@ -1,1624 +1,331 @@
 @extends('layouts.app')
 
 @section('content')
+
 <style>
-.tech-settings-page{
-    --bg:#f5f7fb;
-    --panel:#fff;
-    --line:#e5edf7;
-    --text:#0f172a;
-    --muted:#64748b;
-    --blue:#2563eb;
-    --cyan:#06b6d4;
-    --green:#16a34a;
-    --purple:#7c3aed;
-    --red:#dc2626;
-    min-height:100vh;
-    background:
-        radial-gradient(circle at top right, rgba(6,182,212,.08), transparent 28%),
-        var(--bg);
-    color:var(--text);
-    font-size:12.5px;
-    padding-bottom:56px;
-}
-.tech-settings-page input,
-.tech-settings-page button{font-size:12.5px}
-.topbar-settings{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:14px;
-    margin-bottom:14px;
-}
-.topbar-settings h2{
-    margin:0;
-    font-size:24px;
-    font-weight:950;
-    letter-spacing:-.03em;
-}
-.topbar-settings p{margin:3px 0 0;color:var(--muted)}
-.btn-pill{
-    min-height:38px;
-    border-radius:999px;
-    padding:0 14px;
-    font-weight:900;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-}
-.settings-hero{
-    position:relative;
-    overflow:hidden;
-    padding:22px;
-    border-radius:28px;
-    color:#fff;
-    background:
-        radial-gradient(circle at 78% 20%, rgba(34,211,238,.26), transparent 28%),
-        linear-gradient(135deg,#071225 0%,#0c3159 58%,#0f766e 100%);
-    box-shadow:0 26px 74px rgba(15,23,42,.20);
-    margin-bottom:14px;
-}
-.settings-hero:before{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:linear-gradient(110deg, transparent 0%, rgba(255,255,255,.12) 24%, transparent 48%);
-    transform:translateX(-75%);
-    animation:shine 6s ease-in-out infinite;
-}
-.settings-hero > *{position:relative;z-index:2}
-.hero-chip{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    padding:7px 11px;
-    border-radius:999px;
-    background:rgba(255,255,255,.1);
-    border:1px solid rgba(255,255,255,.12);
-    color:#bae6fd;
-    font-size:10.5px;
-    font-weight:950;
-    letter-spacing:.08em;
-    margin-bottom:12px;
-}
-.hero-chip span{width:7px;height:7px;border-radius:999px;background:#22c55e;box-shadow:0 0 0 6px rgba(34,197,94,.13)}
-.settings-hero h1{
-    margin:0 0 8px;
-    font-size:32px;
-    font-weight:950;
-    letter-spacing:-.04em;
-}
-.settings-hero p{
-    margin:0;
-    color:#cbd5e1;
-    max-width:840px;
-    line-height:1.7;
-}
-.smart-alert{
-    display:flex;
-    gap:10px;
-    padding:12px 14px;
-    border-radius:18px;
-    border:1px solid var(--line);
-    box-shadow:0 12px 34px rgba(15,23,42,.055);
-    background:#fff;
-    margin-bottom:12px;
-}
-.smart-alert.success i{color:#16a34a}
-.smart-alert.danger i{color:#dc2626}
-.summary-grid{
-    display:grid;
-    grid-template-columns:repeat(3,minmax(0,1fr));
-    gap:10px;
-    margin-bottom:14px;
-}
-.summary-card{
-    position:relative;
-    overflow:hidden;
-    padding:15px;
-    border-radius:20px;
-    background:#fff;
-    border:1px solid var(--line);
-    box-shadow:0 14px 40px rgba(15,23,42,.055);
-}
-.summary-card:after{
-    content:"";
-    position:absolute;
-    width:90px;
-    height:90px;
-    right:-42px;
-    bottom:-48px;
-    border-radius:999px;
-    background:#2563eb;
-    opacity:.1;
-}
-.summary-card.green:after{background:#16a34a}
-.summary-card.purple:after{background:#7c3aed}
-.summary-card span{
-    display:block;
-    color:#64748b;
-    font-size:11px;
-    font-weight:950;
-    text-transform:uppercase;
-    letter-spacing:.04em;
-}
-.summary-card strong{
-    display:block;
-    font-size:30px;
-    line-height:1;
-    margin-top:7px;
-    font-weight:950;
-}
-.settings-layout{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:14px;
-    align-items:start;
-}
-.setting-panel{
-    background:#fff;
-    border:1px solid var(--line);
-    border-radius:24px;
-    overflow:hidden;
-    box-shadow:0 16px 48px rgba(15,23,42,.06);
-    margin-bottom:14px;
-    animation:fadeUp .42s ease both;
-}
-.setting-head{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:12px;
-    padding:15px 16px;
-    color:#fff;
-}
-.head-salary{background:linear-gradient(135deg,#2563eb,#0284c7)}
-.head-feedback{background:linear-gradient(135deg,#16a34a,#0f766e)}
-.head-kpi{background:linear-gradient(135deg,#0f172a,#334155)}
-.head-other{background:linear-gradient(135deg,#7c3aed,#4338ca)}
-.setting-head h3{
-    margin:0 0 3px;
-    font-size:15px;
-    font-weight:950;
-}
-.setting-head p{
-    margin:0;
-    color:rgba(255,255,255,.78);
-    font-size:11.5px;
-}
-.btn-add{
-    border:0;
-    border-radius:999px;
-    padding:7px 10px;
-    background:#fff;
-    color:#0f172a;
-    font-size:11.5px;
-    font-weight:950;
-    white-space:nowrap;
-}
-.setting-list{
-    padding:12px;
-    display:grid;
-    gap:9px;
-}
-.setting-item{
-    position:relative;
-    padding:11px;
-    border:1px solid var(--line);
-    border-radius:18px;
-    background:#fbfdff;
-    transition:.2s ease;
-}
-.setting-item:hover{
-    transform:translateY(-1px);
-    box-shadow:0 12px 30px rgba(15,23,42,.06);
-}
-.setting-item.new-item{
-    background:#f0fdf4;
-    border-color:#bbf7d0;
-}
-.setting-line-top{
-    display:grid;
-    grid-template-columns:1fr 118px auto;
-    gap:8px;
-    align-items:center;
-}
-.setting-name,
-.setting-note,
-.new-key{
-    border:1px solid #dbe6f2;
-    border-radius:13px;
-    min-height:35px;
-    font-weight:850;
-    background:#fff;
-}
-.percent-wrap{
-    position:relative;
-}
-.percent-wrap input{
-    border:1px solid #dbe6f2;
-    border-radius:13px;
-    min-height:35px;
-    padding-right:30px;
-    font-weight:950;
-}
-.percent-wrap span{
-    position:absolute;
-    right:11px;
-    top:50%;
-    transform:translateY(-50%);
-    color:#64748b;
-    font-size:11px;
-    font-weight:950;
-}
-.setting-key{
-    color:#64748b;
-    font-family:monospace;
-    font-size:10.5px;
-    margin:7px 0;
-    word-break:break-all;
-}
-.delete-check{
-    width:34px;
-    height:34px;
-    border-radius:13px;
-    background:#fff;
-    border:1px solid #dbe6f2;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-}
-.delete-check input{width:17px;height:17px}
-.empty-list{
-    color:#64748b;
-    font-size:12px;
-    padding:10px;
-    border:1px dashed #d8e2ee;
-    border-radius:16px;
-    text-align:center;
-}
-.sticky-save{
-    position:sticky;
-    bottom:10px;
-    z-index:30;
-    margin-top:14px;
-    padding:10px;
-    background:rgba(245,247,251,.88);
-    backdrop-filter:blur(10px);
-    display:flex;
-    justify-content:flex-end;
-    gap:8px;
-}
-.btn-save{
-    border:0;
-    border-radius:999px;
-    min-height:42px;
-    padding:0 22px;
-    color:#fff;
-    font-weight:950;
-    background:linear-gradient(135deg,#16a34a,#0f766e);
-    box-shadow:0 16px 32px rgba(22,163,74,.18);
-}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes shine{0%,100%{transform:translateX(-75%)}48%{transform:translateX(75%)}}
-@media(max-width:1200px){.settings-layout{grid-template-columns:1fr}}
-@media(max-width:768px){
-    .topbar-settings{flex-direction:column;align-items:stretch}
-    .summary-grid{grid-template-columns:1fr}
-    .setting-line-top{grid-template-columns:1fr}
-    .sticky-save{flex-direction:column}
-}
-
-.kpi-items-manager{
-    background:#fff;
-    border:1px solid #e5edf7;
-    border-radius:24px;
-    overflow:hidden;
-    box-shadow:0 16px 48px rgba(15,23,42,.06);
-    margin-bottom:14px;
-}
-.kpi-items-head{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:12px;
-    padding:15px 16px;
-    color:#fff;
-    background:linear-gradient(135deg,#0f172a,#334155);
-}
-.kpi-items-head h3{
-    margin:0 0 3px;
-    font-size:15px;
-    font-weight:950;
-}
-.kpi-items-head p{
-    margin:0;
-    color:rgba(255,255,255,.78);
-    font-size:11.5px;
-}
-.kpi-items-table{
-    width:100%;
-    min-width:1180px;
-    margin:0;
-}
-.kpi-items-table th{
-    background:#f8fafc;
-    color:#334155;
-    font-size:11px;
-    font-weight:950;
-    padding:9px;
-    white-space:nowrap;
-}
-.kpi-items-table td{
-    padding:8px;
-    border-color:#edf2f7!important;
-    vertical-align:middle;
-}
-.kpi-items-table input,
-.kpi-items-table select{
-    min-height:34px;
-    border:1px solid #dbe6f2;
-    border-radius:12px;
-    font-size:12px;
-    font-weight:850;
-}
-.kpi-items-table textarea{
-    min-height:36px;
-    border:1px solid #dbe6f2;
-    border-radius:12px;
-    font-size:12px;
-    font-weight:750;
-    resize:vertical;
-}
-.kpi-items-actions{
-    display:flex;
-    justify-content:flex-end;
-    gap:8px;
-    padding:12px;
-    border-top:1px solid #e5edf7;
-    background:#fbfdff;
-}
-
-
-/* ego-tech-payroll-compact-v2 */
-.techpay-page,
-.techpay-edit-page,
-.tech-settings-page,
-.payroll-show-page{
-    font-size:12px !important;
-}
-
-.techpay-page input,
-.techpay-page select,
-.techpay-page textarea,
-.techpay-page button,
-.techpay-edit-page input,
-.techpay-edit-page select,
-.techpay-edit-page textarea,
-.techpay-edit-page button,
-.tech-settings-page input,
-.tech-settings-page select,
-.tech-settings-page textarea,
-.tech-settings-page button,
-.payroll-show-page input,
-.payroll-show-page select,
-.payroll-show-page textarea,
-.payroll-show-page button{
-    font-size:12px !important;
-}
-
-.payroll-top,
-.topbar-settings{
-    margin-bottom:10px !important;
-}
-
-.payroll-title h2,
-.topbar-settings h2,
-.payroll-top h2{
-    font-size:20px !important;
-    line-height:1.15 !important;
-    letter-spacing:-.02em !important;
-}
-
-.payroll-title p,
-.topbar-settings p,
-.payroll-top p{
-    font-size:11.5px !important;
-    line-height:1.4 !important;
-}
-
-.action-pill,
-.btn-pill{
-    min-height:34px !important;
-    padding:0 12px !important;
-    font-size:11.5px !important;
-    border-radius:999px !important;
-}
-
-.hero-payroll,
-.settings-hero,
-.hero-slip{
-    min-height:145px !important;
-    padding:18px 20px !important;
-    border-radius:22px !important;
-    margin-bottom:10px !important;
-}
-
-.hero-content,
-.hero-grid{
-    gap:14px !important;
-}
-
-.hero-chip{
-    padding:5px 9px !important;
-    font-size:9.5px !important;
-    margin-bottom:9px !important;
-}
-
-.hero-payroll h1,
-.settings-hero h1,
-.hero-slip h1{
-    font-size:27px !important;
-    line-height:1.08 !important;
-    margin-bottom:6px !important;
-}
-
-.hero-payroll p,
-.settings-hero p,
-.hero-slip p{
-    font-size:11.8px !important;
-    line-height:1.55 !important;
-}
-
-.hero-total-box,
-.hero-total{
-    padding:13px 15px !important;
-    border-radius:18px !important;
-}
-
-.hero-total-box span,
-.hero-total span{
-    font-size:10.5px !important;
-    margin-bottom:5px !important;
-}
-
-.hero-total-box strong,
-.hero-total strong{
-    font-size:27px !important;
-    letter-spacing:-.03em !important;
-}
-
-.layout-grid{
-    grid-template-columns:300px minmax(0, 1fr) !important;
-    gap:10px !important;
-}
-
-.panel-pro,
-.setting-panel,
-.kpi-items-manager{
-    border-radius:18px !important;
-    box-shadow:0 10px 28px rgba(15,23,42,.055) !important;
-}
-
-.panel-head,
-.setting-head,
-.kpi-items-head{
-    padding:11px 13px !important;
-    gap:10px !important;
-}
-
-.panel-head h3,
-.setting-head h3,
-.kpi-items-head h3{
-    font-size:14px !important;
-    line-height:1.2 !important;
-    margin-bottom:3px !important;
-}
-
-.panel-head p,
-.setting-head p,
-.kpi-items-head p{
-    font-size:11px !important;
-    line-height:1.35 !important;
-}
-
-.section-chip{
-    padding:4px 7px !important;
-    font-size:9.5px !important;
-    margin-bottom:5px !important;
-}
-
-.panel-body{
-    padding:11px !important;
-}
-
-.table-card .panel-body{
-    padding:0 !important;
-}
-
-.summary-grid{
-    gap:8px !important;
-    margin-bottom:10px !important;
-}
-
-.metric-card,
-.summary-card{
-    padding:10px 11px !important;
-    border-radius:16px !important;
-    box-shadow:0 9px 24px rgba(15,23,42,.045) !important;
-}
-
-.metric-card span,
-.summary-card span,
-.summary-card .label{
-    font-size:9.8px !important;
-    line-height:1.25 !important;
-    margin-bottom:6px !important;
-}
-
-.metric-card strong,
-.summary-card strong,
-.summary-card .value{
-    font-size:18px !important;
-    line-height:1.05 !important;
-}
-
-.form-label-pro{
-    font-size:10.5px !important;
-    margin-bottom:5px !important;
-}
-
-.field-shell i{
-    left:10px !important;
-    font-size:12px !important;
-}
-
-.field-shell input,
-.field-shell select,
-.field-shell textarea,
-.form-control,
-.form-select{
-    min-height:33px !important;
-    border-radius:11px !important;
-    font-size:12px !important;
-    padding-top:0 !important;
-    padding-bottom:0 !important;
-}
-
-.field-shell input,
-.field-shell select,
-.field-shell textarea{
-    padding-left:30px !important;
-}
-
-.field-shell textarea,
-textarea.form-control{
-    min-height:70px !important;
-    padding-top:8px !important;
-    line-height:1.35 !important;
-}
-
-.help-text{
-    font-size:10.5px !important;
-    line-height:1.35 !important;
-    margin-top:4px !important;
-}
-
-.feedback-list{
-    gap:7px !important;
-}
-
-.feedback-mini{
-    grid-template-columns:32px 1fr 72px !important;
-    gap:8px !important;
-    padding:8px !important;
-    border-radius:14px !important;
-}
-
-.feedback-icon{
-    width:32px !important;
-    height:32px !important;
-    border-radius:12px !important;
-    font-size:15px !important;
-}
-
-.feedback-mini strong{
-    font-size:11.3px !important;
-}
-
-.feedback-mini span{
-    font-size:10px !important;
-}
-
-.feedback-mini input{
-    min-height:31px !important;
-    border-radius:10px !important;
-    padding:0 7px !important;
-}
-
-.satisfaction-box{
-    margin-top:8px !important;
-    padding:9px 10px !important;
-    border-radius:15px !important;
-}
-
-.satisfaction-box strong{
-    font-size:18px !important;
-}
-
-.save-sticky{
-    bottom:9px !important;
-    margin-top:8px !important;
-}
-
-.btn-save-main,
-.btn-save{
-    min-height:40px !important;
-    border-radius:14px !important;
-    font-size:12px !important;
-}
-
-.kpi-table{
-    width:100% !important;
-    table-layout:fixed !important;
-}
-
-.kpi-table thead th{
-    font-size:10.5px !important;
-    padding:7px 8px !important;
-}
-
-.kpi-table tbody td{
-    font-size:11.3px !important;
-    padding:7px 8px !important;
-}
-
-.kpi-table th:nth-child(1),
-.kpi-table td:nth-child(1){
-    width:48px !important;
-}
-
-.kpi-table th:nth-child(2),
-.kpi-table td:nth-child(2){
-    width:285px !important;
-}
-
-.kpi-table th:nth-child(3),
-.kpi-table td:nth-child(3){
-    width:75px !important;
-}
-
-.kpi-table th:nth-child(4),
-.kpi-table td:nth-child(4),
-.kpi-table th:nth-child(5),
-.kpi-table td:nth-child(5){
-    width:110px !important;
-}
-
-.kpi-table th:nth-child(6),
-.kpi-table td:nth-child(6),
-.kpi-table th:nth-child(8),
-.kpi-table td:nth-child(8){
-    width:94px !important;
-}
-
-.kpi-table th:nth-child(7),
-.kpi-table td:nth-child(7){
-    width:76px !important;
-}
-
-.kpi-table th:nth-child(9),
-.kpi-table td:nth-child(9){
-    width:86px !important;
-}
-
-.kpi-index{
-    width:24px !important;
-    height:24px !important;
-    border-radius:9px !important;
-    font-size:11px !important;
-}
-
-.kpi-name{
-    font-size:11.5px !important;
-    line-height:1.25 !important;
-}
-
-.kpi-note{
-    font-size:10px !important;
-    line-height:1.3 !important;
-    margin-top:2px !important;
-}
-
-.kpi-table input{
-    min-width:0 !important;
-    width:100% !important;
-    min-height:30px !important;
-    border-radius:10px !important;
-    padding:0 7px !important;
-    font-size:11.5px !important;
-}
-
-.rate-pill{
-    min-width:0 !important;
-    width:100% !important;
-    padding:4px 5px !important;
-    font-size:11px !important;
-}
-
-.badge-rating,
-.status-badge{
-    padding:4px 7px !important;
-    font-size:10px !important;
-}
-
-.result-panel{
-    padding:11px !important;
-}
-
-.result-grid{
-    gap:8px !important;
-}
-
-.logic-box{
-    margin-top:8px !important;
-    padding:9px 10px !important;
-    border-radius:14px !important;
-    font-size:11.3px !important;
-    line-height:1.45 !important;
-}
-
-.history-table th,
-.history-table td{
-    font-size:11.3px !important;
-    padding:8px 9px !important;
-}
-
-.setting-list{
-    padding:9px !important;
-    gap:7px !important;
-}
-
-.setting-item{
-    padding:9px !important;
-    border-radius:15px !important;
-}
-
-.setting-line-top{
-    grid-template-columns:1fr 92px 30px !important;
-    gap:6px !important;
-    margin-bottom:6px !important;
-}
-
-.setting-name,
-.setting-note,
-.new-key,
-.percent-wrap input{
-    min-height:31px !important;
-    border-radius:11px !important;
-    font-size:11.5px !important;
-}
-
-.percent-wrap span{
-    right:9px !important;
-    font-size:10.5px !important;
-}
-
-.setting-key{
-    font-size:10px !important;
-    margin:5px 0 !important;
-}
-
-.delete-check,
-.setting-delete{
-    width:30px !important;
-    height:30px !important;
-    border-radius:11px !important;
-}
-
-.delete-check input,
-.setting-delete input{
-    width:15px !important;
-    height:15px !important;
-}
-
-.btn-add,
-.add-mini-btn{
-    padding:5px 9px !important;
-    font-size:11px !important;
-    border-radius:999px !important;
-}
-
-.kpi-items-table{
-    min-width:1080px !important;
-}
-
-.kpi-items-table th{
-    font-size:10.3px !important;
-    padding:7px !important;
-}
-
-.kpi-items-table td{
-    padding:6px !important;
-}
-
-.kpi-items-table input,
-.kpi-items-table select,
-.kpi-items-table textarea{
-    min-height:30px !important;
-    border-radius:10px !important;
-    font-size:11.3px !important;
-    padding:0 7px !important;
-}
-
-.kpi-items-table textarea{
-    padding-top:6px !important;
-    line-height:1.3 !important;
-}
-
-.kpi-items-actions,
-.sticky-save{
-    padding:8px !important;
-    gap:7px !important;
-}
-
-.empty-list,
-.empty-state,
-.empty-mini{
-    font-size:11.5px !important;
-}
-
-@media(max-width:1399.98px){
-    .layout-grid{
-        grid-template-columns:1fr !important;
+    .kpiconfig-page{
+        --navy:#0b3558;--cyan:#0ea5c7;--bg:#f2f6fb;--panel:#fff;--line:#dfe9f3;--text:#10233a;--muted:#718198;--green:#16a36c;--amber:#f5a209;--red:#e14f5a;
+        min-height:100vh;background:radial-gradient(circle at 90% 0%,rgba(14,165,199,.08),transparent 28%),var(--bg);color:var(--text);padding:20px 0 46px;font-size:12px;
     }
-
-    .kpi-table{
-        min-width:980px !important;
-        table-layout:auto !important;
-    }
-
-    .kpi-table th:nth-child(n),
-    .kpi-table td:nth-child(n){
-        width:auto !important;
-    }
-}
-
-@media(max-width:767.98px){
-    .hero-payroll h1,
-    .settings-hero h1,
-    .hero-slip h1{
-        font-size:23px !important;
-    }
-
-    .summary-grid,
-    .result-grid{
-        grid-template-columns:1fr !important;
-    }
-
-    .setting-line-top{
-        grid-template-columns:1fr !important;
-    }
-
-    .feedback-mini{
-        grid-template-columns:32px 1fr !important;
-    }
-
-    .feedback-mini input{
-        grid-column:2 !important;
-    }
-}
-/* end ego-tech-payroll-compact-v2 */
-
-
-/* ego-kpi-items-ui-v3 */
-.kpi-items-manager{
-    border-radius:18px !important;
-    overflow:hidden !important;
-    border:1px solid #e5edf7 !important;
-    box-shadow:0 10px 28px rgba(15,23,42,.055) !important;
-}
-.kpi-items-head{
-    padding:12px 14px !important;
-    background:linear-gradient(135deg,#0f172a,#24344f) !important;
-}
-.kpi-items-head h3{
-    font-size:14px !important;
-    margin:0 0 3px !important;
-    font-weight:950 !important;
-}
-.kpi-items-head p{
-    font-size:11px !important;
-    margin:0 !important;
-    color:rgba(255,255,255,.78) !important;
-}
-.kpi-items-manager .table-responsive{
-    overflow-x:auto !important;
-    background:#fff !important;
-}
-.kpi-items-table{
-    width:100% !important;
-    min-width:1120px !important;
-    margin:0 !important;
-    table-layout:fixed !important;
-}
-.kpi-items-table th{
-    background:#f8fafc !important;
-    color:#334155 !important;
-    font-size:10.5px !important;
-    font-weight:950 !important;
-    padding:8px 7px !important;
-    border-color:#e5edf7 !important;
-    white-space:nowrap !important;
-}
-.kpi-items-table td{
-    padding:6px 7px !important;
-    border-color:#edf2f7 !important;
-    vertical-align:middle !important;
-    background:#fff !important;
-}
-.kpi-items-table th:nth-child(1),
-.kpi-items-table td:nth-child(1){width:58px !important;}
-.kpi-items-table th:nth-child(2),
-.kpi-items-table td:nth-child(2){width:210px !important;}
-.kpi-items-table th:nth-child(3),
-.kpi-items-table td:nth-child(3){width:82px !important;}
-.kpi-items-table th:nth-child(4),
-.kpi-items-table td:nth-child(4),
-.kpi-items-table th:nth-child(5),
-.kpi-items-table td:nth-child(5){width:92px !important;}
-.kpi-items-table th:nth-child(6),
-.kpi-items-table td:nth-child(6){width:96px !important;}
-.kpi-items-table th:nth-child(7),
-.kpi-items-table td:nth-child(7){width:175px !important;}
-.kpi-items-table th:nth-child(8),
-.kpi-items-table td:nth-child(8){width:auto !important;}
-.kpi-items-table th:nth-child(9),
-.kpi-items-table td:nth-child(9),
-.kpi-items-table th:nth-child(10),
-.kpi-items-table td:nth-child(10){
-    width:58px !important;
-    text-align:center !important;
-}
-.kpi-items-table input,
-.kpi-items-table select,
-.kpi-items-table textarea{
-    width:100% !important;
-    min-height:30px !important;
-    border:1px solid #dbe6f2 !important;
-    border-radius:10px !important;
-    padding:0 8px !important;
-    color:#0f172a !important;
-    background:#fbfdff !important;
-    font-size:11.5px !important;
-    font-weight:850 !important;
-    box-shadow:none !important;
-}
-.kpi-items-table textarea{
-    min-height:34px !important;
-    padding-top:6px !important;
-    line-height:1.3 !important;
-    resize:vertical !important;
-}
-.kpi-items-table select{
-    padding-right:26px !important;
-}
-.kpi-items-table tr{
-    transition:.16s ease !important;
-}
-.kpi-items-table tbody tr:hover td{
-    background:#fbfdff !important;
-}
-.kpi-action-cell{
-    text-align:center !important;
-}
-.kpi-items-table input[type="checkbox"]{
-    appearance:none !important;
-    -webkit-appearance:none !important;
-    width:24px !important;
-    height:24px !important;
-    min-height:24px !important;
-    padding:0 !important;
-    border-radius:9px !important;
-    border:1px solid #cfe0f3 !important;
-    background:#fff !important;
-    display:inline-grid !important;
-    place-content:center !important;
-    cursor:pointer !important;
-    transition:.16s ease !important;
-}
-.kpi-items-table input[type="checkbox"]::after{
-    content:"✓";
-    font-size:14px;
-    line-height:1;
-    color:#fff;
-    font-weight:950;
-    transform:scale(0);
-    transition:.12s ease;
-}
-.kpi-items-table input[type="checkbox"]:checked{
-    background:#2563eb !important;
-    border-color:#2563eb !important;
-    box-shadow:0 8px 18px rgba(37,99,235,.22) !important;
-}
-.kpi-items-table input[type="checkbox"]:checked::after{
-    transform:scale(1);
-}
-.kpi-trash-btn{
-    width:28px !important;
-    height:28px !important;
-    border-radius:10px !important;
-    border:1px solid #fecaca !important;
-    background:#fff5f5 !important;
-    color:#dc2626 !important;
-    display:inline-flex !important;
-    align-items:center !important;
-    justify-content:center !important;
-    font-size:13px !important;
-    line-height:1 !important;
-    cursor:pointer !important;
-    transition:.16s ease !important;
-}
-.kpi-trash-btn:hover{
-    transform:translateY(-1px) !important;
-    background:#dc2626 !important;
-    color:#fff !important;
-    border-color:#dc2626 !important;
-    box-shadow:0 10px 22px rgba(220,38,38,.20) !important;
-}
-.kpi-trash-btn.is-loading{
-    pointer-events:none !important;
-    opacity:.55 !important;
-}
-.kpi-trash-btn.is-local{
-    border-color:#fed7aa !important;
-    background:#fff7ed !important;
-    color:#ea580c !important;
-}
-.kpi-items-actions{
-    padding:10px 12px !important;
-    gap:8px !important;
-    border-top:1px solid #e5edf7 !important;
-    background:#fbfdff !important;
-}
-.kpi-items-actions .btn,
-.kpi-items-actions button{
-    min-height:36px !important;
-    border-radius:999px !important;
-    font-size:11.5px !important;
-    font-weight:950 !important;
-}
-@media(max-width:1399.98px){
-    .kpi-items-table{
-        min-width:1120px !important;
-    }
-}
-/* end ego-kpi-items-ui-v3 */
-
+    .kpiconfig-shell{width:min(1540px,calc(100% - 34px));margin:0 auto}
+    .kpiconfig-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:14px}
+    .kpiconfig-breadcrumb{display:flex;align-items:center;gap:7px;color:#6e7f94;font-size:10px;font-weight:800;margin-bottom:7px}
+    .kpiconfig-title{margin:0;font-size:26px;font-weight:950;letter-spacing:-.035em}
+    .kpiconfig-subtitle{margin:5px 0 0;color:var(--muted);font-size:11.5px}
+    .kpiconfig-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .kpiconfig-btn{height:36px;border:1px solid #d7e4ef;border-radius:10px;background:#fff;color:#294763;padding:0 13px;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:900;text-decoration:none;white-space:nowrap;transition:.18s ease}
+    .kpiconfig-btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(16,35,58,.08);color:#183d5e}
+    .kpiconfig-btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+    .kpiconfig-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:12px}
+    .kpiconfig-stat{background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px 13px;min-height:88px;position:relative;overflow:hidden}
+    .kpiconfig-stat:after{content:"";position:absolute;right:-20px;top:-30px;width:80px;height:80px;border-radius:999px;background:rgba(14,165,199,.06)}
+    .kpiconfig-stat span{display:block;color:#73839a;font-size:9.5px;text-transform:uppercase;font-weight:900;letter-spacing:.035em}
+    .kpiconfig-stat strong{display:block;margin-top:7px;font-size:24px;line-height:1;font-weight:950;color:#11324f}
+    .kpiconfig-stat small{display:block;margin-top:5px;color:#8594a6;font-size:9px}
+    .kpiconfig-panel{background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:0 8px 26px rgba(16,35,58,.045);overflow:hidden;margin-bottom:12px}
+    .kpiconfig-panel-head{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .kpiconfig-panel-head h3{margin:0;font-size:13.5px;font-weight:950}.kpiconfig-panel-head p{margin:3px 0 0;color:var(--muted);font-size:10px}
+    .kpiconfig-panel-body{padding:13px 14px}
+    .kpiconfig-notice{display:flex;gap:8px;align-items:flex-start;padding:9px 11px;border-radius:10px;background:#eef8ff;border:1px solid #d6edf8;color:#45657d;font-size:10px;margin-bottom:11px}
+    .kpiconfig-notice.warning{background:#fff8e8;border-color:#f4e2ad;color:#7a5b16}
+    .kpiconfig-table-wrap{overflow:auto}
+    .kpiconfig-table{width:100%;border-collapse:separate;border-spacing:0;min-width:1050px}
+    .kpiconfig-table th{background:#f7f9fc;border-bottom:1px solid var(--line);padding:8px 8px;color:#60738b;font-size:8.8px;text-transform:uppercase;letter-spacing:.035em;text-align:left;white-space:nowrap}
+    .kpiconfig-table td{padding:8px;border-bottom:1px solid #edf2f7;vertical-align:middle}
+    .kpiconfig-table tr:last-child td{border-bottom:0}
+    .kpiconfig-index{display:flex;align-items:center;gap:8px;font-weight:950;color:#2d4c67}
+    .kpiconfig-icon{width:32px;height:32px;border-radius:9px;background:#edf7ff;color:#2883c4;display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 32px}
+    .kpiconfig-control{width:100%;height:34px;border:1px solid #d9e4ee;border-radius:9px;background:#fbfdff;padding:0 9px;color:#173a58;font-weight:750;outline:none}
+    textarea.kpiconfig-control{height:52px;padding-top:7px;resize:vertical;line-height:1.35}
+    .kpiconfig-control:focus{border-color:#7dc7dc;box-shadow:0 0 0 3px rgba(14,165,199,.07);background:#fff}
+    .kpiconfig-weight{max-width:84px}.kpiconfig-order{max-width:60px}.kpiconfig-unit{max-width:110px}.kpiconfig-small{max-width:95px}
+    .kpiconfig-footer{padding:10px 14px;border-top:1px solid var(--line);background:#fcfdff;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+    .kpiconfig-weight-note{font-size:10px;color:#6f8094}.kpiconfig-weight-note strong{font-size:13px;color:#133d5e}
+    .kpiconfig-save{height:38px;border:0;border-radius:10px;background:var(--navy);color:#fff;padding:0 16px;font-weight:950;display:inline-flex;align-items:center;gap:7px;box-shadow:0 8px 20px rgba(11,53,88,.16)}
+    .kpiconfig-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .kpiconfig-setting-list{display:grid;gap:8px}
+    .kpiconfig-setting{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:10px;align-items:center;padding:10px 11px;border:1px solid #e2ebf3;border-radius:11px;background:#fcfdff}
+    .kpiconfig-setting strong{display:block;font-size:11px}.kpiconfig-setting small{display:block;color:#8391a3;font-size:9px;margin-top:2px}
+    .kpiconfig-percent{position:relative}.kpiconfig-percent input{padding-right:28px}.kpiconfig-percent span{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#789;font-weight:900}
+    .kpiconfig-scale{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .kpiconfig-scale-card{border:1px solid #e2ebf3;border-radius:11px;background:#f9fbfd;padding:10px;text-align:center}
+    .kpiconfig-scale-card strong{display:block;font-size:12px;color:#173c5d}.kpiconfig-scale-card span{display:block;color:#8492a4;font-size:9px;margin-top:3px}
+    .kpiconfig-material{grid-template-columns:repeat(5,1fr)}
+    .kpiconfig-alert{padding:9px 12px;border-radius:11px;margin-bottom:10px;font-weight:750;border:1px solid}
+    .kpiconfig-alert.success{background:#edf9f3;color:#16734f;border-color:#cfefdf}.kpiconfig-alert.danger{background:#fff0f1;color:#b43d48;border-color:#f5d4d8}
+    .kpiconfig-row-actions{display:flex;align-items:center;gap:6px;white-space:nowrap}.kpiconfig-action{width:32px;height:32px;border-radius:9px;border:1px solid #dce7f0;background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s ease}.kpiconfig-action.edit{color:#176da6}.kpiconfig-action.delete{color:#cf4450;background:#fff7f8;border-color:#f1d8db}.kpiconfig-action:hover{transform:translateY(-1px);box-shadow:0 5px 14px rgba(16,35,58,.10)}.kpiconfig-readonly{font-size:10px;color:#8391a3;font-weight:800}.kpiconfig-table tr.is-deleted{display:none}.kpiconfig-table tr.is-editing td{background:#f4fbff}.kpiconfig-btn[type=button]{cursor:pointer}.kpiconfig-empty td{text-align:center;padding:25px;color:#8492a4}
+    @media(max-width:1100px){.kpiconfig-summary{grid-template-columns:repeat(2,1fr)}.kpiconfig-grid{grid-template-columns:1fr}.kpiconfig-material{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:720px){.kpiconfig-shell{width:min(100% - 20px,1540px)}.kpiconfig-head{flex-direction:column}.kpiconfig-actions{justify-content:flex-start}.kpiconfig-summary,.kpiconfig-scale,.kpiconfig-material{grid-template-columns:1fr 1fr}.kpiconfig-setting{grid-template-columns:1fr}}
 </style>
 
-@php
-    $allSettings = collect($settings ?? []);
-    $salaryKeys = ['base_salary_rate', 'kpi_salary_rate'];
-    $feedbackKeys = ['bad_feedback_penalty', 'good_feedback_bonus', 'customer_feedback_max'];
-    $kpiKeys = ['quality_error_penalty', 'safety_error_penalty', 'equipment_error_penalty', 'success_project_bonus', 'kpi_max_rate'];
-    $usedKeys = array_merge($salaryKeys, $feedbackKeys, $kpiKeys);
-
-    $salarySettings = $allSettings->filter(fn($s) => in_array($s->setting_key, $salaryKeys));
-    $feedbackSettings = $allSettings->filter(fn($s) => in_array($s->setting_key, $feedbackKeys));
-    $kpiSettings = $allSettings->filter(fn($s) => in_array($s->setting_key, $kpiKeys));
-    $otherSettings = $allSettings->filter(fn($s) => !in_array($s->setting_key, $usedKeys));
-@endphp
-
-
-@php
-    $kpiItemRows = collect();
-
-    if (\Illuminate\Support\Facades\Schema::hasTable('technical_payroll_kpi_items')) {
-        $kpiItemRows = \Illuminate\Support\Facades\DB::table('technical_payroll_kpi_items')
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
-    }
-@endphp
-
-<div class="tech-settings-page">
-    <div class="container-fluid py-3 py-lg-4">
-        <div class="topbar-settings">
+<div class="kpiconfig-page">
+    <div class="kpiconfig-shell">
+        <header class="kpiconfig-head">
             <div>
-                <h2>Cài đặt KPI kỹ thuật</h2>
-                <p>Quản lý tỷ lệ lương, feedback và các rule cộng/trừ KPI.</p>
+                <div class="kpiconfig-breadcrumb"><span>Kỹ thuật</span><i class="bi bi-chevron-right"></i><span>KPIs</span><i class="bi bi-chevron-right"></i><span>Cấu hình</span></div>
+                <h1 class="kpiconfig-title">Cấu hình KPIs Kỹ thuật</h1>
+                <p class="kpiconfig-subtitle">Quản trị viên có thể thêm, sửa, xóa và sắp xếp các dòng KPI. Tổng trọng số của các tiêu chí đang dùng phải bằng 100%.</p>
             </div>
-            <a href="{{ route('ky-thuat.luong.index') }}" class="btn btn-outline-secondary btn-pill">
-                <i class="bi bi-arrow-left me-1"></i>Quay lại bảng lương
-            </a>
-        </div>
+            <div class="kpiconfig-actions">
+                <a href="{{ route('ky-thuat.kpis.index') }}" class="kpiconfig-btn"><i class="bi bi-arrow-left"></i>Về KPIs</a>
+                <a href="{{ route('ky-thuat.luong.index') }}" class="kpiconfig-btn primary"><i class="bi bi-pencil-square"></i>Chấm KPI</a>
+            </div>
+        </header>
 
-        <section class="settings-hero">
-            <div class="hero-chip"><span></span> TECH KPI SETTINGS</div>
-            <h1>Thông số tính lương KPI</h1>
-            <p>Nhập dạng phần trăm. Ví dụ nhập <b>70</b> nghĩa là <b>70%</b>. Khi lưu, hệ thống tự đổi về 0.7000 để tính toán.</p>
+        @if(session('success'))<div class="kpiconfig-alert success"><i class="bi bi-check-circle me-1"></i>{{ session('success') }}</div>@endif
+        @if(session('error'))<div class="kpiconfig-alert danger"><i class="bi bi-exclamation-triangle me-1"></i>{{ session('error') }}</div>@endif
+
+        <section class="kpiconfig-summary">
+            <article class="kpiconfig-stat"><span>Số tiêu chí</span><strong id="criteriaCountSummary">{{ $criteriaCount }}</strong><small>Dòng KPI đang sử dụng</small></article>
+            <article class="kpiconfig-stat"><span>Tổng trọng số</span><strong id="totalWeightSummary">100%</strong><small>Phải bằng 100%</small></article>
+            <article class="kpiconfig-stat"><span>Lương cố định</span><strong id="baseRateSummary">{{ $baseSetting->percentSummary }}%</strong><small>Tỷ lệ trên Gross</small></article>
+            <article class="kpiconfig-stat"><span>Quỹ lương KPI</span><strong id="kpiRateSummary">{{ $kpiSalarySetting->percentSummary }}%</strong><small>Tỷ lệ trên Gross</small></article>
         </section>
 
-        @if(session('success'))
-            <div class="smart-alert success"><i class="bi bi-check-circle fs-5"></i><div><b>Đã lưu</b><br>{{ session('success') }}</div></div>
-        @endif
-
-        @if(session('error'))
-            <div class="smart-alert danger"><i class="bi bi-exclamation-triangle fs-5"></i><div><b>Có lỗi</b><br>{{ session('error') }}</div></div>
-        @endif
-
-        
-        <form method="POST" action="{{ route('ky-thuat.luong.settings.kpi-items') }}" class="kpi-items-manager" id="kpiItemsForm">
+        <form method="POST" action="{{ route('ky-thuat.luong.settings.kpi-items') }}" id="kpiItemsForm" class="kpiconfig-panel">
             @csrf
-
-            <div class="kpi-items-head">
-                <div>
-                    <h3><i class="bi bi-table me-1"></i>Dòng KPI chi tiết</h3>
-                    <p>Thêm / bớt / sửa các dòng sẽ hiển thị ở Bảng KPI chi tiết ngoài trang tính lương.</p>
+            <div class="kpiconfig-panel-head">
+                <div><h3>Danh sách tiêu chí KPI kỹ thuật</h3><p>Sửa trực tiếp từng dòng, thêm tiêu chí mới hoặc đánh dấu xóa rồi bấm Lưu cấu hình KPI.</p></div>
+                <div class="kpiconfig-actions">
+                    @if($canManageKpi)
+                        <button type="button" class="kpiconfig-btn primary" id="addKpiRow"><i class="bi bi-plus-lg"></i>Thêm dòng</button>
+                    @else
+                        <span class="kpiconfig-btn" style="height:30px;pointer-events:none"><i class="bi bi-lock"></i>Chỉ Admin được sửa</span>
+                    @endif
                 </div>
-
-                <button type="button" class="btn-add" onclick="addKpiItemRow()">
-                    + Thêm dòng KPI
-                </button>
+            </div>
+            <div class="kpiconfig-panel-body">
+                <div class="kpiconfig-notice"><i class="bi bi-info-circle"></i><div>Mỗi dòng là một tiêu chí KPI. Bạn có thể đổi tên, đơn vị, KH/TH mặc định, trọng số, cách tính, <b>nguồn dữ liệu Công trình</b>, ghi chú và thứ tự. <b>Tổng trọng số phải bằng 100%</b> trước khi lưu.</div></div>
             </div>
 
-            <div class="table-responsive">
-                <table class="table table-bordered align-middle kpi-items-table">
-                    <thead>
-                        <tr>
-                            <th style="width:70px">STT</th>
-                            <th style="width:230px">Tên chỉ tiêu</th>
-                            <th style="width:95px">ĐVT</th>
-                            <th style="width:100px">KH mặc định</th>
-                            <th style="width:100px">TH mặc định</th>
-                            <th style="width:110px">Trọng số %</th>
-                            <th style="width:190px">Cách tính</th>
-                            <th>Ghi chú</th>
-                            <th style="width:80px">Hiện</th>
-                            <th style="width:80px">Xóa</th>
-                        </tr>
-                    </thead>
+            @foreach($legacyRows as $legacy)
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][id]" value="{{ $legacy->id }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][sort_order]" value="{{ $legacy->order }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][name]" value="{{ $legacy->name }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][unit]" value="{{ $legacy->unit }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][plan_value]" value="{{ $legacy->plan }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][actual_value]" value="{{ $legacy->actual }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][weight_percent]" value="{{ $legacy->weightPercent }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][calc_type]" value="{{ $legacy->calcType }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][source_code]" value="{{ $legacy->sourceCode }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][note]" value="{{ $legacy->note }}">
+                <input type="hidden" name="kpi_items[{{ $legacy->key }}][is_enabled]" value="0">
+            @endforeach
 
-                    <tbody id="kpiItemsBody">
-                        @forelse($kpiItemRows as $item)
+            <div class="kpiconfig-table-wrap">
+                <table class="kpiconfig-table">
+                    <thead><tr><th>STT</th><th>Tiêu chí</th><th>ĐVT</th><th>KH mặc định</th><th>TH mặc định</th><th>Trọng số</th><th>Cách tính</th><th>Nguồn dữ liệu</th><th>Quy tắc / ghi chú</th><th>Thao tác</th></tr></thead>
+                    <tbody id="kpiRowsBody">
+                        @foreach($criteriaRows as $row)
                             <tr>
                                 <td>
-                                    <input type="hidden" name="kpi_items[{{ $loop->index }}][id]" value="{{ $item->id }}">
-                                    <input type="number" name="kpi_items[{{ $loop->index }}][sort_order]" value="{{ $item->sort_order }}" class="form-control">
+                                    @if($row->id)<input type="hidden" class="js-row-id" name="kpi_items[{{ $row->key }}][id]" value="{{ $row->id }}">@endif
+                                    <input type="hidden" name="kpi_items[{{ $row->key }}][is_enabled]" value="1">
+                                    <input type="hidden" class="js-delete-flag" name="kpi_items[{{ $row->key }}][delete]" value="0">
+                                    <div class="kpiconfig-index"><span class="kpiconfig-icon"><i class="bi {{ $row->icon }}"></i></span><input type="number" name="kpi_items[{{ $row->key }}][sort_order]" value="{{ $row->order }}" class="kpiconfig-control kpiconfig-order" @disabled(!$canManageKpi)></div>
                                 </td>
+                                <td><input type="text" name="kpi_items[{{ $row->key }}][name]" value="{{ $row->name }}" class="kpiconfig-control js-kpi-name" required @disabled(!$canManageKpi)></td>
+                                <td><input type="text" name="kpi_items[{{ $row->key }}][unit]" value="{{ $row->unit }}" class="kpiconfig-control kpiconfig-unit" @disabled(!$canManageKpi)></td>
+                                <td><input type="number" step="0.01" min="0" name="kpi_items[{{ $row->key }}][plan_value]" value="{{ $row->plan }}" class="kpiconfig-control kpiconfig-small" @disabled(!$canManageKpi)></td>
+                                <td><input type="number" step="0.01" min="0" name="kpi_items[{{ $row->key }}][actual_value]" value="{{ $row->actual }}" class="kpiconfig-control kpiconfig-small" @disabled(!$canManageKpi)></td>
+                                <td><input type="number" step="0.01" min="0" max="100" name="kpi_items[{{ $row->key }}][weight_percent]" value="{{ number_format($row->weightPercent,2,'.','') }}" class="kpiconfig-control kpiconfig-weight js-kpi-weight" @disabled(!$canManageKpi)></td>
                                 <td>
-                                    <input type="text" name="kpi_items[{{ $loop->index }}][name]" value="{{ $item->name }}" class="form-control" required>
-                                </td>
-                                <td>
-                                    <input type="text" name="kpi_items[{{ $loop->index }}][unit]" value="{{ $item->unit }}" class="form-control">
-                                </td>
-                                <td>
-                                    <input type="number" step="0.01" name="kpi_items[{{ $loop->index }}][plan_value]" value="{{ $item->plan_value }}" class="form-control">
-                                </td>
-                                <td>
-                                    <input type="number" step="0.01" name="kpi_items[{{ $loop->index }}][actual_value]" value="{{ $item->actual_value }}" class="form-control">
-                                </td>
-                                <td>
-                                    <input type="number" step="0.01" name="kpi_items[{{ $loop->index }}][weight_percent]" value="{{ number_format((float)$item->weight * 100, 2, '.', '') }}" class="form-control">
-                                </td>
-                                <td>
-                                    <select name="kpi_items[{{ $loop->index }}][calc_type]" class="form-select">
-                                        @foreach([
-                                            'actual_div_plan' => 'TH / KH',
-                                            'plan_div_actual' => 'KH / TH',
-                                            'minus_quality' => 'Trừ lỗi chất lượng',
-                                            'minus_safety' => 'Trừ sự cố an toàn',
-                                            'minus_equipment' => 'Trừ lỗi thiết bị',
-                                            'customer_feedback' => 'Feedback khách hàng',
-                                            'success_project' => 'Cộng công trình chốt',
-                                            'ot_rule' => 'Quy tắc OT'
-                                        ] as $key => $label)
-                                            <option value="{{ $key }}" {{ $item->calc_type === $key ? 'selected' : '' }}>{{ $label }}</option>
-                                        @endforeach
+                                    <select name="kpi_items[{{ $row->key }}][calc_type]" class="kpiconfig-control" @disabled(!$canManageKpi)>
+                                        <option value="actual_div_plan" @selected($row->calcType==='actual_div_plan')>TH / KH (tối đa 100%)</option>
+                                        <option value="plan_div_actual" @selected($row->calcType==='plan_div_actual')>KH / TH</option>
+                                        <option value="material_waste" @selected($row->calcType==='material_waste')>Quy đổi hao hụt vật tư</option>
+                                        <option value="minus_quality" @selected($row->calcType==='minus_quality')>Trừ theo lỗi chất lượng</option>
+                                        <option value="minus_safety" @selected($row->calcType==='minus_safety')>Trừ theo sự cố HSE</option>
                                     </select>
                                 </td>
                                 <td>
-                                    <textarea name="kpi_items[{{ $loop->index }}][note]" class="form-control">{{ $item->note }}</textarea>
+                                    <select name="kpi_items[{{ $row->key }}][source_code]" class="kpiconfig-control" @disabled(!$canManageKpi)>
+                                        @foreach($projectSourceOptions as $sourceValue => $sourceLabel)
+                                            <option value="{{ $sourceValue }}" @selected($row->sourceCode === $sourceValue)>{{ $sourceLabel }}</option>
+                                        @endforeach
+                                    </select>
                                 </td>
-                                <td class="text-center">
-                                    <input type="hidden" name="kpi_items[{{ $loop->index }}][is_enabled]" value="0">
-                                    <input type="checkbox" name="kpi_items[{{ $loop->index }}][is_enabled]" value="1" class="form-check-input" {{ $item->is_enabled ? 'checked' : '' }}>
-                                </td>
-                                <td class="text-center kpi-action-cell">
-                                    <button
-                                        type="button"
-                                        class="kpi-trash-btn js-delete-kpi-item"
-                                        data-id="{{ $item->id }}"
-                                        data-name="{{ $item->name }}"
-                                        data-url="{{ route('ky-thuat.luong.settings.kpi-items.destroy', $item->id) }}"
-                                        title="Xóa ngay dòng KPI này"
-                                    >
-                                        <i class="bi bi-trash3"></i>
-                                    </button>
+                                <td><textarea name="kpi_items[{{ $row->key }}][note]" class="kpiconfig-control" @disabled(!$canManageKpi)>{{ $row->note }}</textarea></td>
+                                <td>
+                                    @if($canManageKpi)
+                                        <div class="kpiconfig-row-actions">
+                                            <button type="button" class="kpiconfig-action edit js-edit-row" title="Sửa dòng"><i class="bi bi-pencil-square"></i></button>
+                                            <button type="button" class="kpiconfig-action delete js-delete-row" title="Xóa dòng"><i class="bi bi-trash3"></i></button>
+                                        </div>
+                                    @else
+                                        <span class="kpiconfig-readonly"><i class="bi bi-eye"></i> Xem</span>
+                                    @endif
                                 </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="10" class="text-center text-muted py-4">Chưa có dòng KPI nào. Bấm “Thêm dòng KPI”.</td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
-
-            <div class="kpi-items-actions">
-                <button type="button" class="btn btn-outline-primary btn-pill" onclick="addKpiItemRow()">
-                    <i class="bi bi-plus-circle me-1"></i>Thêm dòng KPI
-                </button>
-
-                <button type="submit" class="btn-save">
-                    <i class="bi bi-save me-1"></i>Lưu dòng KPI chi tiết
-                </button>
+            <div class="kpiconfig-footer">
+                <div class="kpiconfig-weight-note">Tổng trọng số hiện tại: <strong id="weightTotalText">100%</strong> <span id="weightStatus">· Đúng chuẩn</span></div>
+                @if($canManageKpi)
+                    <button type="submit" class="kpiconfig-save" id="saveKpiItems"><i class="bi bi-save"></i>Lưu cấu hình KPI</button>
+                @else
+                    <span class="kpiconfig-weight-note"><i class="bi bi-lock me-1"></i>Chỉ Quản trị viên có quyền thay đổi cấu hình.</span>
+                @endif
             </div>
         </form>
 
-<form method="POST" action="{{ route('ky-thuat.luong.settings.save') }}" id="settingsForm">
-            @csrf
-
-            <div class="summary-grid">
-                <div class="summary-card">
-                    <span>Lương cố định</span>
-                    <strong class="text-primary" id="basePercentBox">70%</strong>
-                </div>
-                <div class="summary-card green">
-                    <span>Lương KPI</span>
-                    <strong class="text-success" id="kpiPercentBox">30%</strong>
-                </div>
-                <div class="summary-card purple">
-                    <span>Tổng tỷ lệ lương</span>
-                    <strong id="totalPercentBox">100%</strong>
-                    <div class="small mt-1" id="totalPercentNote">Đúng chuẩn 100%</div>
-                </div>
-            </div>
-
-            <div class="settings-layout">
-                <div>
-                    <div class="setting-panel">
-                        <div class="setting-head head-salary">
-                            <div>
-                                <h3><i class="bi bi-wallet2 me-1"></i>Tỷ lệ lương</h3>
-                                <p>Lương cố định + lương KPI. Tổng nên bằng 100%.</p>
-                            </div>
-                            <button type="button" class="btn-add" onclick="addSettingItem('salaryList', 'salary')">+ Thêm</button>
+        <div class="kpiconfig-grid">
+            <form method="POST" action="{{ route('ky-thuat.luong.settings.save') }}" class="kpiconfig-panel" id="settingsForm">
+                @csrf
+                <div class="kpiconfig-panel-head"><div><h3>Tỷ lệ lương & giới hạn KPI</h3><p>Giữ cấu hình tài chính tách biệt với các tiêu chí đánh giá.</p></div><i class="bi bi-wallet2 tw:text-[#0d6efd]"></i></div>
+                <div class="kpiconfig-panel-body">
+                    <div class="kpiconfig-setting-list">
+                        <div class="kpiconfig-setting">
+                            <div><strong>Lương cố định</strong><small>{{ $baseSetting->note }}</small></div>
+                            <div class="kpiconfig-percent"><input type="number" step="0.01" min="0" max="100" name="settings[base_salary_rate][value]" value="{{ $baseSetting->percentInput }}" class="kpiconfig-control js-salary-rate" @disabled(!$canManageKpi)><span>%</span></div>
+                            <input type="hidden" name="settings[base_salary_rate][label]" value="{{ $baseSetting->label }}"><input type="hidden" name="settings[base_salary_rate][note]" value="{{ $baseSetting->note }}">
                         </div>
-
-                        <div class="setting-list" id="salaryList">
-                            @foreach($salarySettings as $setting)
-                                @php $percentValue = (float) $setting->setting_value * 100; @endphp
-                                <div class="setting-item">
-                                    <div class="setting-line-top">
-                                        <input type="text" name="settings[{{ $setting->setting_key }}][label]" value="{{ $setting->setting_label }}" class="form-control setting-name">
-                                        <div class="percent-wrap">
-                                            <input type="number" step="0.01" name="settings[{{ $setting->setting_key }}][value]" value="{{ number_format($percentValue, 2, '.', '') }}" class="form-control setting-percent">
-                                            <span>%</span>
-                                        </div>
-                                        <label class="delete-check" title="Tích để xóa">
-                                            <input type="checkbox" name="delete_settings[{{ $setting->setting_key }}]" value="1" class="form-check-input">
-                                        </label>
-                                    </div>
-                                    <div class="setting-key">{{ $setting->setting_key }}</div>
-                                    <input type="text" name="settings[{{ $setting->setting_key }}][note]" value="{{ $setting->note }}" class="form-control setting-note" placeholder="Ghi chú">
-                                </div>
-                            @endforeach
+                        <div class="kpiconfig-setting">
+                            <div><strong>Quỹ lương KPI</strong><small>{{ $kpiSalarySetting->note }}</small></div>
+                            <div class="kpiconfig-percent"><input type="number" step="0.01" min="0" max="100" name="settings[kpi_salary_rate][value]" value="{{ $kpiSalarySetting->percentInput }}" class="kpiconfig-control js-salary-rate" @disabled(!$canManageKpi)><span>%</span></div>
+                            <input type="hidden" name="settings[kpi_salary_rate][label]" value="{{ $kpiSalarySetting->label }}"><input type="hidden" name="settings[kpi_salary_rate][note]" value="{{ $kpiSalarySetting->note }}">
+                        </div>
+                        <div class="kpiconfig-setting">
+                            <div><strong>Trần KPI tổng</strong><small>{{ $maxSetting->note }}</small></div>
+                            <div class="kpiconfig-percent"><input type="number" step="0.01" min="100" max="200" name="settings[kpi_max_rate][value]" value="{{ $maxSetting->percentInput }}" class="kpiconfig-control" @disabled(!$canManageKpi)><span>%</span></div>
+                            <input type="hidden" name="settings[kpi_max_rate][label]" value="{{ $maxSetting->label }}"><input type="hidden" name="settings[kpi_max_rate][note]" value="{{ $maxSetting->note }}">
                         </div>
                     </div>
-
-                    <div class="setting-panel">
-                        <div class="setting-head head-feedback">
-                            <div>
-                                <h3><i class="bi bi-chat-square-heart me-1"></i>Feedback khách hàng</h3>
-                                <p>Áp dụng riêng cho chỉ tiêu mức độ hài lòng khách hàng.</p>
-                            </div>
-                            <button type="button" class="btn-add" onclick="addSettingItem('feedbackList', 'feedback')">+ Thêm</button>
-                        </div>
-
-                        <div class="setting-list" id="feedbackList">
-                            @foreach($feedbackSettings as $setting)
-                                @php $percentValue = (float) $setting->setting_value * 100; @endphp
-                                <div class="setting-item">
-                                    <div class="setting-line-top">
-                                        <input type="text" name="settings[{{ $setting->setting_key }}][label]" value="{{ $setting->setting_label }}" class="form-control setting-name">
-                                        <div class="percent-wrap">
-                                            <input type="number" step="0.01" name="settings[{{ $setting->setting_key }}][value]" value="{{ number_format($percentValue, 2, '.', '') }}" class="form-control setting-percent">
-                                            <span>%</span>
-                                        </div>
-                                        <label class="delete-check" title="Tích để xóa">
-                                            <input type="checkbox" name="delete_settings[{{ $setting->setting_key }}]" value="1" class="form-check-input">
-                                        </label>
-                                    </div>
-                                    <div class="setting-key">{{ $setting->setting_key }}</div>
-                                    <input type="text" name="settings[{{ $setting->setting_key }}][note]" value="{{ $setting->note }}" class="form-control setting-note" placeholder="Ghi chú">
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
+                    <div class="kpiconfig-notice" id="salaryTotalNotice" style="margin-top:10px;margin-bottom:0"><i class="bi bi-calculator"></i><div>Lương cố định + quỹ KPI = <b id="salaryTotalText">100%</b>. Tổng hai tỷ lệ nên bằng 100%.</div></div>
                 </div>
+                <div class="kpiconfig-footer"><span class="kpiconfig-weight-note">Các thông số cũ khác vẫn được giữ trong database, trang này chỉ hiển thị phần đang dùng.</span>@if($canManageKpi)<button type="submit" class="kpiconfig-save"><i class="bi bi-save"></i>Lưu tỷ lệ lương</button>@else<span class="kpiconfig-weight-note"><i class="bi bi-lock me-1"></i>Chỉ Admin được sửa</span>@endif</div>
+            </form>
 
-                <div>
-                    <div class="setting-panel">
-                        <div class="setting-head head-kpi">
-                            <div>
-                                <h3><i class="bi bi-sliders me-1"></i>Quy tắc KPI</h3>
-                                <p>Các mức cộng/trừ trong bảng KPI kỹ thuật.</p>
-                            </div>
-                            <button type="button" class="btn-add" onclick="addSettingItem('kpiList', 'kpi')">+ Thêm</button>
-                        </div>
-
-                        <div class="setting-list" id="kpiList">
-                            @foreach($kpiSettings as $setting)
-                                @php $percentValue = (float) $setting->setting_value * 100; @endphp
-                                <div class="setting-item">
-                                    <div class="setting-line-top">
-                                        <input type="text" name="settings[{{ $setting->setting_key }}][label]" value="{{ $setting->setting_label }}" class="form-control setting-name">
-                                        <div class="percent-wrap">
-                                            <input type="number" step="0.01" name="settings[{{ $setting->setting_key }}][value]" value="{{ number_format($percentValue, 2, '.', '') }}" class="form-control setting-percent">
-                                            <span>%</span>
-                                        </div>
-                                        <label class="delete-check" title="Tích để xóa">
-                                            <input type="checkbox" name="delete_settings[{{ $setting->setting_key }}]" value="1" class="form-check-input">
-                                        </label>
-                                    </div>
-                                    <div class="setting-key">{{ $setting->setting_key }}</div>
-                                    <input type="text" name="settings[{{ $setting->setting_key }}][note]" value="{{ $setting->note }}" class="form-control setting-note" placeholder="Ghi chú">
-                                </div>
-                            @endforeach
-                        </div>
+            <section class="kpiconfig-panel">
+                <div class="kpiconfig-panel-head"><div><h3>Quy tắc hiển thị trên Dashboard</h3><p>Cùng chuẩn với trang KPIs Kỹ thuật hiện tại.</p></div><i class="bi bi-speedometer2 tw:text-[#0d6efd]"></i></div>
+                <div class="kpiconfig-panel-body">
+                    <div class="kpiconfig-scale">
+                        <div class="kpiconfig-scale-card"><strong>≥ 100%</strong><span>Vượt KPI · quỹ KPI 110–120%</span></div>
+                        <div class="kpiconfig-scale-card"><strong>90–&lt;100%</strong><span>Đạt KPI · quỹ KPI 100%</span></div>
+                        <div class="kpiconfig-scale-card"><strong>75–&lt;90%</strong><span>Cần cải thiện · quỹ KPI 80%</span></div>
+                        <div class="kpiconfig-scale-card"><strong>&lt; 75%</strong><span>Không đạt · quỹ KPI 0%</span></div>
                     </div>
-
-                    <div class="setting-panel">
-                        <div class="setting-head head-other">
-                            <div>
-                                <h3><i class="bi bi-plus-circle me-1"></i>Mục khác</h3>
-                                <p>Các thông số phát sinh thêm. Có thể thêm/xóa tự do.</p>
-                            </div>
-                            <button type="button" class="btn-add" onclick="addSettingItem('otherList', 'other')">+ Thêm</button>
-                        </div>
-
-                        <div class="setting-list" id="otherList">
-                            @forelse($otherSettings as $setting)
-                                @php $percentValue = (float) $setting->setting_value * 100; @endphp
-                                <div class="setting-item">
-                                    <div class="setting-line-top">
-                                        <input type="text" name="settings[{{ $setting->setting_key }}][label]" value="{{ $setting->setting_label }}" class="form-control setting-name">
-                                        <div class="percent-wrap">
-                                            <input type="number" step="0.01" name="settings[{{ $setting->setting_key }}][value]" value="{{ number_format($percentValue, 2, '.', '') }}" class="form-control setting-percent">
-                                            <span>%</span>
-                                        </div>
-                                        <label class="delete-check" title="Tích để xóa">
-                                            <input type="checkbox" name="delete_settings[{{ $setting->setting_key }}]" value="1" class="form-check-input">
-                                        </label>
-                                    </div>
-                                    <div class="setting-key">{{ $setting->setting_key }}</div>
-                                    <input type="text" name="settings[{{ $setting->setting_key }}][note]" value="{{ $setting->note }}" class="form-control setting-note" placeholder="Ghi chú">
-                                </div>
-                            @empty
-                                <div class="empty-list" id="emptyOtherText">Chưa có mục khác.</div>
-                            @endforelse
-                        </div>
+                    <div style="height:10px"></div>
+                    <div class="kpiconfig-scale kpiconfig-material">
+                        <div class="kpiconfig-scale-card"><strong>0%</strong><span>120% điểm vật tư</span></div>
+                        <div class="kpiconfig-scale-card"><strong>&gt;0–2%</strong><span>100% điểm</span></div>
+                        <div class="kpiconfig-scale-card"><strong>&gt;2–4%</strong><span>85% điểm</span></div>
+                        <div class="kpiconfig-scale-card"><strong>&gt;4–6%</strong><span>70% điểm</span></div>
+                        <div class="kpiconfig-scale-card"><strong>&gt;6%</strong><span>0% điểm</span></div>
                     </div>
+                    <div class="kpiconfig-notice warning" style="margin-top:10px;margin-bottom:0"><i class="bi bi-shield-exclamation"></i><div>Vi phạm an toàn nghiêm trọng có thể trừ trực tiếp <b>10 hoặc 20 điểm KPI</b> tại màn hình Chấm KPI.</div></div>
                 </div>
-            </div>
-
-            <div class="sticky-save">
-                <button type="button" class="btn btn-outline-primary btn-pill" onclick="addSettingItem('otherList', 'other')">
-                    <i class="bi bi-plus-circle me-1"></i>Thêm mục khác
-                </button>
-                <button type="submit" class="btn-save">
-                    <i class="bi bi-save me-1"></i>Lưu cài đặt
-                </button>
-            </div>
-        </form>
+            </section>
+        </div>
     </div>
 </div>
 
 <script>
-let newSettingIndex = 0;
+(function(){
+    const canManage = @json($canManageKpi);
+    const tbody = document.getElementById('kpiRowsBody');
+    const save = document.getElementById('saveKpiItems');
+    const addButton = document.getElementById('addKpiRow');
+    let rowCounter = Date.now();
 
-function slugify(text) {
-    return text.toString()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/đ/g, 'd')
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
-}
-
-function addSettingItem(listId, group) {
-    newSettingIndex++;
-    const list = document.getElementById(listId);
-    const emptyOtherText = document.getElementById('emptyOtherText');
-    if (emptyOtherText && listId === 'otherList') emptyOtherText.remove();
-
-    const item = document.createElement('div');
-    item.className = 'setting-item new-item';
-    item.innerHTML = `
-        <div class="setting-line-top">
-            <input type="text" name="new_settings[${newSettingIndex}][label]" class="form-control setting-name new-label" placeholder="Tên thông số" oninput="autoFillKey(this, '${group}')">
-            <div class="percent-wrap">
-                <input type="number" step="0.01" name="new_settings[${newSettingIndex}][value]" value="0" class="form-control">
-                <span>%</span>
-            </div>
-            <button type="button" class="btn btn-sm btn-outline-danger btn-pill" onclick="this.closest('.setting-item').remove()">Xóa</button>
-        </div>
-        <input type="hidden" name="new_settings[${newSettingIndex}][group]" value="${group}">
-        <input type="text" name="new_settings[${newSettingIndex}][key]" class="form-control setting-note new-key my-2" placeholder="custom_ma_thong_so">
-        <input type="text" name="new_settings[${newSettingIndex}][note]" class="form-control setting-note" placeholder="Ghi chú">
-    `;
-    list.appendChild(item);
-}
-
-function autoFillKey(input, group) {
-    const item = input.closest('.setting-item');
-    const keyInput = item.querySelector('.new-key');
-    if (!keyInput.dataset.touched) keyInput.value = group + '_' + slugify(input.value);
-}
-
-function getSettingPercentByKey(key) {
-    const input = document.querySelector(`input[name="settings[${key}][value]"]`);
-    return input ? (parseFloat(input.value) || 0) : 0;
-}
-
-function updateSalaryPercentSummary() {
-    const base = getSettingPercentByKey('base_salary_rate');
-    const kpi = getSettingPercentByKey('kpi_salary_rate');
-    const total = base + kpi;
-
-    const baseBox = document.getElementById('basePercentBox');
-    const kpiBox = document.getElementById('kpiPercentBox');
-    const totalBox = document.getElementById('totalPercentBox');
-    const note = document.getElementById('totalPercentNote');
-
-    if (!baseBox || !kpiBox || !totalBox || !note) return;
-
-    baseBox.innerText = base.toFixed(2) + '%';
-    kpiBox.innerText = kpi.toFixed(2) + '%';
-    totalBox.innerText = total.toFixed(2) + '%';
-    totalBox.classList.remove('text-success', 'text-danger');
-
-    if (Math.abs(total - 100) < 0.001) {
-        totalBox.classList.add('text-success');
-        note.innerText = 'Đúng chuẩn 100%';
-        note.className = 'small mt-1 text-success fw-bold';
-    } else {
-        totalBox.classList.add('text-danger');
-        note.innerText = 'Cần chỉnh lại để tổng = 100%';
-        note.className = 'small mt-1 text-danger fw-bold';
-    }
-}
-
-document.addEventListener('input', function(e) {
-    if (e.target.classList.contains('new-key')) e.target.dataset.touched = '1';
-    updateSalaryPercentSummary();
-});
-
-updateSalaryPercentSummary();
-</script>
-
-<script>
-let kpiItemIndex = {{ max(100, $kpiItemRows->count() + 100) }};
-
-function addKpiItemRow() {
-    kpiItemIndex++;
-
-    const body = document.getElementById('kpiItemsBody');
-
-    if (!body) return;
-
-    if (body.children.length === 1 && body.children[0].children.length === 1) {
-        body.innerHTML = '';
+    function activeRows(){
+        return [...tbody.querySelectorAll('tr')].filter(row => !row.classList.contains('is-deleted') && !row.classList.contains('kpiconfig-empty'));
     }
 
-    const tr = document.createElement('tr');
-
-    tr.innerHTML = `
-        <td><input type="number" name="kpi_items[${kpiItemIndex}][sort_order]" value="${kpiItemIndex - 100}" class="form-control"></td>
-        <td><input type="text" name="kpi_items[${kpiItemIndex}][name]" value="" class="form-control" required placeholder="Tên chỉ tiêu"></td>
-        <td><input type="text" name="kpi_items[${kpiItemIndex}][unit]" value="" class="form-control" placeholder="ĐVT"></td>
-        <td><input type="number" step="0.01" name="kpi_items[${kpiItemIndex}][plan_value]" value="0" class="form-control"></td>
-        <td><input type="number" step="0.01" name="kpi_items[${kpiItemIndex}][actual_value]" value="0" class="form-control"></td>
-        <td><input type="number" step="0.01" name="kpi_items[${kpiItemIndex}][weight_percent]" value="10" class="form-control"></td>
-        <td>
-            <select name="kpi_items[${kpiItemIndex}][calc_type]" class="form-select">
-                <option value="actual_div_plan">TH / KH</option>
-                <option value="plan_div_actual">KH / TH</option>
-                <option value="minus_quality">Trừ lỗi chất lượng</option>
-                <option value="minus_safety">Trừ sự cố an toàn</option>
-                <option value="minus_equipment">Trừ lỗi thiết bị</option>
-                <option value="customer_feedback">Feedback khách hàng</option>
-                <option value="success_project">Cộng công trình chốt</option>
-                <option value="ot_rule">Quy tắc OT</option>
-            </select>
-        </td>
-        <td><textarea name="kpi_items[${kpiItemIndex}][note]" class="form-control" placeholder="Ghi chú hiển thị dưới chỉ tiêu"></textarea></td>
-        <td class="text-center">
-            <input type="hidden" name="kpi_items[${kpiItemIndex}][is_enabled]" value="0">
-            <input type="checkbox" name="kpi_items[${kpiItemIndex}][is_enabled]" value="1" class="form-check-input" checked>
-        </td>
-        <td class="text-center">
-            <button type="button" class="kpi-trash-btn is-local" onclick="this.closest('tr').remove()" title="Xóa dòng mới">
-                <i class="bi bi-trash3"></i>
-            </button>
-        </td>
-    `;
-
-    body.appendChild(tr);
-}
-</script>
-
-
-<script>
-/* ego-kpi-item-delete-v1 */
-document.addEventListener('click', async function (event) {
-    const button = event.target.closest('.js-delete-kpi-item');
-
-    if (!button) return;
-
-    event.preventDefault();
-
-    const row = button.closest('tr');
-    const name = button.dataset.name || 'dòng KPI này';
-    const url = button.dataset.url;
-
-    if (!url) {
-        alert('Thiếu URL xóa dòng KPI.');
-        return;
+    function weightSummary(){
+        const rows = activeRows();
+        const total = rows.reduce((sum,row)=>sum+(parseFloat(row.querySelector('.js-kpi-weight')?.value)||0),0);
+        const text = total.toLocaleString('vi-VN',{minimumFractionDigits:0,maximumFractionDigits:2})+'%';
+        document.getElementById('weightTotalText').textContent = text;
+        document.getElementById('totalWeightSummary').textContent = text;
+        document.getElementById('criteriaCountSummary').textContent = rows.length;
+        const ok = rows.length > 0 && Math.abs(total-100)<0.001;
+        const status = document.getElementById('weightStatus');
+        status.textContent = ok ? '· Đúng chuẩn' : (rows.length ? '· Cần chỉnh về 100%' : '· Cần ít nhất 1 tiêu chí');
+        status.style.color = ok ? '#16845a' : '#d34a55';
+        if (save) {
+            save.disabled = !ok;
+            save.style.opacity = ok ? '1' : '.55';
+            save.title = ok ? '' : 'Cần ít nhất 1 tiêu chí và tổng trọng số phải bằng 100%';
+        }
     }
 
-    const ok = confirm('Xóa ngay "' + name + '" khỏi danh sách KPI chi tiết?');
-
-    if (!ok) return;
-
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-        || document.querySelector('input[name="_token"]')?.value
-        || '';
-
-    button.classList.add('is-loading');
-    button.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
-
-    try {
-        const response = await fetch(url, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': csrf,
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+    function bindRow(row){
+        row.querySelector('.js-kpi-weight')?.addEventListener('input', weightSummary);
+        row.querySelector('.js-edit-row')?.addEventListener('click', function(){
+            row.classList.add('is-editing');
+            const input = row.querySelector('.js-kpi-name');
+            input?.focus();
+            input?.select();
+            setTimeout(()=>row.classList.remove('is-editing'), 1200);
         });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok || data.ok === false) {
-            throw new Error(data.message || 'Không xóa được dòng KPI.');
-        }
-
-        if (row) {
-            row.style.transition = '.22s ease';
-            row.style.opacity = '0';
-            row.style.transform = 'translateX(12px)';
-
-            setTimeout(() => {
+        row.querySelector('.js-delete-row')?.addEventListener('click', function(){
+            if (!confirm('Xóa dòng KPI này? Thay đổi sẽ được áp dụng khi bấm Lưu cấu hình KPI.')) return;
+            const id = row.querySelector('.js-row-id')?.value;
+            if (id) {
+                const flag = row.querySelector('.js-delete-flag');
+                if (flag) flag.value = '1';
+                row.classList.add('is-deleted');
+            } else {
                 row.remove();
-
-                const body = document.getElementById('kpiItemsBody');
-                if (body && body.children.length === 0) {
-                    body.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Chưa có dòng KPI nào. Bấm “Thêm dòng KPI”.</td></tr>';
-                }
-            }, 220);
-        }
-    } catch (error) {
-        alert(error.message || 'Không xóa được dòng KPI.');
-        button.classList.remove('is-loading');
-        button.innerHTML = '<i class="bi bi-trash3"></i>';
+            }
+            weightSummary();
+        });
     }
-});
-/* end ego-kpi-item-delete-v1 */
-</script>
 
+    function addRow(){
+        if (!canManage) return;
+        const key = 'new_' + (rowCounter++);
+        const order = activeRows().length + 1;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <input type="hidden" name="kpi_items[${key}][is_enabled]" value="1">
+                <input type="hidden" class="js-delete-flag" name="kpi_items[${key}][delete]" value="0">
+                <div class="kpiconfig-index"><span class="kpiconfig-icon"><i class="bi bi-plus-circle"></i></span><input type="number" min="1" name="kpi_items[${key}][sort_order]" value="${order}" class="kpiconfig-control kpiconfig-order"></div>
+            </td>
+            <td><input type="text" name="kpi_items[${key}][name]" value="" class="kpiconfig-control js-kpi-name" placeholder="Tên tiêu chí KPI" required></td>
+            <td><input type="text" name="kpi_items[${key}][unit]" value="Công trình" class="kpiconfig-control kpiconfig-unit"></td>
+            <td><input type="number" step="0.01" min="0" name="kpi_items[${key}][plan_value]" value="1" class="kpiconfig-control kpiconfig-small"></td>
+            <td><input type="number" step="0.01" min="0" name="kpi_items[${key}][actual_value]" value="1" class="kpiconfig-control kpiconfig-small"></td>
+            <td><input type="number" step="0.01" min="0" max="100" name="kpi_items[${key}][weight_percent]" value="0" class="kpiconfig-control kpiconfig-weight js-kpi-weight"></td>
+            <td>
+                <select name="kpi_items[${key}][calc_type]" class="kpiconfig-control">
+                    <option value="actual_div_plan">TH / KH (tối đa 100%)</option>
+                    <option value="plan_div_actual">KH / TH</option>
+                    <option value="material_waste">Quy đổi hao hụt vật tư</option>
+                    <option value="minus_quality">Trừ theo lỗi chất lượng</option>
+                    <option value="minus_safety">Trừ theo sự cố HSE</option>
+                </select>
+            </td>
+            <td><select name="kpi_items[${key}][source_code]" class="kpiconfig-control"><option value="manual">Nhập tay</option><option value="project_timeline">Công trình · Tiến độ / deadline</option><option value="project_quality">Công trình · Nghiệm thu / chất lượng</option><option value="project_material_waste">Công trình · Hao hụt vật tư</option><option value="project_hse">Công trình · HSE / vệ sinh</option><option value="project_evn_app">Công trình · EVN / App</option></select></td>
+            <td><textarea name="kpi_items[${key}][note]" class="kpiconfig-control" placeholder="Quy tắc / ghi chú"></textarea></td>
+            <td><div class="kpiconfig-row-actions"><button type="button" class="kpiconfig-action edit js-edit-row" title="Sửa dòng"><i class="bi bi-pencil-square"></i></button><button type="button" class="kpiconfig-action delete js-delete-row" title="Xóa dòng"><i class="bi bi-trash3"></i></button></div></td>
+        `;
+        tbody.appendChild(tr);
+        bindRow(tr);
+        weightSummary();
+        tr.querySelector('.js-kpi-name')?.focus();
+    }
+
+    tbody.querySelectorAll('tr').forEach(bindRow);
+    addButton?.addEventListener('click', addRow);
+    weightSummary();
+
+    const salaryInputs=[...document.querySelectorAll('.js-salary-rate')];
+    function salarySummary(){
+        const base=parseFloat(salaryInputs[0]?.value||0), kpi=parseFloat(salaryInputs[1]?.value||0), total=base+kpi;
+        document.getElementById('baseRateSummary').textContent=base.toLocaleString('vi-VN',{maximumFractionDigits:2})+'%';
+        document.getElementById('kpiRateSummary').textContent=kpi.toLocaleString('vi-VN',{maximumFractionDigits:2})+'%';
+        document.getElementById('salaryTotalText').textContent=total.toLocaleString('vi-VN',{maximumFractionDigits:2})+'%';
+        const notice=document.getElementById('salaryTotalNotice');
+        const ok=Math.abs(total-100)<0.001;
+        notice.classList.toggle('warning',!ok);
+    }
+    salaryInputs.forEach(i=>i.addEventListener('input',salarySummary));
+    salarySummary();
+})();
+</script>
 @endsection

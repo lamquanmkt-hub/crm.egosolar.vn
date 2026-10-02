@@ -19,15 +19,14 @@ class SolarMaintenanceApprovalController extends Controller
     public function __construct(private readonly SolarMaintenanceApprovalService $service) {}
 
     /**
-     * V3: endpoint cũ /gui-duyet được giữ để tương thích cache/tab cũ.
-     * Thao tác này nay hoàn tất trực tiếp đợt bảo trì, không tạo bước phê duyệt cuối.
+     * Gửi kết quả bảo trì cho Trưởng phòng kỹ thuật phê duyệt.
      */
     public function submit(SolarMaintenanceApprovalRequest $request, SolarMaintenanceSchedule $schedule): RedirectResponse
     {
         $this->authorize('submitForApproval', $schedule);
         $this->service->submit($schedule, $request->user(), $request->validated('comment'));
 
-        return back()->with('success', 'Đã hoàn tất đợt bảo trì. Không cần gửi duyệt.');
+        return back()->with('success', 'Đã gửi Trưởng phòng kỹ thuật phê duyệt.');
     }
 
     /**
@@ -38,10 +37,18 @@ class SolarMaintenanceApprovalController extends Controller
         $this->authorize('approve', $schedule);
         $this->service->approve($schedule, $request->user(), $request->validated('comment'));
 
-        return back()->with(
-            'success',
-            'Đã phê duyệt riêng đợt '.((int) ($schedule->round_no ?: 1)).'/'.((int) ($schedule->total_rounds ?: 1)).'. Các đợt khác không thay đổi.'
-        );
+        return back()->with('success', 'Đã phê duyệt kết quả kỹ thuật.');
+    }
+
+    /**
+     * Đóng công việc sau khi kết quả kỹ thuật đã được phê duyệt.
+     */
+    public function complete(SolarMaintenanceApprovalRequest $request, SolarMaintenanceSchedule $schedule): RedirectResponse
+    {
+        $this->authorize('approve', $schedule);
+        $this->service->complete($schedule, $request->user(), $request->validated('comment'));
+
+        return back()->with('success', 'Đã hoàn thành và đóng hồ sơ đợt bảo trì.');
     }
 
     /**
@@ -53,10 +60,7 @@ class SolarMaintenanceApprovalController extends Controller
         $comment = trim((string) $request->input('comment'));
         $this->service->requestRevision($schedule, $request->user(), $comment);
 
-        return back()->with(
-            'success',
-            'Đã yêu cầu bổ sung riêng hồ sơ đợt '.((int) ($schedule->round_no ?: 1)).'/'.((int) ($schedule->total_rounds ?: 1)).'.'
-        );
+        return back()->with('success', 'Đã trả lại và yêu cầu kỹ thuật viên chỉnh sửa.');
     }
 
     /**

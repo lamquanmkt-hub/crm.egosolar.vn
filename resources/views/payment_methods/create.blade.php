@@ -1,27 +1,27 @@
 @extends('layouts.app')
 @section('title', 'Thêm phương thức thanh toán')
 @section('content')
-    <div class="container-fluid px-4 mt-4">
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Thêm phương thức mới</h5>
-                    </div>
-                    <div class="card-body">
+    <div class="container-fluid tw:px-6 tw:mt-6">
+        <div class="tw:row tw:justify-center">
+            <div class="tw:md:col12-8">
+                <x-ui.card class="shadow-sm">
+                    <x-ui.card-header class="bg-primary tw:text-[#ffffff]">
+                        <h5 class="tw:mb-0"><i class="bi bi-plus-circle"></i> Thêm phương thức mới</h5>
+                    </x-ui.card-header>
+                    <x-ui.card-body>
                         <form action="{{ route('payment-methods.store') }}" method="POST">
                             @csrf
 
                             {{-- Include Form Partial --}}
                             @include('payment_methods._form')
 
-                            <div class="d-flex justify-content-end gap-2 mt-4">
-                                <a href="{{ route('payment-methods.index') }}" class="btn btn-secondary">Quay lại</a>
-                                <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Lưu lại</button>
+                            <div class="tw:flex tw:justify-end tw:gap-2 tw:mt-6">
+                                <x-ui.button href="{{ route('payment-methods.index') }}" variant="secondary">Quay lại</x-ui.button>
+                                <x-ui.button variant="primary" type="submit"><i class="bi bi-save"></i> Lưu lại</x-ui.button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                    </x-ui.card-body>
+                </x-ui.card>
             </div>
         </div>
     </div>

@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Technical;
 
 use App\Http\Controllers\Controller;
-use App\Models\Site;
+use App\Models\Projects\Site;
 use App\Models\SolarMaintenanceSchedule;
 use App\Models\SolarWarrantyClaim;
 use App\Models\User;
-use App\Support\Synced\EgoCompanyScope;
+use App\Support\EgoCompanyScope;
 use App\Support\SchemaCache;
 use App\Support\SolarMaintenanceAccess;
 use Illuminate\Http\RedirectResponse;
@@ -38,14 +38,8 @@ class SolarWarrantyClaimController extends Controller
             'issue_description.required' => 'Vui lòng mô tả hiện tượng/sự cố.',
         ]);
 
-        if (in_array($data['claim_type'], ['replacement', 'paid_repair'], true)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'claim_type' => 'Đổi hàng bảo hành và Sửa chữa tính phí phải tạo tại Kỹ thuật → Bảo hành & Sửa chữa (quy trình riêng).',
-            ])->errorBag('warrantyClaim');
-        }
-
         try {
-            $site = Site::withoutGlobalScopes()->findOrFail((int) $data['site_id']);
+            $site = Site::query()->findOrFail((int) $data['site_id']);
             $companyId = (int) ($site->company_id ?: EgoCompanyScope::currentId());
             $this->assertCompany($companyId);
 
@@ -125,12 +119,6 @@ class SolarWarrantyClaimController extends Controller
     {
         $this->assertCanUpdate($request, $claim);
 
-        if (\App\Support\Warranty\WarrantyFlow::isFlowType((string) $claim->claim_type)) {
-            throw ValidationException::withMessages([
-                'status' => 'Phiếu này thuộc quy trình có nút hành động riêng (duyệt, giữ hàng, xuất kho...). Không thể đổi trạng thái trực tiếp.',
-            ]);
-        }
-
         $data = $request->validate([
             'status' => ['required', Rule::in(array_keys(SolarWarrantyClaim::STATUSES))],
             'diagnosis' => ['nullable', 'string', 'max:10000'],
@@ -148,21 +136,6 @@ class SolarWarrantyClaimController extends Controller
             throw ValidationException::withMessages([
                 'status' => 'Không thể chuyển từ “'.(SolarWarrantyClaim::STATUSES[$oldStatus] ?? $oldStatus).'” sang “'.(SolarWarrantyClaim::STATUSES[$newStatus] ?? $newStatus).'”.',
             ]);
-        }
-
-        if ((string) $claim->claim_type === 'replacement') {
-            if (in_array($newStatus, ['replacing', 'waiting_customer', 'completed'], true)
-                && ! $claim->replacement_serial_unit_id) {
-                throw ValidationException::withMessages([
-                    'status' => 'Đề xuất đổi hàng chưa có serial thay thế. Kho phải hoàn tất xuất đổi trước khi chuyển sang bước này.',
-                ]);
-            }
-
-            if ($newStatus === 'completed' && ! $claim->returned_serial_unit_id) {
-                throw ValidationException::withMessages([
-                    'status' => 'Chưa ghi nhận thu hồi serial lỗi. Kho phải hoàn tất phiếu thu hồi trước khi đóng đề xuất đổi hàng.',
-                ]);
-            }
         }
 
         if (in_array($newStatus, ['approved', 'rejected'], true)

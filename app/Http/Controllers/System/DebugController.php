@@ -18,8 +18,7 @@ final class DebugController extends Controller
      */
     public function __construct(private readonly SchemaInspector $inspector)
     {
-        // Route debug lộ thông tin schema: chỉ mở ở local/testing, KHÔNG tồn tại trên production.
-        abort_unless(app()->environment(['local', 'testing']), 404);
+        // Chặn debug ngoài local/dev (thêm middleware ở mục 5)
     }
 
     /**

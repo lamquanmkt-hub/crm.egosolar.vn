@@ -25,7 +25,7 @@ final class WarehouseIssueCharacterizationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->warehouseUser = $this->userWithRole('warehouse');
+        $this->warehouseUser = $this->userWithRole('warehouse', permissions: ['page.orders']);
     }
 
     /** Id user thao tác trong fixture đơn hàng. */

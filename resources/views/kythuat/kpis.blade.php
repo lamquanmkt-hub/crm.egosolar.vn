@@ -8,6 +8,7 @@
         return match ((string) $status) {
             'approved' => 'Đã duyệt',
             'draft' => 'Chờ duyệt',
+            'not_scored' => 'Chưa chấm',
             default => $status ? ucfirst((string) $status) : 'Chờ duyệt',
         };
     };
@@ -471,21 +472,21 @@
         </header>
 
         @if(session('success'))
-            <div class="alert alert-success border-0 shadow-sm py-2 px-3 mb-3" style="border-radius:12px;font-size:11.5px;font-weight:700">
-                <i class="bi bi-check-circle-fill me-2"></i>{{ session('success') }}
-            </div>
+            <x-ui.alert variant="success" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:py-2 tw:px-4 tw:mb-4" style="border-radius:12px;font-size:11.5px;font-weight:700">
+                <i class="bi bi-check-circle-fill tw:mr-2"></i>{{ session('success') }}
+            </x-ui.alert>
         @endif
         @if(session('error'))
-            <div class="alert alert-danger border-0 shadow-sm py-2 px-3 mb-3" style="border-radius:12px;font-size:11.5px;font-weight:700">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ session('error') }}
-            </div>
+            <x-ui.alert variant="danger" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:py-2 tw:px-4 tw:mb-4" style="border-radius:12px;font-size:11.5px;font-weight:700">
+                <i class="bi bi-exclamation-triangle-fill tw:mr-2"></i>{{ session('error') }}
+            </x-ui.alert>
         @endif
 
         @if(isset($kpiConfigValid) && !$kpiConfigValid)
-            <div class="alert alert-warning border-0 shadow-sm py-2 px-3 mb-3" style="border-radius:12px;font-size:11.5px;font-weight:750">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <x-ui.alert variant="warning" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:py-2 tw:px-4 tw:mb-4" style="border-radius:12px;font-size:11.5px;font-weight:750">
+                <i class="bi bi-exclamation-triangle-fill tw:mr-2"></i>
                 Tổng trọng số KPI hiện tại là <strong>{{ number_format(($kpiConfigWeight ?? 0) * 100, 2, ',', '.') }}%</strong>. Hệ thống sẽ không cho chấm/cập nhật KPI cho tới khi tổng trọng số bằng đúng 100%.
-            </div>
+            </x-ui.alert>
         @endif
 
         <section class="tkpi-summary">
@@ -583,7 +584,7 @@
                             @foreach($kpiCriteria as $criterion)
                                 <th title="{{ $criterion['name'] }}">
                                     {{ \Illuminate\Support\Str::limit($criterion['subject'] ?? $criterion['name'], 26) }}
-                                    <span class="text-muted">{{ number_format((float)$criterion['weight'], 0, ',', '.') }}%</span>
+                                    <span class="tw:text-[rgba(33,37,41,0.75)]!">{{ number_format((float)$criterion['weight'], 0, ',', '.') }}%</span>
                                 </th>
                             @endforeach
                             <th>Trạng thái</th>
@@ -591,8 +592,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($payrolls as $index => $row)
+                        @forelse(($kpiRows ?? $payrolls) as $index => $row)
                             @php
+                                $isPlaceholder = (bool)($row->_is_placeholder ?? false);
                                 $totalRate = (float)($row->total_kpi_percent ?? 0);
                                 $tone = $kpiTone($totalRate);
                                 $employeeName = (string)($row->employee_name ?? ('Kỹ sư #'.($row->user_id ?? $row->id)));
@@ -612,18 +614,29 @@
                                     </div>
                                 </td>
                                 <td style="text-align:center">
-                                    <button type="button" class="tkpi-project-count {{ ($row->kpi_project_issue_count ?? 0) > 0 ? 'has-issue' : '' }}" onclick="document.getElementById('kpi-projects-{{ $row->id }}').showModal()" title="Xem công trình đóng góp KPI">
-                                        <i class="bi bi-building"></i>{{ (int)($row->kpi_project_count ?? 0) }}
-                                    </button>
+                                    @if($isPlaceholder)
+                                        <span style="color:#94a3b8;font-weight:800">—</span>
+                                    @else
+                                        <button type="button" class="tkpi-project-count {{ ($row->kpi_project_issue_count ?? 0) > 0 ? 'has-issue' : '' }}" onclick="document.getElementById('kpi-projects-{{ $row->id }}').showModal()" title="Xem công trình đóng góp KPI">
+                                            <i class="bi bi-building"></i>{{ (int)($row->kpi_project_count ?? 0) }}
+                                        </button>
+                                    @endif
                                 </td>
                                 <td>
-                                    <div class="tkpi-total {{ $tone }}">
-                                        <div class="tkpi-total-line">
-                                            <strong>{{ number_format($totalRate * 100, 1, ',', '.') }}%</strong>
-                                            <small>{{ $totalRate >= 1 ? 'Vượt' : ($totalRate >= .9 ? 'Đạt' : ($totalRate >= .75 ? 'Cải thiện' : 'Chưa đạt')) }}</small>
+                                    @if($isPlaceholder)
+                                        <div class="tkpi-component empty">
+                                            <strong>Chưa chấm</strong>
+                                            <span>Chưa có hồ sơ KPI tháng này</span>
                                         </div>
-                                        <div class="tkpi-bar"><span style="width:{{ min(100, max(0, $totalRate * 100)) }}%"></span></div>
-                                    </div>
+                                    @else
+                                        <div class="tkpi-total {{ $tone }}">
+                                            <div class="tkpi-total-line">
+                                                <strong>{{ \App\Support\DisplayFormat::percent($totalRate * 100, 1) }}</strong>
+                                                <small>{{ $totalRate >= 1 ? 'Vượt' : ($totalRate >= .9 ? 'Đạt' : ($totalRate >= .75 ? 'Cải thiện' : 'Chưa đạt')) }}</small>
+                                            </div>
+                                            <div class="tkpi-bar"><span style="width:{{ min(100, max(0, $totalRate * 100)) }}%"></span></div>
+                                        </div>
+                                    @endif
                                 </td>
 
                                 @foreach($kpiCriteria as $criterion)
@@ -631,8 +644,8 @@
                                     <td title="{{ $criterion['name'] }}">
                                         @if($component)
                                             <div class="tkpi-component">
-                                                <strong>{{ number_format($component['rate'] ?? 0, 1, ',', '.') }}%</strong>
-                                                <span>{{ number_format($component['score'] ?? 0, 1, ',', '.') }} điểm · TS {{ number_format($component['weight'] ?? $criterion['weight'], 0, ',', '.') }}%</span>
+                                                <strong>{{ \App\Support\DisplayFormat::percent($component['rate'] ?? 0, 1) }}</strong>
+                                                <span>{{ number_format($component['score'] ?? 0, 1, ',', '.') }} điểm · TS {{ \App\Support\DisplayFormat::percent($component['weight'] ?? $criterion['weight']) }}</span>
                                             </div>
                                         @else
                                             <div class="tkpi-component empty">
@@ -649,10 +662,12 @@
                                     </span>
                                 </td>
                                 <td style="text-align:center">
-                                    @if(\Illuminate\Support\Facades\Route::has('ky-thuat.luong.show'))
+                                    @if(!$isPlaceholder && \Illuminate\Support\Facades\Route::has('ky-thuat.luong.show'))
                                         <a href="{{ route('ky-thuat.luong.show', $row->id) }}" class="tkpi-view" title="Xem chi tiết KPI">
                                             <i class="bi bi-arrow-up-right"></i>
                                         </a>
+                                    @else
+                                        <span style="color:#94a3b8;font-weight:800">—</span>
                                     @endif
                                 </td>
                             </tr>

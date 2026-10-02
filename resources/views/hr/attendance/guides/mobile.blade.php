@@ -147,9 +147,9 @@
                 <p>Áp dụng cho Chrome Android, Safari iPhone và các trình duyệt mobile phổ biến.</p>
             </div>
 
-            <a href="{{ route('hr.attendance.my') }}" class="btn btn-light btn-pill">
+            <x-ui.button href="{{ route('hr.attendance.my') }}" variant="light" size="none" class="btn-pill tw:leading-[1.5]">
                 <i class="bi bi-arrow-left"></i> Quay lại chấm công
-            </a>
+            </x-ui.button>
         </div>
 
         <div class="guide-card">
@@ -162,7 +162,7 @@
                         <b>Nhân sự → Chấm công của tôi</b>.
                     </div>
                     <div class="guide-img">
-                        <i class="bi bi-phone fs-1 d-block mb-2"></i>
+                        <i class="bi bi-phone fs-1 tw:block tw:mb-2"></i>
                         Ảnh minh họa: màn hình trang Chấm công của tôi trên điện thoại.
                     </div>
                 </div>
@@ -177,7 +177,7 @@
                         Nếu trình duyệt hiện popup hỏi quyền vị trí, hãy chọn <b>Cho phép</b>.
                     </div>
                     <div class="guide-img">
-                        <i class="bi bi-geo-alt fs-1 d-block mb-2"></i>
+                        <i class="bi bi-geo-alt fs-1 tw:block tw:mb-2"></i>
                         Ảnh minh họa: popup xin quyền vị trí.
                     </div>
                 </div>
@@ -192,7 +192,7 @@
                         Sau đó vào <b>Quyền trang web → Vị trí → Cho phép</b>.
                     </div>
                     <div class="guide-img">
-                        <i class="bi bi-shield-lock fs-1 d-block mb-2"></i>
+                        <i class="bi bi-shield-lock fs-1 tw:block tw:mb-2"></i>
                         Ảnh minh họa: vị trí nút ổ khóa / quyền trang web trên trình duyệt điện thoại.
                     </div>
                 </div>
@@ -207,7 +207,7 @@
                         Nếu vị trí chưa chính xác, hãy ra nơi thoáng hơn hoặc bật chế độ chính xác cao.
                     </div>
                     <div class="guide-img">
-                        <i class="bi bi-broadcast-pin fs-1 d-block mb-2"></i>
+                        <i class="bi bi-broadcast-pin fs-1 tw:block tw:mb-2"></i>
                         Ảnh minh họa: bật dịch vụ định vị trên điện thoại.
                     </div>
                 </div>

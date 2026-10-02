@@ -8,20 +8,22 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('sales_work_reports')) {
+        if (! Schema::hasTable('sales_work_reports')) {
             return;
         }
 
-        if (!Schema::hasColumn('sales_work_reports', 'customer_stage')) {
+        if (! Schema::hasColumn('sales_work_reports', 'customer_stage')) {
             Schema::table('sales_work_reports', function (Blueprint $table) {
-                $table->string('customer_stage', 40)->nullable()->after('customer_type')->index();
+                if (! Schema::hasColumn('sales_work_reports', 'customer_stage')) {
+                    $table->string('customer_stage', 40)->nullable()->after('customer_type')->index();
+                }
             });
         }
     }
 
     public function down(): void
     {
-        if (!Schema::hasTable('sales_work_reports')) {
+        if (! Schema::hasTable('sales_work_reports')) {
             return;
         }
 

@@ -18,7 +18,7 @@ class StoreSiteRequest extends FormRequest
     {
         return (bool) optional($this->user())->hasAnyRole([
             'sales',
-            'ky_thuat',
+            'technical',
             'admin',
             'accounting',
             'warehouse',
@@ -33,12 +33,22 @@ class StoreSiteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+            'company_id' => ['required', 'integer', 'exists:companies,id'],
+            'project_type' => ['nullable', 'string', 'in:factory,residential'],
             'name' => ['required', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:50'],
 
-            'address' => ['nullable', 'string', 'max:255'],
-            'contact_name' => ['nullable', 'string', 'max:255'],
+            /*
+             * Bốn trường dưới đây khớp với `UnifiedProjectController@store`, vì hai
+             * form cùng ghi vào bảng `sites` và bảng điều phối dự án đọc chung.
+             *
+             * ⚠️ `address` giữ `max:255` theo ĐÚNG kiểu cột `varchar(255)`. Luồng hợp
+             * nhất đang khai `max:700` — chép sang là để MariaDB cắt cụt im lặng.
+             */
+            'address' => ['required', 'string', 'max:255'],
+            'priority' => ['required', 'string', 'in:low,normal,high,urgent'],
+            'lead_engineer_id' => ['required', 'integer', 'exists:users,id'],
+            'contact_name' => ['nullable', 'string', 'max:120'],
             'contact_phone' => ['nullable', 'string', 'max:50'],
             'note' => ['nullable', 'string'],
 
@@ -55,9 +65,9 @@ class StoreSiteRequest extends FormRequest
             'warranty_reminder_2_at' => ['nullable', 'date'],
             'warranty_reminder_3_at' => ['nullable', 'date'],
 
-            'technician_name' => ['nullable', 'string', 'max:255'],
+            'technician_name' => ['nullable', 'string', 'max:120'],
             'monitoring_link' => ['nullable', 'string', 'max:255'],
-            'monitoring_account' => ['nullable', 'string', 'max:255'],
+            'monitoring_account' => ['nullable', 'string', 'max:120'],
             'stage' => ['nullable', 'string', 'max:50'],
 
             'contract_amount' => ['nullable', 'numeric', 'min:0'],
@@ -101,6 +111,18 @@ class StoreSiteRequest extends FormRequest
         return [
             'name.required' => 'Tên công trình là bắt buộc.',
             'name.max' => 'Tên công trình không được quá :max ký tự.',
+
+            'company_id.required' => 'Vui lòng chọn công ty.',
+            'company_id.exists' => 'Công ty được chọn không tồn tại.',
+
+            'address.required' => 'Địa chỉ công trình là bắt buộc.',
+            'address.max' => 'Địa chỉ không được quá :max ký tự.',
+
+            'priority.required' => 'Vui lòng chọn mức ưu tiên.',
+            'priority.in' => 'Mức ưu tiên không hợp lệ.',
+
+            'lead_engineer_id.required' => 'Vui lòng chọn kỹ sư phụ trách.',
+            'lead_engineer_id.exists' => 'Kỹ sư phụ trách được chọn không tồn tại.',
 
             'installed_at.date' => 'Ngày lắp đặt không hợp lệ.',
             'deployment_started_at.date' => 'Ngày bắt đầu triển khai không hợp lệ.',

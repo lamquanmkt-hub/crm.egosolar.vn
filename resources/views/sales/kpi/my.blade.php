@@ -82,9 +82,9 @@
     })->values()->toArray();
 @endphp
 
-<div class="container-fluid px-3 px-lg-4 py-3 kpi-entry-pro">
+<div class="container-fluid tw:px-4 tw:py-4 kpi-entry-pro">
     @if(session('success'))
-        <div class="smart-alert smart-alert--success mb-3">
+        <div class="smart-alert smart-alert--success tw:mb-4">
             <i class="bi bi-check-circle"></i>
             <div>
                 <strong>Đã lưu KPI</strong>
@@ -94,11 +94,11 @@
     @endif
 
     @if ($errors->any())
-        <div class="smart-alert smart-alert--danger mb-3">
+        <div class="smart-alert smart-alert--danger tw:mb-4">
             <i class="bi bi-exclamation-triangle"></i>
             <div>
                 <strong>Có lỗi khi lưu KPI</strong>
-                <ul class="mb-0 ps-3">
+                <ul class="tw:mb-0 ps-3">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
@@ -107,7 +107,7 @@
         </div>
     @endif
 
-    <section class="entry-hero mb-3">
+    <section class="entry-hero tw:mb-4">
         <div class="hero-glow hero-glow--one"></div>
         <div class="hero-glow hero-glow--two"></div>
 
@@ -170,7 +170,7 @@
         </div>
     </section>
 
-    <form method="GET" action="{{ route('sales.kpi.my') }}" class="filter-strip mb-3">
+    <form method="GET" action="{{ route('sales.kpi.my') }}" class="filter-strip tw:mb-4">
         <div class="filter-field">
             <label>Ngày KPI</label>
             <div>
@@ -197,13 +197,13 @@
             </div>
         </div>
 
-        <button class="btn btn-filter">
+        <x-ui.button variant="none" size="none" type="submit" class="btn-filter tw:py-[6px] tw:px-3">
             <i class="bi bi-arrow-repeat me-1"></i>Tải ngày này
-        </button>
+        </x-ui.button>
     </form>
 
-    <div class="row g-3">
-        <div class="col-xxl-8">
+    <div class="tw:row tw:g-3">
+        <div class="tw:min-[87.5rem]:col12-8">
             <form method="POST" action="{{ route('sales.kpi.my.store') }}" id="dailyKpiForm" class="entry-card">
                 @csrf
                 <input type="hidden" name="work_date" value="{{ $workDate }}">
@@ -218,9 +218,9 @@
                         <p>Tất cả chỉ tiêu đều nhập tay. Hạng mục không bật trong Settings sẽ tự ẩn khỏi form.</p>
                     </div>
 
-                    <button class="btn btn-save-top">
+                    <x-ui.button variant="none" size="none" type="submit" class="btn-save-top">
                         <i class="bi bi-lightning-charge-fill me-1"></i>Lưu KPI
-                    </button>
+                    </x-ui.button>
                 </div>
 
                 @if($coreModules->count() || $followEnabled)
@@ -281,7 +281,7 @@
                 @endif
 
                 @if($activeExtraModules->count())
-                    <div class="mini-section-title mt-3">
+                    <div class="mini-section-title tw:mt-4">
                         KPI mở rộng từ Settings
                         <span>{{ $activeExtraModules->count() }} mục</span>
                     </div>
@@ -322,7 +322,7 @@
                     </div>
                 @endif
 
-                <div class="mini-section-title mt-3">Link & ghi chú</div>
+                <div class="mini-section-title tw:mt-4">Link & ghi chú</div>
 
                 <div class="two-col-inputs">
                     <div class="text-panel">
@@ -361,18 +361,18 @@ https://www.facebook.com/..."
                 </div>
 
                 <div class="bottom-action-bar">
-                    <a href="{{ route('sales.kpi.my', ['work_date' => $workDate]) }}" class="btn btn-soft">
+                    <x-ui.button variant="none" size="none" class="btn-soft tw:text-[16px]/[24px]" href="{{ route('sales.kpi.my', ['work_date' => $workDate]) }}">
                         <i class="bi bi-arrow-clockwise me-1"></i>Làm mới
-                    </a>
+                    </x-ui.button>
 
-                    <button class="btn btn-main-save">
+                    <x-ui.button variant="none" size="none" type="submit" class="btn-main-save">
                         <i class="bi bi-save2 me-1"></i>Lưu KPI hôm nay
-                    </button>
+                    </x-ui.button>
                 </div>
             </form>
         </div>
 
-        <div class="col-xxl-4">
+        <div class="tw:min-[87.5rem]:col12-4">
             <div class="side-stack">
                 <div class="side-card side-card--preview">
                     <div class="side-card__head">
@@ -481,7 +481,7 @@ https://www.facebook.com/..."
                         @endforelse
                     </div>
 
-                    <div class="mt-2">
+                    <div class="tw:mt-2">
                         {{ $history->links() }}
                     </div>
                 </div>

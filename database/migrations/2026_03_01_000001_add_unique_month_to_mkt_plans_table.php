@@ -4,19 +4,24 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        Schema::table('mkt_plans', function (Blueprint $table) {
-            // month dạng date (YYYY-MM-01) → unique để 1 tháng 1 plan
-            $table->unique('month', 'mkt_plans_month_unique');
-        });
+        if (Schema::hasTable('mkt_plans')) {
+            Schema::table('mkt_plans', function (Blueprint $table) {
+                // month dạng date (YYYY-MM-01) → unique để 1 tháng 1 plan
+                $table->unique('month', 'mkt_plans_month_unique');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('mkt_plans', function (Blueprint $table) {
-            $table->dropUnique('mkt_plans_month_unique');
-        });
+        if (Schema::hasTable('mkt_plans')) {
+            Schema::table('mkt_plans', function (Blueprint $table) {
+                $table->dropUnique('mkt_plans_month_unique');
+            });
+        }
     }
 };

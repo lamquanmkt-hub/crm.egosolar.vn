@@ -1,22 +1,22 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid py-4">
-    <div class="d-flex align-items-center justify-content-between mb-3">
+<div class="container-fluid tw:py-6">
+    <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
         <div>
-            <h4 class="mb-1">Thông tin công ty</h4>
-            <div class="text-muted">Quản lý thông tin dùng để in PDF đơn hàng.</div>
+            <h4 class="tw:mb-1">Thông tin công ty</h4>
+            <div class="tw:text-[rgba(33,37,41,0.75)]">Quản lý thông tin dùng để in PDF đơn hàng.</div>
         </div>
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
+        <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
     @endif
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
+    <x-ui.card class="shadow-sm border-0">
+        <x-ui.card-body class="tw:p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle tw:mb-0">
                     <thead class="table-light">
                         <tr>
                             <th style="width:70px;">ID</th>
@@ -25,7 +25,7 @@
                             <th>MST</th>
                             <th>Email</th>
                             <th>Ngân hàng</th>
-                            <th style="width:120px;" class="text-end">Hành động</th>
+                            <th style="width:120px;" class="tw:text-right">Hành động</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -33,27 +33,27 @@
                             <tr>
                                 <td>{{ $company->id }}</td>
                                 <td>
-                                    <div class="fw-semibold">{{ $company->name }}</div>
+                                    <div class="tw:font-semibold">{{ $company->name }}</div>
                                     @if(!$company->is_active)
                                         <span class="badge bg-secondary">Đã tắt</span>
                                     @endif
                                 </td>
-                                <td><span class="badge bg-info text-dark">{{ $company->code }}</span></td>
+                                <td><span class="badge bg-info tw:text-[#212529]">{{ $company->code }}</span></td>
                                 <td>{{ $company->tax_code ?: '---' }}</td>
                                 <td>{{ $company->email ?: '---' }}</td>
                                 <td>
                                     <div>{{ $company->bank_account ?: '---' }}</div>
-                                    <small class="text-muted">{{ $company->bank_name ?: '' }}</small>
+                                    <small class="tw:text-[rgba(33,37,41,0.75)]">{{ $company->bank_name ?: '' }}</small>
                                 </td>
-                                <td class="text-end">
-                                    <a href="{{ route('companies.edit', $company) }}" class="btn btn-sm btn-warning">
+                                <td class="tw:text-right">
+                                    <x-ui.button href="{{ route('companies.edit', $company) }}" variant="warning" size="sm">
                                         Sửa
-                                    </a>
+                                    </x-ui.button>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
+                                <td colspan="7" class="tw:text-center tw:text-[rgba(33,37,41,0.75)] tw:py-6">
                                     Chưa có công ty.
                                 </td>
                             </tr>
@@ -61,13 +61,13 @@
                     </tbody>
                 </table>
             </div>
-        </div>
+        </x-ui.card-body>
 
         @if($companies->hasPages())
-            <div class="card-footer bg-white">
+            <x-ui.card-footer class="bg-white">
                 {{ $companies->links() }}
-            </div>
+            </x-ui.card-footer>
         @endif
-    </div>
+    </x-ui.card>
 </div>
 @endsection

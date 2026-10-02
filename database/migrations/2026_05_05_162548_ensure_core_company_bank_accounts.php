@@ -9,21 +9,23 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('companies') && !Schema::hasColumn('companies', 'bank_accounts')) {
+        if (Schema::hasTable('companies') && ! Schema::hasColumn('companies', 'bank_accounts')) {
             Schema::table('companies', function (Blueprint $table) {
-                $table->longText('bank_accounts')->nullable()->after('bank_holder');
+                if (! Schema::hasColumn('companies', 'bank_accounts')) {
+                    $table->longText('bank_accounts')->nullable()->after('bank_holder');
+                }
             });
         }
 
         if (Schema::hasTable('companies') && Schema::hasColumn('companies', 'bank_accounts')) {
             foreach (DB::table('companies')->get() as $company) {
-                if (!empty($company->bank_accounts)) {
+                if (! empty($company->bank_accounts)) {
                     continue;
                 }
 
-                $account = trim((string)($company->bank_account ?? ''));
-                $bank = trim((string)($company->bank_name ?? ''));
-                $holder = trim((string)($company->bank_holder ?? ''));
+                $account = trim((string) ($company->bank_account ?? ''));
+                $bank = trim((string) ($company->bank_name ?? ''));
+                $holder = trim((string) ($company->bank_holder ?? ''));
 
                 if ($account !== '' || $bank !== '' || $holder !== '') {
                     DB::table('companies')->where('id', $company->id)->update([

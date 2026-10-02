@@ -8,13 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('solar_provinces', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->string('region')->nullable();
-            $table->decimal('sun_hours', 5, 2)->default(4.0);
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('solar_provinces')) {
+            Schema::create('solar_provinces', function (Blueprint $table) {
+                $table->id();
+                $table->string('name')->unique();
+                $table->string('region')->nullable();
+                $table->decimal('sun_hours', 5, 2)->default(4.0);
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void

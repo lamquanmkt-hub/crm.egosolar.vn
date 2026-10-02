@@ -15,8 +15,6 @@ use Illuminate\Support\Collection;
  */
 interface CommissionEngineServiceInterface
 {
-    public function ensureSchema(): void;
-
     public function currentPolicy(string $month): object;
 
     public function copyPreviousMonth(string $month): void;

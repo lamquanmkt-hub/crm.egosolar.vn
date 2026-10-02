@@ -6,17 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Models\SalesDailyKpi;
 use App\Models\User;
 use App\Services\CRM\Commission\CommissionEngineService;
+use App\Services\Sales\Commission\CommissionEligibilityPolicy;
+use App\Services\Sales\Commission\CommissionSchema;
+use App\Services\Sales\Commission\OrderColumnMap;
+use App\Services\Sales\CommissionReportData;
 use App\Services\Sales\SalesCommissionExcelExporter;
 use App\Services\Sales\SalesCommissionScope;
 use App\Services\Sales\SalesKpiSettingsService;
+use App\Support\ProbeFailureLog;
+use App\Support\SchemaCache;
+use App\View\Presenters\Sales\SalesCommissionSettingsPresenter;
+use App\View\Presenters\Sales\SalesKpiSettingsPresenter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
  * Controller quản lý hoa hồng sales và KPI hằng ngày của đội kinh doanh.
@@ -29,6 +34,8 @@ class SalesCommissionController extends Controller
     public function __construct(
         private readonly SalesKpiSettingsService $kpiSettings,
         private readonly SalesCommissionExcelExporter $commissionExporter,
+        private readonly SalesKpiSettingsPresenter $kpiSettingsPresenter,
+        private readonly SalesCommissionSettingsPresenter $commissionSettingsPresenter,
     ) {}
 
     private const CACHE_VERSION = 'v20_index_no_cache_no_engine';
@@ -70,7 +77,7 @@ class SalesCommissionController extends Controller
     private function getTeamIdsForManager(int $managerId)
     {
         try {
-            if (! Schema::hasColumn('users', 'manager_id')) {
+            if (! SchemaCache::hasColumn('users', 'manager_id')) {
                 return null;
             }
 
@@ -78,22 +85,29 @@ class SalesCommissionController extends Controller
                 ->where('manager_id', $managerId)
                 ->pluck('id');
         } catch (\Throwable $e) {
+            ProbeFailureLog::warn('SalesCommissionController::getTeamIdsForManager', $e);
+
             return null;
         }
     }
 
     /**
-     * Giới hạn query chỉ lấy user có role sales hoặc sales_manager.
+     * Giới hạn query chỉ lấy nhân sự kinh doanh.
+     *
+     * Trước 2026-09-05 chỉ xét vai trò Spatie `sales`/`sales_manager`. Trên
+     * production KHÔNG ai tạo đơn mà mang vai trò đó (0/235 đơn đã thu đủ tiền),
+     * nên toàn bộ báo cáo hoa hồng trả về rỗng. Luật nhận diện nay nằm ở
+     * {@see SalesCommissionScope::constrainToSalesStaff} — phòng ban HOẶC chức
+     * danh HOẶC vai trò.
      */
     private function onlySalesRolesFilter($query, string $salesColumn = 'sc.sales_user_id')
     {
         return $query->whereExists(function ($sub) use ($salesColumn) {
             $sub->select(DB::raw(1))
-                ->from('model_has_roles as mhr')
-                ->join('roles as r', 'r.id', '=', 'mhr.role_id')
-                ->whereColumn('mhr.model_id', $salesColumn)
-                ->where('mhr.model_type', User::class)
-                ->whereIn('r.name', ['sales', 'sales_manager']);
+                ->from('users as scu')
+                ->whereColumn('scu.id', $salesColumn);
+
+            SalesCommissionScope::constrainToSalesStaff($sub, 'scu');
         });
     }
 
@@ -149,9 +163,9 @@ class SalesCommissionController extends Controller
         | 4. total_amount - tax_amount nếu order có tax_amount
         | 5. fallback total_amount
         */
-        $orderCols = Schema::hasTable('crm_orders') ? Schema::getColumnListing('crm_orders') : [];
-        $itemCols = Schema::hasTable('crm_order_items') ? Schema::getColumnListing('crm_order_items') : [];
-        $productCols = Schema::hasTable('crm_product_catalog') ? Schema::getColumnListing('crm_product_catalog') : [];
+        $orderCols = SchemaCache::hasTable('crm_orders') ? SchemaCache::columns('crm_orders') : [];
+        $itemCols = SchemaCache::hasTable('crm_order_items') ? SchemaCache::columns('crm_order_items') : [];
+        $productCols = SchemaCache::hasTable('crm_product_catalog') ? SchemaCache::columns('crm_product_catalog') : [];
 
         $hasOrder = fn ($col) => in_array($col, $orderCols, true);
         $hasItem = fn ($col) => in_array($col, $itemCols, true);
@@ -177,7 +191,7 @@ class SalesCommissionController extends Controller
 
         $taxExpr = $taxCol ? "COALESCE(o.`{$taxCol}`, 0)" : '0';
 
-        if (! Schema::hasTable('crm_order_items')) {
+        if (! SchemaCache::hasTable('crm_order_items')) {
             return DB::table('crm_orders as o')
                 ->select([
                     DB::raw('o.id as order_id'),
@@ -251,7 +265,7 @@ class SalesCommissionController extends Controller
             }
         }
 
-        $canJoinProduct = Schema::hasTable('crm_product_catalog') && $hasItem('product_id');
+        $canJoinProduct = SchemaCache::hasTable('crm_product_catalog') && $hasItem('product_id');
 
         if ($canJoinProduct) {
             foreach ([
@@ -329,24 +343,15 @@ class SalesCommissionController extends Controller
     /**
      * Subquery tổng hợp thanh toán theo đơn (tổng đã thu, ngày thanh toán cuối).
      */
-    private function paymentSummarySubquery(?Carbon $from = null, ?Carbon $to = null)
+    private function paymentSummarySubquery()
     {
-        $query = DB::table('crm_payments as p')
+        return DB::table('crm_payments as p')
             ->select([
                 'p.order_id',
                 DB::raw('SUM(COALESCE(p.amount, 0)) as paid_total'),
                 DB::raw('MAX(COALESCE(p.payment_date, p.created_at)) as final_payment_date'),
-            ]);
-
-        // Doanh số hoa hồng được ghi nhận theo đúng thời điểm tiền thực tế về.
-        if ($from && $to) {
-            $query->whereRaw(
-                'COALESCE(p.payment_date, p.created_at) BETWEEN ? AND ?',
-                [$from->format('Y-m-d H:i:s'), $to->format('Y-m-d H:i:s')]
-            );
-        }
-
-        return $query->groupBy('p.order_id');
+            ])
+            ->groupBy('p.order_id');
     }
 
     /**
@@ -354,7 +359,7 @@ class SalesCommissionController extends Controller
      */
     private function buildQuery(Request $request, $user, ?Carbon $from, ?Carbon $to)
     {
-        $paymentSub = $this->paymentSummarySubquery($from, $to);
+        $paymentSub = $this->paymentSummarySubquery();
 
         /*
         |--------------------------------------------------------------------------
@@ -367,10 +372,10 @@ class SalesCommissionController extends Controller
         | 4. Nếu order có tax_amount thì phân bổ theo tỷ lệ trước/sau VAT
         | 5. Fallback line_total
         */
-        $hasProductPrices = Schema::hasTable('crm_product_prices')
-            && Schema::hasColumn('crm_product_prices', 'product_id')
-            && Schema::hasColumn('crm_product_prices', 'price_tier_id')
-            && Schema::hasColumn('crm_product_prices', 'price');
+        $hasProductPrices = SchemaCache::hasTable('crm_product_prices')
+            && SchemaCache::hasColumn('crm_product_prices', 'product_id')
+            && SchemaCache::hasColumn('crm_product_prices', 'price_tier_id')
+            && SchemaCache::hasColumn('crm_product_prices', 'price');
 
         $priceSub = null;
 
@@ -388,8 +393,8 @@ class SalesCommissionController extends Controller
         $lineAfterExpr = "COALESCE(oi.line_total, (COALESCE(oi.unit_price,0) * {$qtyExpr}) - COALESCE(oi.discount_amount,0))";
 
         $ppPriceExpr = $hasProductPrices ? 'COALESCE(pp.price,0)' : '0';
-        $itemVatExpr = Schema::hasColumn('crm_order_items', 'vat_percent') ? 'COALESCE(oi.vat_percent,0)' : '0';
-        $productVatExpr = Schema::hasColumn('crm_product_catalog', 'vat_percent') ? 'COALESCE(pc.vat_percent,0)' : '0';
+        $itemVatExpr = SchemaCache::hasColumn('crm_order_items', 'vat_percent') ? 'COALESCE(oi.vat_percent,0)' : '0';
+        $productVatExpr = SchemaCache::hasColumn('crm_product_catalog', 'vat_percent') ? 'COALESCE(pc.vat_percent,0)' : '0';
 
         $orderBeforeRateExpr = '
             CASE
@@ -431,7 +436,7 @@ class SalesCommissionController extends Controller
             ->leftJoin('crm_product_catalog as pc', 'pc.id', '=', 'oi.product_id')
             ->where('u.name', '!=', SalesCommissionScope::EXCLUDED_SALES_NAME)
             ->whereNotNull('pay.final_payment_date')
-            ->whereRaw('COALESCE(pay.paid_total, 0) > 0');
+            ->whereRaw('COALESCE(pay.paid_total, 0) >= COALESCE(o.total_amount, 0)');
 
         if ($hasProductPrices && $priceSub) {
             $q->leftJoinSub($priceSub, 'pp', function ($join) {
@@ -475,22 +480,11 @@ class SalesCommissionController extends Controller
             }
         }
 
-        // Chính sách chuẩn: Lead/ADS 0,5%; mọi trạng thái còn lại 1%.
         $rateCase = "
             CASE
-                WHEN LOWER(TRIM(COALESCE(c.customer_status, ''))) LIKE '%lead%'
-                    OR LOWER(TRIM(COALESCE(c.customer_status, ''))) LIKE '%ads%' THEN 0.5
-                ELSE 1
-            END
-        ";
-
-        // Chỉ tính trên phần tiền thực thu trong kỳ, quy đổi tỷ lệ về doanh thu trước VAT.
-        $paidBeforeVatSql = "
-            CASE
-                WHEN COALESCE(o.total_amount, 0) > 0
-                    THEN ({$baseAmountSql})
-                        * LEAST(COALESCE(pay.paid_total, 0), COALESCE(o.total_amount, 0))
-                        / COALESCE(o.total_amount, 1)
+                WHEN c.customer_status = 'lead'   THEN 0.5
+                WHEN c.customer_status = 'member' THEN 1
+                WHEN c.customer_status = 'retail' THEN 2
                 ELSE 0
             END
         ";
@@ -509,19 +503,16 @@ class SalesCommissionController extends Controller
             'u.name as sales_name',
             DB::raw("COALESCE(co.name, '-') as company_name"),
         ])
-            ->selectRaw("{$paidBeforeVatSql} as total_amount")
-            ->selectRaw("COALESCE(o.total_amount, 0) as order_total_amount")
+            ->selectRaw("{$baseAmountSql} as total_amount")
             ->selectRaw("GROUP_CONCAT(DISTINCT pc.barcode ORDER BY pc.barcode SEPARATOR ', ') as product_codes")
             ->selectRaw("GROUP_CONCAT(DISTINCT pc.name ORDER BY pc.name SEPARATOR ', ') as product_names")
             ->selectRaw("{$rateCase} as rate_percent")
-            ->selectRaw("(({$paidBeforeVatSql}) * ({$rateCase}) / 100) as commission_calc")
+            ->selectRaw("(({$baseAmountSql}) * ({$rateCase}) / 100) as commission_calc")
             ->groupBy(
                 'o.id',
                 'l.customer_id',
                 'o.created_by',
                 'o.order_code',
-                'o.total_amount',
-                'o.tax_amount',
                 'c.name',
                 'c.customer_status',
                 'u.name',
@@ -532,7 +523,7 @@ class SalesCommissionController extends Controller
 
         if ($request->filled('min_commission')) {
             $min = (float) $request->get('min_commission');
-            $q->havingRaw("(({$paidBeforeVatSql}) * ({$rateCase}) / 100) >= ?", [$min]);
+            $q->havingRaw("(({$baseAmountSql}) * ({$rateCase}) / 100) >= ?", [$min]);
         }
 
         return $q;
@@ -545,12 +536,6 @@ class SalesCommissionController extends Controller
     {
         $user = auth()->user();
 
-        $period = $request->get('period', 'month');
-        if (! in_array($period, ['month', 'quarter', 'year'], true)) {
-            $period = 'month';
-        }
-
-        $month = $request->get('month', now()->format('Y-m'));
         [$from, $to] = $this->resolveDateRange($request);
 
         /*
@@ -597,101 +582,16 @@ class SalesCommissionController extends Controller
             ]);
         }
 
-        $totalRevenue = (float) $rows->sum('total_amount');
-        $totalCommission = (float) $rows->sum('commission_calc');
-        $totalOrders = (int) $rows->count();
-        $uniqueSales = (int) $rows->pluck('sales_user_id')->unique()->count();
-
-        $ranking = $rows->groupBy('sales_user_id')->map(function ($g) {
-            return [
-                'sales_user_id' => $g->first()->sales_user_id,
-                'sales_name' => $g->first()->sales_name,
-                'orders' => $g->count(),
-                'revenue' => (float) $g->sum('total_amount'),
-                'commission' => (float) $g->sum('commission_calc'),
-            ];
-        })->sortByDesc('commission')->values()->take(10);
-
         /*
-        |--------------------------------------------------------------------------
-        | Policy/rules nhẹ cho sidebar cấu hình
-        |--------------------------------------------------------------------------
-        | Không gọi CommissionEngineService để tránh ensureSchema/recalculate nặng.
-        */
-        $defaultPolicy = (object) [
-            'period_month' => $month,
-            'project_rate_percent' => 3,
-            'trade_rate_percent' => 1,
-            'panel_fixed_amount' => 0,
-            'only_paid' => 1,
-            'only_shipped' => 0,
-            'only_completed' => 0,
-            'hold_if_debt' => 0,
-            'note' => null,
-        ];
-
-        $policy = $defaultPolicy;
-
-        if (Schema::hasTable('crm_commission_policies')) {
-            $policyRow = DB::table('crm_commission_policies')
-                ->where('period_month', $month)
-                ->orderByDesc('id')
-                ->first();
-
-            if ($policyRow) {
-                $policy = (object) array_merge((array) $defaultPolicy, (array) $policyRow);
-            }
-        }
-
-        $rules = collect();
-
-        if (Schema::hasTable('crm_commission_rules') && isset($policy->id)) {
-            $rules = DB::table('crm_commission_rules')
-                ->where('policy_id', (int) $policy->id)
-                ->where('is_active', 1)
-                ->orderBy('priority')
-                ->orderBy('id')
-                ->get();
-        }
-
-        $commissionRuleStats = [
-            'project' => (int) $rules->where('commission_type', 'project')->count(),
-            'trade_product' => (int) $rules->where('commission_type', 'trade_product')->count(),
-            'solar_panel' => (int) $rules->where('commission_type', 'solar_panel')->count(),
-            'total' => (int) $rules->count(),
-        ];
-
-        $salesOptions = DB::table('users')
-            ->select('users.id', 'users.name')
-            ->where('users.name', '!=', SalesCommissionScope::EXCLUDED_SALES_NAME)
-            ->whereExists(function ($sub) {
-                $sub->select(DB::raw(1))
-                    ->from('model_has_roles as mhr')
-                    ->join('roles as r', 'r.id', '=', 'mhr.role_id')
-                    ->whereColumn('mhr.model_id', 'users.id')
-                    ->where('mhr.model_type', User::class)
-                    ->whereIn('r.name', ['sales', 'sales_manager']);
-            })
-            ->orderBy('users.name')
-            ->get();
-
-        return view('sales.commissions.index', [
-            'period' => $period,
-            'month' => $month,
-            'from' => $from,
-            'to' => $to,
-            'rows' => $rows,
-            'totalRevenue' => $totalRevenue,
-            'totalCommission' => $totalCommission,
-            'totalOrders' => $totalOrders,
-            'uniqueSales' => $uniqueSales,
-            'ranking' => $ranking,
-            'salesOptions' => $salesOptions,
-            'salesId' => $request->get('sales_id'),
-            'policy' => $policy,
-            'rules' => $rules,
-            'commissionRuleStats' => $commissionRuleStats,
-        ]);
+         * Dữ liệu do CommissionReportData dựng — trước đây nằm trong một khối
+         * `@php` 1.299 dòng ngay trong view. Phần tính toán phía trên method này
+         * vẫn còn nhưng KHÔNG được view dùng (5 biến không đụng, 10 biến bị gán
+         * đè); sẽ dọn ở bước riêng sau khi đối chiếu xong.
+         */
+        return view('sales.commissions.index', app(CommissionReportData::class)->build(
+            (string) request('month', ''),
+            (int) request('sales_id', 0),
+        ));
     }
 
     /**
@@ -699,51 +599,10 @@ class SalesCommissionController extends Controller
      */
     public function exportExcel(Request $request)
     {
-        if (! class_exists(Spreadsheet::class)) {
-            return response('Server chưa có PhpSpreadsheet.', 500);
-        }
-
-        $user = auth()->user();
-        [$from, $to] = $this->resolveDateRange($request);
-        $rows = $this->buildQuery($request, $user, $from, $to)
-            ->orderByDesc('completed_date')
-            ->get();
-
-        $sheetBook = new Spreadsheet();
-        $sheet = $sheetBook->getActiveSheet();
-        $sheet->setTitle('Hoa hong Sales');
-        $sheet->fromArray([
-            ['STT', 'Mã đơn', 'Ngày thu tiền', 'Sales', 'Khách hàng', 'Trạng thái khách', 'Tiền thực thu', 'Doanh thu trước VAT tính HH', 'Tỷ lệ', 'Hoa hồng'],
-        ], null, 'A1');
-
-        $rowNo = 2;
-        foreach ($rows as $index => $row) {
-            $sheet->fromArray([[
-                $index + 1,
-                $row->order_code ?? '',
-                $row->completed_date ?? '',
-                $row->sales_name ?? '',
-                $row->customer_name ?? '',
-                $row->customer_status ?? '',
-                (float) ($row->paid_total ?? 0),
-                (float) ($row->total_amount ?? 0),
-                (float) ($row->rate_percent ?? 0),
-                (float) ($row->commission_calc ?? 0),
-            ]], null, 'A'.$rowNo);
-            $rowNo++;
-        }
-
-        $sheet->getStyle('A1:J1')->getFont()->setBold(true);
-        $sheet->getStyle('G2:J'.max(2, $rowNo - 1))->getNumberFormat()->setFormatCode('#,##0.00');
-        foreach (range('A', 'J') as $column) {
-            $sheet->getColumnDimension($column)->setAutoSize(true);
-        }
-
-        $filename = 'hoa_hong_sales_'.($request->get('month', now()->format('Y-m'))).'_'.now()->format('Ymd_His').'.xlsx';
-        $tmp = storage_path('app/'.$filename);
-        (new Xlsx($sheetBook))->save($tmp);
-
-        return response()->download($tmp, $filename)->deleteFileAfterSend(true);
+        return $this->commissionExporter->download(
+            (string) $request->get('month', ''),
+            (int) $request->get('sales_id', 0),
+        );
     }
 
     /**
@@ -758,13 +617,14 @@ class SalesCommissionController extends Controller
             ->orderByDesc('completed_date')
             ->get();
 
-        $rows = $rows->map(function ($row) {
-            $row->revenue_before_vat = (float) ($row->total_amount ?? 0);
-            $row->revenue_after_vat = (float) ($row->paid_total ?? 0);
-            $row->commission_calc = (float) ($row->commission_calc ?? 0);
-            $row->rate_percent = (float) ($row->rate_percent ?? 0);
-            return $row;
-        });
+        $engine = app(CommissionEngineService::class);
+        $month = $request->get('month', now()->format('Y-m'));
+        $policy = $engine->currentPolicy($month);
+        $rules = $engine->rulesForPolicy((int) $policy->id);
+        $rows = $engine->recalculateRows($rows, $policy, $rules);
+
+        // Áp ĐÚNG điều kiện của chính sách như màn hình — xem keepEligibleRows().
+        $rows = $this->keepEligibleRows($rows, $policy);
 
         $totalCommission = (float) $rows->sum('commission_calc');
         $totalOrders = (int) $rows->count();
@@ -786,6 +646,56 @@ class SalesCommissionController extends Controller
     }
 
     /**
+     * Lọc dòng cho bản PDF theo ĐÚNG điều kiện của chính sách, như màn hình.
+     *
+     * ## Vì sao cần
+     * `buildQuery()` chỉ lọc "đã thu đủ tiền". Màn hình và Excel dùng
+     * {@see CommissionEligibilityPolicy} với đủ 4 cờ của chính sách
+     * (`only_paid`, `hold_if_debt`, `only_shipped`, `only_completed`). Với cờ
+     * đang bật trên production (`hold_if_debt = 1`), bản PDF vì thế kê cả đơn
+     * còn công nợ mà màn hình đã loại.
+     *
+     * Đo tháng 3/2026 trước khi sửa: 13/54 đơn còn công nợ > 1đ; hoa hồng
+     * 8.659.667đ so với 7.548.042đ sau khi áp.
+     *
+     * ## Lấy đơn THẬT chứ không dùng dòng của buildQuery
+     * `isShipped()`/`isCompleted()` đọc cột trạng thái của đơn, mà `buildQuery`
+     * không chọn những cột đó. Nạp một lượt bằng `whereIn` để hai cờ kia cũng
+     * đúng nếu nghiệp vụ bật lên sau này.
+     */
+    private function keepEligibleRows($rows, object $policy)
+    {
+        $rows = collect($rows);
+
+        if ($rows->isEmpty()) {
+            return $rows;
+        }
+
+        $orderIds = $rows->pluck('order_id')->filter()->map(fn ($id) => (int) $id)->unique()->all();
+
+        $orders = DB::table('crm_orders')->whereIn('id', $orderIds)->get()->keyBy('id');
+
+        $eligibility = new CommissionEligibilityPolicy(
+            OrderColumnMap::discover(app(CommissionSchema::class)),
+            $policy,
+        );
+
+        return $rows->filter(function ($row) use ($orders, $eligibility): bool {
+            $order = $orders->get((int) ($row->order_id ?? 0));
+
+            if (! $order) {
+                return false;
+            }
+
+            return $eligibility->isEligible(
+                $order,
+                (float) ($row->revenue_after_vat ?? 0),
+                (float) ($row->paid_total ?? 0),
+            );
+        })->values();
+    }
+
+    /**
      * Trang cấu hình chính sách hoa hồng theo tháng (hỗ trợ sao chép tháng trước).
      */
     public function commissionSettings(Request $request)
@@ -801,7 +711,15 @@ class SalesCommissionController extends Controller
                 ->with('success', 'Đã sao chép chính sách từ tháng trước.');
         }
 
-        return view('sales.commissions.settings', $engine->settingsViewData($month));
+        $data = $engine->settingsViewData($month);
+
+        return view('sales.commissions.settings', array_merge($data, $this->commissionSettingsPresenter->viewData(
+            $data['rules'],
+            $data['salesUsers'],
+            $data['salarySettings'],
+            $data['kpiTiers'],
+            $data['policy'],
+        )));
     }
 
     /**
@@ -920,12 +838,22 @@ class SalesCommissionController extends Controller
             ->whereIn('r.name', ['sales_manager', 'sales'])
             ->groupBy('mhr.model_id');
 
-        $rows = DB::table('users')
-            ->joinSub($roleSub, 'rr', function ($join) {
+        /*
+         * LEFT join chứ không INNER: nhân sự kinh doanh được nhận diện theo phòng
+         * ban / chức danh (xem SalesCommissionScope), phần lớn KHÔNG mang vai trò
+         * Spatie. Dùng INNER như trước thì danh sách chọn rỗng — đúng lỗi P1n.
+         * Vai trò nay chỉ dùng để SẮP XẾP (quản lý lên trước) và hiển thị.
+         */
+        $query = DB::table('users')
+            ->leftJoinSub($roleSub, 'rr', function ($join) {
                 $join->on('rr.user_id', '=', 'users.id');
             })
-            ->select('users.*', 'rr.role_names', 'rr.role_sort')
-            ->orderBy('rr.role_sort')
+            ->select('users.*', 'rr.role_names', DB::raw('COALESCE(rr.role_sort, 2) as role_sort'));
+
+        SalesCommissionScope::constrainToSalesStaff($query, 'users');
+
+        $rows = $query
+            ->orderBy('role_sort')
             ->orderBy('users.name')
             ->get();
 
@@ -1391,7 +1319,7 @@ class SalesCommissionController extends Controller
             ]
         );
 
-        if (Schema::hasColumn('sales_daily_kpis', 'extra_metrics')) {
+        if (SchemaCache::hasColumn('sales_daily_kpis', 'extra_metrics')) {
             DB::table('sales_daily_kpis')
                 ->where('id', $kpi->id)
                 ->update([
@@ -1425,29 +1353,7 @@ class SalesCommissionController extends Controller
     {
         $settings = $this->kpiSettings->salesKpiSettings();
 
-        $coreModules = [
-            ['key' => 'posts', 'enabled_key' => 'enable_posts', 'target_key' => 'posts_target', 'title' => 'Bài đăng group', 'unit' => 'bài/ngày', 'icon' => 'bi-megaphone', 'tone' => 'blue', 'description' => 'Số bài đăng group điện mặt trời mỗi ngày.'],
-            ['key' => 'calls', 'enabled_key' => 'enable_calls', 'target_key' => 'calls_target', 'title' => 'Cuộc gọi nghe máy', 'unit' => 'call/ngày', 'icon' => 'bi-telephone-outbound', 'tone' => 'cyan', 'description' => 'Số cuộc gọi khách hàng nghe máy được tính KPI.'],
-            ['key' => 'company_data', 'enabled_key' => 'enable_company_data', 'target_key' => 'company_data_target', 'title' => 'Data công ty đã gọi', 'unit' => 'data/ngày', 'icon' => 'bi-database-check', 'tone' => 'violet', 'description' => 'Số data công ty cấp mà sales đã xử lý trong ngày.'],
-            ['key' => 'follow_up', 'enabled_key' => 'enable_follow_up', 'target_key' => null, 'title' => 'Follow up khách cũ', 'unit' => 'bắt buộc', 'icon' => 'bi-chat-dots', 'tone' => 'green', 'description' => 'Checklist follow up toàn bộ khách hôm trước.'],
-        ];
-
-        $suggestedModules = [
-            ['enabled_key' => 'enable_new_leads', 'target_key' => 'new_leads_target', 'title' => 'Lead mới', 'unit' => 'lead/ngày', 'icon' => 'bi-person-plus', 'description' => 'Khách hàng/lead mới tự khai thác hoặc được phân bổ.'],
-            ['enabled_key' => 'enable_quotes', 'target_key' => 'quotes_target', 'title' => 'Báo giá gửi khách', 'unit' => 'báo giá/ngày', 'icon' => 'bi-file-earmark-text', 'description' => 'Số báo giá gửi khách trong ngày.'],
-            ['enabled_key' => 'enable_customer_care', 'target_key' => 'customer_care_target', 'title' => 'Chăm sóc khách hàng', 'unit' => 'khách/ngày', 'icon' => 'bi-heart', 'description' => 'Số khách được chăm sóc, nhắc lại, hỏi nhu cầu.'],
-            ['enabled_key' => 'enable_meetings', 'target_key' => 'meetings_target', 'title' => 'Lịch hẹn / meeting', 'unit' => 'lịch/ngày', 'icon' => 'bi-calendar2-check', 'description' => 'Lịch tư vấn, khảo sát, demo hoặc gặp khách.'],
-            ['enabled_key' => 'enable_zalo_messages', 'target_key' => 'zalo_messages_target', 'title' => 'Tin nhắn Zalo', 'unit' => 'tin/ngày', 'icon' => 'bi-send', 'description' => 'Tin nhắn chăm sóc, tư vấn, follow qua Zalo.'],
-            ['enabled_key' => 'enable_debt_follow', 'target_key' => 'debt_follow_target', 'title' => 'Follow công nợ', 'unit' => 'case/ngày', 'icon' => 'bi-wallet2', 'description' => 'Theo dõi khách còn công nợ hoặc cần nhắc thanh toán.'],
-            ['enabled_key' => 'enable_order_follow', 'target_key' => 'order_follow_target', 'title' => 'Bám đơn hàng', 'unit' => 'đơn/ngày', 'icon' => 'bi-box-seam', 'description' => 'Theo dõi đơn đang xử lý, giao hàng, thanh toán, xuất kho.'],
-            ['enabled_key' => 'enable_technical_coordination', 'target_key' => 'technical_coordination_target', 'title' => 'Phối hợp kỹ thuật', 'unit' => 'việc/ngày', 'icon' => 'bi-tools', 'description' => 'Phối hợp khảo sát, kỹ thuật, cấu hình hệ thống.'],
-            ['enabled_key' => 'enable_overdue_tasks', 'target_key' => 'overdue_tasks_target', 'title' => 'Task quá hạn tối đa', 'unit' => 'task', 'icon' => 'bi-alarm', 'description' => 'Giới hạn số công việc quá hạn được phép tồn.'],
-            ['enabled_key' => 'enable_training', 'target_key' => 'training_target', 'title' => 'Học sản phẩm', 'unit' => 'mục/ngày', 'icon' => 'bi-mortarboard', 'description' => 'Học sản phẩm, chính sách, kịch bản tư vấn.'],
-            ['enabled_key' => 'enable_quality_score', 'target_key' => 'quality_score_target', 'title' => 'Điểm chất lượng', 'unit' => 'điểm', 'icon' => 'bi-stars', 'description' => 'Chất lượng tư vấn, ghi chú CRM, thái độ chăm sóc.'],
-            ['enabled_key' => 'enable_revenue_pipeline', 'target_key' => 'revenue_pipeline_target', 'title' => 'Pipeline doanh số', 'unit' => 'VNĐ', 'icon' => 'bi-graph-up-arrow', 'description' => 'Giá trị cơ hội/báo giá đang theo đuổi.'],
-        ];
-
-        return view('sales.kpi.settings', compact('settings', 'coreModules', 'suggestedModules'));
+        return view('sales.kpi.settings', array_merge(['settings' => $settings], $this->kpiSettingsPresenter->viewData($settings)));
     }
 
     /**

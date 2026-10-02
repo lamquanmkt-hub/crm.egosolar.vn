@@ -4,9 +4,9 @@ namespace App\Services\Hr;
 
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Support\SchemaCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 
 class LeaveApprovalAccessService
 {
@@ -36,17 +36,6 @@ class LeaveApprovalAccessService
         'accounting_manager',
         'leader',
         'lead',
-    ];
-
-    /**
-     * Các role có thể được chọn trực tiếp làm người duyệt đơn nghỉ phép,
-     * không phụ thuộc phòng ban của nhân viên tạo đơn.
-     *
-     * Lưu ý: đây chỉ là quyền được chọn/gán và duyệt các đơn được giao,
-     * không biến role này thành quyền quản lý toàn bộ đơn nghỉ phép.
-     */
-    private const DIRECT_APPROVER_ROLES = [
-        'sales_manager',
     ];
 
     public function canManageAll(?User $user): bool
@@ -82,7 +71,7 @@ class LeaveApprovalAccessService
             return true;
         }
 
-        if (Schema::hasColumn('users', 'manager_id')) {
+        if (SchemaCache::hasColumn('users', 'manager_id')) {
             return User::query()
                 ->where('manager_id', $user->id)
                 ->exists();
@@ -115,7 +104,7 @@ class LeaveApprovalAccessService
 
         $departmentId = (int) ($user->department_id ?? 0);
         $isDepartmentManager = $this->isDepartmentManager($user);
-        $hasManagerColumn = Schema::hasColumn('users', 'manager_id');
+        $hasManagerColumn = SchemaCache::hasColumn('users', 'manager_id');
 
         return $query->where(function (Builder $scope) use (
             $user,
@@ -157,7 +146,7 @@ class LeaveApprovalAccessService
         }
 
         if (
-            Schema::hasColumn('users', 'manager_id')
+            SchemaCache::hasColumn('users', 'manager_id')
             && (int) ($employee->manager_id ?? 0) === (int) $user->id
         ) {
             return true;
@@ -196,14 +185,14 @@ class LeaveApprovalAccessService
         $users = User::query()
             ->with(['roles:id,name', 'department:id,name'])
             ->when(
-                Schema::hasColumn('users', 'is_active'),
+                SchemaCache::hasColumn('users', 'is_active'),
                 fn (Builder $query) => $query->where('is_active', true)
             )
             ->where('id', '!=', $requester->id)
             ->orderBy('name')
             ->get();
 
-        $directManagerId = Schema::hasColumn('users', 'manager_id')
+        $directManagerId = SchemaCache::hasColumn('users', 'manager_id')
             ? (int) ($requester->manager_id ?? 0)
             : 0;
 
@@ -218,12 +207,6 @@ class LeaveApprovalAccessService
             }
 
             if ($this->canManageAll($candidate)) {
-                return true;
-            }
-
-            // Sales Manager có thể được chọn trực tiếp làm người duyệt
-            // cho nhân viên ở mọi phòng ban.
-            if ($this->hasAnyRole($candidate, self::DIRECT_APPROVER_ROLES)) {
                 return true;
             }
 
@@ -256,8 +239,6 @@ class LeaveApprovalAccessService
                     $priority = 1;
                 } elseif ($this->canManageAll($candidate)) {
                     $priority = 2;
-                } elseif ($this->hasAnyRole($candidate, self::DIRECT_APPROVER_ROLES)) {
-                    $priority = 2;
                 }
 
                 return sprintf('%d-%s', $priority, mb_strtolower((string) $candidate->name));
@@ -271,7 +252,7 @@ class LeaveApprovalAccessService
             return null;
         }
 
-        if (Schema::hasColumn('users', 'manager_id')) {
+        if (SchemaCache::hasColumn('users', 'manager_id')) {
             $managerId = (int) ($requester->manager_id ?? 0);
 
             if ($managerId > 0) {

@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Projects;
 
 use App\Http\Controllers\Controller;
-use App\Support\EgoCompanyLock;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -19,7 +18,7 @@ class SiteAssemblyController extends Controller
      */
     public function index(Request $request)
     {
-        abort_unless(Schema::hasTable('site_assemblies'), 500, 'Chưa có bảng site_assemblies. Hãy chạy migrate.');
+        abort_unless(SchemaCache::hasTable('site_assemblies'), 500, 'Chưa có bảng site_assemblies. Hãy chạy migrate.');
 
         $q = trim((string) $request->get('q', ''));
         $status = trim((string) $request->get('status', ''));
@@ -38,8 +37,7 @@ class SiteAssemblyController extends Controller
                 'p.sku as finished_product_sku',
                 'mw.name as material_warehouse_name',
                 'fw.name as finished_warehouse_name',
-            ])
-            ->where('a.company_id', EgoCompanyLock::id());
+            ]);
 
         if ($q !== '') {
             $query->where(function ($x) use ($q) {
@@ -58,9 +56,9 @@ class SiteAssemblyController extends Controller
         $assemblies = $query->orderByDesc('a.id')->paginate(20)->appends($request->query());
 
         $stats = [
-            'total' => DB::table('site_assemblies')->where('company_id', EgoCompanyLock::id())->count(),
-            'draft' => DB::table('site_assemblies')->where('company_id', EgoCompanyLock::id())->where('status', 'draft')->count(),
-            'completed' => DB::table('site_assemblies')->where('company_id', EgoCompanyLock::id())->where('status', 'completed')->count(),
+            'total' => DB::table('site_assemblies')->count(),
+            'draft' => DB::table('site_assemblies')->where('status', 'draft')->count(),
+            'completed' => DB::table('site_assemblies')->where('status', 'completed')->count(),
         ];
 
         return view('site-assemblies.index', array_merge($this->formData(), compact('assemblies', 'stats', 'q', 'status')));
@@ -127,7 +125,7 @@ class SiteAssemblyController extends Controller
 
                 $id = DB::table('site_assemblies')->insertGetId([
                     'code' => $this->makeCode(),
-                    'company_id' => EgoCompanyLock::id(),
+                    'company_id' => (int) $request->input('company_id'),
                     'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
                     'material_warehouse_id' => (int) $request->input('material_warehouse_id'),
                     'finished_warehouse_id' => (int) $request->input('finished_warehouse_id'),
@@ -187,7 +185,7 @@ class SiteAssemblyController extends Controller
      */
     public function destroy($id)
     {
-        $assembly = DB::table('site_assemblies')->where('company_id', EgoCompanyLock::id())->where('id', (int) $id)->first();
+        $assembly = DB::table('site_assemblies')->where('id', (int) $id)->first();
         abort_unless($assembly, 404);
 
         if (($assembly->status ?? '') === 'completed') {
@@ -196,7 +194,7 @@ class SiteAssemblyController extends Controller
 
         DB::transaction(function () use ($id) {
             DB::table('site_assembly_materials')->where('assembly_id', (int) $id)->delete();
-            DB::table('site_assemblies')->where('company_id', EgoCompanyLock::id())->where('id', (int) $id)->delete();
+            DB::table('site_assemblies')->where('id', (int) $id)->delete();
         });
 
         return back()->with('success', 'Đã xóa phiếu lắp ráp nháp.');
@@ -207,7 +205,7 @@ class SiteAssemblyController extends Controller
      */
     private function completeInsideTransaction(int $id): void
     {
-        $assembly = DB::table('site_assemblies')->where('company_id', EgoCompanyLock::id())->where('id', $id)->lockForUpdate()->first();
+        $assembly = DB::table('site_assemblies')->where('id', $id)->lockForUpdate()->first();
 
         if (! $assembly) {
             throw new \RuntimeException('Không tìm thấy phiếu lắp ráp.');
@@ -259,7 +257,7 @@ class SiteAssemblyController extends Controller
         $this->createFinishedLot($assembly);
         $this->createInventoryRef($eventId, 'site_assembly', $id);
 
-        DB::table('site_assemblies')->where('company_id', EgoCompanyLock::id())->where('id', $id)->update([
+        DB::table('site_assemblies')->where('id', $id)->update([
             'status' => 'completed',
             'completed_by' => auth()->id(),
             'completed_at' => now(),
@@ -272,33 +270,27 @@ class SiteAssemblyController extends Controller
      */
     private function formData(): array
     {
-        $companies = Schema::hasTable('companies')
-            ? DB::table('companies')->select('id', 'code', 'name')->where('id', EgoCompanyLock::id())->where('is_active', 1)->orderBy('id')->get()
+        $companies = SchemaCache::hasTable('companies')
+            ? DB::table('companies')->select('id', 'code', 'name')->where('is_active', 1)->orderBy('id')->get()
             : collect();
 
-        $warehouses = Schema::hasTable('crm_warehouses')
-            ? DB::table('crm_warehouses')->select('id', 'company_id', 'name', 'location')->where('company_id', EgoCompanyLock::id())->orderBy('company_id')->orderBy('name')->get()
+        $warehouses = SchemaCache::hasTable('crm_warehouses')
+            ? DB::table('crm_warehouses')->select('id', 'company_id', 'name', 'location')->orderBy('company_id')->orderBy('name')->get()
             : collect();
 
-        $products = Schema::hasTable('crm_product_catalog')
+        $products = SchemaCache::hasTable('crm_product_catalog')
             ? DB::table('crm_product_catalog as p')
-                ->leftJoin('crm_product_stock as st', function ($join) {
-                    $join->on('st.product_id', '=', 'p.id')
-                        ->where('st.company_id', EgoCompanyLock::id());
-                })
+                ->leftJoin('crm_product_stock as st', 'st.product_id', '=', 'p.id')
                 ->selectRaw('p.id, p.company_id, p.sku, p.name, p.unit, p.is_active, COALESCE(SUM(st.qty),0) as stock_qty')
                 ->where('p.is_active', 1)
-                ->where(function ($query) {
-                    $query->where('p.company_id', EgoCompanyLock::id())->orWhereNull('p.company_id');
-                })
                 ->groupBy('p.id', 'p.company_id', 'p.sku', 'p.name', 'p.unit', 'p.is_active')
                 ->orderBy('p.name')
                 ->limit(2000)
                 ->get()
             : collect();
 
-        $sites = Schema::hasTable('sites')
-            ? DB::table('sites')->select('id', 'company_id', 'name', 'contact_name', 'contact_phone', 'address')->where('company_id', EgoCompanyLock::id())->orderByDesc('id')->limit(500)->get()
+        $sites = SchemaCache::hasTable('sites')
+            ? DB::table('sites')->select('id', 'company_id', 'name', 'contact_name', 'contact_phone', 'address')->orderByDesc('id')->limit(500)->get()
             : collect();
 
         return compact('companies', 'warehouses', 'products', 'sites');
@@ -319,7 +311,7 @@ class SiteAssemblyController extends Controller
             throw new \RuntimeException('Vui lòng chọn kho.');
         }
 
-        if (Schema::hasTable('crm_warehouses') && Schema::hasColumn('crm_warehouses', 'company_id')) {
+        if (SchemaCache::hasTable('crm_warehouses') && SchemaCache::hasColumn('crm_warehouses', 'company_id')) {
             $badWarehouse = DB::table('crm_warehouses')
                 ->whereIn('id', $warehouseIds)
                 ->whereNotNull('company_id')
@@ -337,7 +329,7 @@ class SiteAssemblyController extends Controller
             throw new \RuntimeException('Vui lòng chọn sản phẩm.');
         }
 
-        if (Schema::hasTable('crm_product_catalog') && Schema::hasColumn('crm_product_catalog', 'company_id')) {
+        if (SchemaCache::hasTable('crm_product_catalog') && SchemaCache::hasColumn('crm_product_catalog', 'company_id')) {
             $badProduct = DB::table('crm_product_catalog')
                 ->whereIn('id', $productIds)
                 ->whereNotNull('company_id')
@@ -356,7 +348,7 @@ class SiteAssemblyController extends Controller
     private function makeCode(): string
     {
         $prefix = 'LR-'.now()->format('Ymd').'-';
-        $count = DB::table('site_assemblies')->where('company_id', EgoCompanyLock::id())->where('code', 'like', $prefix.'%')->count() + 1;
+        $count = DB::table('site_assemblies')->where('code', 'like', $prefix.'%')->count() + 1;
 
         return $prefix.str_pad((string) $count, 4, '0', STR_PAD_LEFT);
     }
@@ -411,7 +403,7 @@ class SiteAssemblyController extends Controller
             ]);
         }
 
-        if (Schema::hasTable('crm_stock_movements')) {
+        if (SchemaCache::hasTable('crm_stock_movements')) {
             DB::table('crm_stock_movements')->insert([
                 'product_id' => $productId,
                 'warehouse_id' => $warehouseId,
@@ -426,7 +418,7 @@ class SiteAssemblyController extends Controller
             ]);
         }
 
-        if (Schema::hasTable('crm_product_catalog') && Schema::hasColumn('crm_product_catalog', 'quantity')) {
+        if (SchemaCache::hasTable('crm_product_catalog') && SchemaCache::hasColumn('crm_product_catalog', 'quantity')) {
             $total = (int) DB::table('crm_product_stock')->where('product_id', $productId)->sum('qty');
 
             DB::table('crm_product_catalog')->where('id', $productId)->update([
@@ -441,7 +433,7 @@ class SiteAssemblyController extends Controller
      */
     private function createFinishedLot(object $assembly): void
     {
-        if (! Schema::hasTable('crm_product_stock_lots')) {
+        if (! SchemaCache::hasTable('crm_product_stock_lots')) {
             return;
         }
 
@@ -473,7 +465,7 @@ class SiteAssemblyController extends Controller
      */
     private function createInventoryEvent(string $type, string $note): ?int
     {
-        if (! Schema::hasTable('crm_inventory_events')) {
+        if (! SchemaCache::hasTable('crm_inventory_events')) {
             return null;
         }
 
@@ -492,7 +484,7 @@ class SiteAssemblyController extends Controller
      */
     private function createInventoryRef(?int $eventId, string $refType, int $refId): void
     {
-        if (! $eventId || ! Schema::hasTable('crm_inventory_event_refs')) {
+        if (! $eventId || ! SchemaCache::hasTable('crm_inventory_event_refs')) {
             return;
         }
 

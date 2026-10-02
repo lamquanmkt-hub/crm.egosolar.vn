@@ -6,8 +6,8 @@ namespace App\Services\Finance;
 
 use App\Contracts\Services\SupplierDebtServiceInterface;
 use App\Enums\SupplierDebtStatus;
+use App\Support\SchemaCache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Nghiệp vụ công nợ nhà cung cấp: phân loại trạng thái đợt thanh toán
@@ -28,6 +28,7 @@ class SupplierDebtService implements SupplierDebtServiceInterface
     public function companyOptions(): array
     {
         return [
+            'Công ty TNHH Ego Việt Nam',
             'Công ty TNHH TMKT Quốc Tế EGO',
         ];
     }
@@ -62,13 +63,13 @@ class SupplierDebtService implements SupplierDebtServiceInterface
      */
     public function paymentRequestRow($paymentRequestId)
     {
-        if (! $paymentRequestId || ! Schema::hasTable('payment_requests')) {
+        if (! $paymentRequestId || ! SchemaCache::hasTable('payment_requests')) {
             return null;
         }
 
         $query = DB::table('payment_requests')->where('id', (int) $paymentRequestId);
 
-        if (Schema::hasColumn('payment_requests', 'deleted_at')) {
+        if (SchemaCache::hasColumn('payment_requests', 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
 
@@ -151,7 +152,7 @@ class SupplierDebtService implements SupplierDebtServiceInterface
      */
     public function remainingRoundAlreadyExists($round, float $remainingAmount): bool
     {
-        if ($remainingAmount <= 0 || ! Schema::hasTable('finance_supplier_debt_payments')) {
+        if ($remainingAmount <= 0 || ! SchemaCache::hasTable('finance_supplier_debt_payments')) {
             return false;
         }
 
@@ -237,7 +238,7 @@ class SupplierDebtService implements SupplierDebtServiceInterface
             return false;
         }
 
-        if (! Schema::hasTable('payment_requests') || ! Schema::hasColumn('payment_requests', 'status')) {
+        if (! SchemaCache::hasTable('payment_requests') || ! SchemaCache::hasColumn('payment_requests', 'status')) {
             return true;
         }
 
@@ -253,7 +254,7 @@ class SupplierDebtService implements SupplierDebtServiceInterface
      */
     public function syncSupplierDebtTotals(int $debtId): void
     {
-        if (! Schema::hasTable('finance_supplier_debts')) {
+        if (! SchemaCache::hasTable('finance_supplier_debts')) {
             return;
         }
 
@@ -265,7 +266,7 @@ class SupplierDebtService implements SupplierDebtServiceInterface
 
         $rounds = collect();
 
-        if (Schema::hasTable('finance_supplier_debt_payments')) {
+        if (SchemaCache::hasTable('finance_supplier_debt_payments')) {
             $rounds = DB::table('finance_supplier_debt_payments')
                 ->where('supplier_debt_id', $debtId)
                 ->get();
@@ -328,13 +329,13 @@ class SupplierDebtService implements SupplierDebtServiceInterface
      */
     public function paymentRequestExistsForSupplierDebt($paymentRequestId): bool
     {
-        if (! $paymentRequestId || ! Schema::hasTable('payment_requests')) {
+        if (! $paymentRequestId || ! SchemaCache::hasTable('payment_requests')) {
             return false;
         }
 
         $query = DB::table('payment_requests')->where('id', (int) $paymentRequestId);
 
-        if (Schema::hasColumn('payment_requests', 'deleted_at')) {
+        if (SchemaCache::hasColumn('payment_requests', 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
 
@@ -347,9 +348,9 @@ class SupplierDebtService implements SupplierDebtServiceInterface
     public function clearMissingSupplierDebtPaymentRequests(array $roundIds = []): int
     {
         if (
-            ! Schema::hasTable('finance_supplier_debt_payments') ||
-            ! Schema::hasTable('payment_requests') ||
-            ! Schema::hasColumn('finance_supplier_debt_payments', 'payment_request_id')
+            ! SchemaCache::hasTable('finance_supplier_debt_payments') ||
+            ! SchemaCache::hasTable('payment_requests') ||
+            ! SchemaCache::hasColumn('finance_supplier_debt_payments', 'payment_request_id')
         ) {
             return 0;
         }
@@ -358,7 +359,7 @@ class SupplierDebtService implements SupplierDebtServiceInterface
             ->leftJoin('payment_requests as pr', 'pr.id', '=', 'p.payment_request_id')
             ->whereNotNull('p.payment_request_id');
 
-        if (Schema::hasColumn('payment_requests', 'deleted_at')) {
+        if (SchemaCache::hasColumn('payment_requests', 'deleted_at')) {
             $query->where(function ($q) {
                 $q->whereNull('pr.id')->orWhereNotNull('pr.deleted_at');
             });

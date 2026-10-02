@@ -1396,11 +1396,11 @@ class MaterialRequestController extends Controller
             ], true);
         }
 
-        if ($user->hasRole('warehouse') || $user->hasRole('kho')) {
+        if ($user->hasRole('warehouse')) {
             return $status === MaterialRequestStatus::ADMIN_APPROVED->value;
         }
 
-        if ($user->hasRole('technical') || $user->hasRole('ky_thuat')) {
+        if ($user->hasRole('technical')) {
             return $status === MaterialRequestStatus::DRAFT->value;
         }
 

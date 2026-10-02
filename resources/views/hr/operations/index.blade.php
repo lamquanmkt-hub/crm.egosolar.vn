@@ -78,8 +78,8 @@
             <div class="hc-sub">Gộp đúng luồng: quản lý hồ sơ, quản lý tài sản, chi phí văn phòng, phân bổ VPP, bảo trì trang thiết bị và giao nhận hồ sơ.</div>
         </div>
         <div class="hc-actions">
-            <a class="hc-btn-outline" href="{{ route('hr.recruitment.index') }}">Tuyển dụng</a>
-            <a class="hc-btn-outline" href="{{ route('hr.office-supply-process.index') }}">Văn phòng phẩm</a>
+            <a class="hc-btn-outline" href="{{ route('hr.recruitment.index') }}">Quy trình tuyển dụng</a>
+            <a class="hc-btn-outline" href="{{ route('hr.office-supply-process.index') }}">Quy trình phân bổ VPP</a>
             <a class="hc-btn-outline" href="{{ route('hr.document-handovers.index') }}">Giao nhận hồ sơ</a>
             <a class="hc-btn-outline" href="{{ route('hr.records.index') }}">HS nhân sự</a>
         </div>
@@ -100,6 +100,7 @@
         <div class="hc-stat"><div class="hc-stat-label">Bảo trì thiết bị</div><div class="hc-stat-value">{{ $stats['maintenance'] ?? 0 }}</div></div>
         <div class="hc-stat"><div class="hc-stat-label">Việc đang xử lý</div><div class="hc-stat-value">{{ $stats['processing_tasks'] ?? 0 }}</div></div>
         <div class="hc-stat"><div class="hc-stat-label">Việc quá hạn</div><div class="hc-stat-value">{{ $stats['overdue_tasks'] ?? 0 }}</div></div>
+        <div class="hc-stat"><div class="hc-stat-label">Sự cố đang mở</div><div class="hc-stat-value">{{ $stats['open_incidents'] ?? 0 }}</div></div>
     </div>
 
     <div class="hc-tabs">
@@ -107,6 +108,7 @@
         <a class="hc-tab {{ $tab === 'expenses' ? 'active' : '' }}" href="{{ route('hr.operations.index', ['tab' => 'expenses']) }}">Chi phí văn phòng</a>
         <a class="hc-tab {{ $tab === 'assets' ? 'active' : '' }}" href="{{ route('hr.operations.index', ['tab' => 'assets']) }}">Tài sản công ty</a>
         <a class="hc-tab {{ $tab === 'maintenance' ? 'active' : '' }}" href="{{ route('hr.operations.index', ['tab' => 'maintenance']) }}">Bảo trì thiết bị</a>
+        <a class="hc-tab {{ $tab === 'incidents' ? 'active' : '' }}" href="{{ route('hr.operations.index', ['tab' => 'incidents']) }}">Sự cố văn phòng</a>
         <a class="hc-tab {{ $tab === 'suppliers' ? 'active' : '' }}" href="{{ route('hr.operations.index', ['tab' => 'suppliers']) }}">Nhà cung cấp</a>
         <a class="hc-tab {{ $tab === 'tasks' ? 'active' : '' }}" href="{{ route('hr.operations.index', ['tab' => 'tasks']) }}">Việc phát sinh</a>
     </div>
@@ -139,11 +141,19 @@
             </div>
             <div class="hc-flow">
                 <div>
-                    <h4>4. Văn phòng phẩm</h4>
+                    <h4>4. Quy trình phân bổ VPP</h4>
                     <p>Cấp phát văn phòng phẩm theo phòng ban, ghi nhận văn phòng được cấp và định kỳ 1 tháng cấp 1 lần.</p>
                     <ul><li>Cấp phát cho phòng ban nào</li><li>Ghi nhận vật phẩm được cấp</li><li>Theo dõi đã duyệt, đã xuất, đã nhận</li></ul>
                 </div>
                 <div class="hc-flow-actions"><a class="hc-btn" href="{{ route('hr.office-supply-process.index') }}">Mở phân bổ VPP</a></div>
+            </div>
+            <div class="hc-flow">
+                <div>
+                    <h4>5. Tiếp nhận & xử lý sự cố văn phòng</h4>
+                    <p>Luồng 4 bước: tiếp nhận → phân loại/duyệt chi → xử lý → nghiệm thu & đóng để đối soát KPI.</p>
+                    <ul><li>Mức 1: SLA 1–2 giờ</li><li>Mức 2: SLA 4–8 giờ làm việc</li><li>Mức 3: SLA 24–48 giờ</li></ul>
+                </div>
+                <div class="hc-flow-actions"><a class="hc-btn" href="{{ route('hr.operations.index', ['tab' => 'incidents']) }}">Mở xử lý sự cố</a></div>
             </div>
         </div>
 
@@ -298,6 +308,80 @@
             </tbody></table></div>
             @else <div class="hc-empty">Chưa có yêu cầu bảo trì trang thiết bị.</div> @endif
         </div></div>
+    @endif
+
+    @if($tab === 'incidents')
+        @php
+            $incidentStatusLabels = [
+                'received' => 'Đã tiếp nhận', 'approved' => 'Đã duyệt', 'processing' => 'Đang xử lý',
+                'waiting_vendor' => 'Chờ thợ/NCC', 'completed' => 'Đã hoàn thành', 'cancelled' => 'Đã huỷ',
+            ];
+            $approvalLabels = ['not_required' => 'Không cần duyệt', 'pending' => 'Chờ duyệt', 'approved' => 'Đã duyệt', 'rejected' => 'Từ chối'];
+            $severityLabels = [1 => 'Mức 1 - Khẩn cấp', 2 => 'Mức 2 - Bình thường', 3 => 'Mức 3 - Thấp'];
+        @endphp
+        <div class="hc-card">
+            <div class="hc-card-head">
+                <div>
+                    <h3 class="hc-card-title">Tiếp nhận sự cố văn phòng</h3>
+                    <div class="hc-card-note">Nhân viên báo vị trí + mô tả + ảnh/video. Hệ thống tự gán SLA: M1 = 2 giờ, M2 = 8 giờ, M3 = 48 giờ. Chi dự kiến trên 500.000đ sẽ chuyển trạng thái chờ duyệt.</div>
+                </div>
+            </div>
+            <div class="hc-card-body">
+                <form method="POST" action="{{ route('hr.operations.incidents.store') }}" enctype="multipart/form-data">@csrf
+                    <div class="hc-grid">
+                        <div class="hc-field"><label class="hc-label">Người báo lỗi *</label><input class="hc-input" name="reported_by" value="{{ old('reported_by', auth()->user()->name ?? '') }}" required></div>
+                        <div class="hc-field"><label class="hc-label">Bộ phận</label><select class="hc-select" name="department"><option value="">-- Chọn --</option>@foreach($departments as $dep)<option value="{{ $dep }}">{{ $dep }}</option>@endforeach</select></div>
+                        <div class="hc-field"><label class="hc-label">Vị trí sự cố *</label><input class="hc-input" name="location" placeholder="VD: Phòng họp tầng 2" required></div>
+                        <div class="hc-field"><label class="hc-label">Mức độ *</label><select class="hc-select" name="severity" required><option value="1">Mức 1 - Khẩn cấp (1–2h)</option><option value="2" selected>Mức 2 - Bình thường (4–8h)</option><option value="3">Mức 3 - Thấp (24–48h)</option></select></div>
+                        <div class="hc-field"><label class="hc-label">Chi phí dự kiến</label><input class="hc-input" type="number" min="0" step="1000" name="estimated_cost" placeholder="0"></div>
+                        <div class="hc-field"><label class="hc-label">Người phụ trách</label><input class="hc-input" name="assignee" placeholder="HC / IT / người xử lý"></div>
+                        <div class="hc-field"><label class="hc-label">Ảnh / video / PDF hiện trạng</label><input class="hc-input" type="file" name="evidence" accept="image/*,video/mp4,video/quicktime,application/pdf"></div>
+                        <div class="hc-field full"><label class="hc-label">Mô tả hiện tượng *</label><textarea class="hc-textarea" name="description" required placeholder="Mô tả lỗi, hiện tượng, ảnh hưởng..."></textarea></div>
+                        <div class="hc-field full"><label class="hc-label">Ghi chú</label><textarea class="hc-textarea" name="note"></textarea></div>
+                    </div>
+                    <div class="hc-form-foot"><button class="hc-btn" type="submit">+ Tiếp nhận sự cố</button></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="hc-card">
+            <div class="hc-card-head"><div><h3 class="hc-card-title">Theo dõi xử lý sự cố & KPI</h3><div class="hc-card-note">Đóng yêu cầu sau khi nghiệm thu, cập nhật ảnh kết quả, thời gian hoàn thành và đánh giá 1–5 sao.</div></div></div>
+            <div class="hc-card-body">
+                @if($incidents->count())
+                    <div class="hc-table-wrap"><table class="hc-table" style="min-width:1800px"><thead><tr>
+                        <th>Mã vụ</th><th>Tiếp nhận</th><th>Người báo / Bộ phận</th><th>Vị trí & Nội dung</th><th>Mức độ</th><th>SLA</th><th>Chi phí</th><th>Duyệt chi</th><th>Người xử lý</th><th>Trạng thái</th><th>Nghiệm thu</th><th>Đánh giá</th><th>Minh chứng</th><th>Thao tác</th>
+                    </tr></thead><tbody>
+                    @foreach($incidents as $row)
+                        @php
+                            $isOverdue = !empty($row->sla_due_at) && \Illuminate\Support\Carbon::parse($row->sla_due_at)->isPast() && !in_array($row->status, ['completed','cancelled'], true);
+                            $slaClass = $isOverdue ? 'red' : (in_array($row->status, ['completed'], true) ? 'green' : 'yellow');
+                        @endphp
+                        <tr>
+                            <td><strong>{{ $row->incident_code }}</strong></td>
+                            <td>{{ \Illuminate\Support\Carbon::parse($row->reported_at)->format('d/m/Y H:i') }}</td>
+                            <td><strong>{{ $row->reported_by }}</strong><div style="color:#64748b;margin-top:4px">{{ $row->department ?: '—' }}</div></td>
+                            <td style="min-width:260px"><strong>{{ $row->location }}</strong><div style="margin-top:4px;color:#475569">{{ $row->description }}</div></td>
+                            <td><span class="hc-pill {{ (int)$row->severity === 1 ? 'red' : ((int)$row->severity === 3 ? 'green' : 'yellow') }}">{{ $severityLabels[(int)$row->severity] ?? $row->severity }}</span></td>
+                            <td><span class="hc-pill {{ $slaClass }}">{{ $isOverdue ? 'Quá SLA' : 'Hạn' }}</span><div style="margin-top:5px">{{ \Illuminate\Support\Carbon::parse($row->sla_due_at)->format('d/m H:i') }}</div></td>
+                            <td><form id="inc{{ $row->id }}" method="POST" action="{{ route('hr.operations.incidents.update', $row->id) }}" enctype="multipart/form-data">@csrf @method('PUT')<input class="hc-input" style="width:120px" type="number" min="0" step="1000" name="estimated_cost" value="{{ (float)$row->estimated_cost }}"><input class="hc-input" style="width:120px;margin-top:5px" type="number" min="0" step="1000" name="actual_cost" value="{{ (float)$row->actual_cost }}" placeholder="Thực tế"></form></td>
+                            <td><select form="inc{{ $row->id }}" class="hc-select" name="approval_status" @disabled((float)$row->estimated_cost <= 500000)>@foreach($approvalLabels as $key=>$label)<option value="{{ $key }}" @selected($row->approval_status === $key)>{{ $label }}</option>@endforeach</select><div style="margin-top:5px;color:#64748b">{{ (float)$row->estimated_cost > 500000 ? '>500k cần duyệt' : 'HC chủ động' }}</div></td>
+                            <td><input form="inc{{ $row->id }}" class="hc-input" name="assignee" value="{{ $row->assignee }}"></td>
+                            <td><select form="inc{{ $row->id }}" class="hc-select" name="status">@foreach($incidentStatusLabels as $key=>$label)<option value="{{ $key }}" @selected($row->status === $key)>{{ $label }}</option>@endforeach</select></td>
+                            <td style="min-width:230px"><textarea form="inc{{ $row->id }}" class="hc-textarea" name="resolution" placeholder="Kết quả sửa chữa...">{{ $row->resolution }}</textarea><input form="inc{{ $row->id }}" class="hc-input" style="margin-top:5px" type="file" name="completion_evidence" accept="image/*,video/mp4,video/quicktime,application/pdf"></td>
+                            <td><select form="inc{{ $row->id }}" class="hc-select" name="rating"><option value="">—</option>@for($i=1;$i<=5;$i++)<option value="{{ $i }}" @selected((int)$row->rating === $i)>{{ str_repeat('★',$i) }}</option>@endfor</select><textarea form="inc{{ $row->id }}" class="hc-textarea" style="margin-top:5px" name="note">{{ $row->note }}</textarea></td>
+                            <td>
+                                @if(!empty($row->evidence_path))<a class="hc-btn-outline" target="_blank" href="{{ asset('storage/'.$row->evidence_path) }}">Hiện trạng</a>@endif
+                                @if(!empty($row->completion_evidence_path))<a class="hc-btn-outline" style="margin-top:5px" target="_blank" href="{{ asset('storage/'.$row->completion_evidence_path) }}">Sau xử lý</a>@endif
+                            </td>
+                            <td><div class="hc-actions-row"><button form="inc{{ $row->id }}" class="hc-btn" type="submit">Lưu</button><form method="POST" action="{{ route('hr.operations.incidents.destroy', $row->id) }}" onsubmit="return confirm('Xoá sự cố {{ $row->incident_code }}?')">@csrf @method('DELETE')<button class="hc-btn-danger" type="submit">Xoá</button></form></div>@if($row->completed_at)<div style="margin-top:6px;color:#15803d;font-weight:800">Đóng: {{ \Illuminate\Support\Carbon::parse($row->completed_at)->format('d/m/Y H:i') }}</div>@endif</td>
+                        </tr>
+                    @endforeach
+                    </tbody></table></div>
+                @else
+                    <div class="hc-empty">Chưa có sự cố văn phòng nào được ghi nhận.</div>
+                @endif
+            </div>
+        </div>
     @endif
 
     @if($tab === 'suppliers')

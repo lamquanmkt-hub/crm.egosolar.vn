@@ -11,7 +11,7 @@ return new class extends Migration
         /**
          * SEO phases (1-4) per plan
          */
-        if (!Schema::hasTable('mkt_seo_phases')) {
+        if (! Schema::hasTable('mkt_seo_phases')) {
             Schema::create('mkt_seo_phases', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('plan_id')->index();
@@ -33,7 +33,7 @@ return new class extends Migration
         /**
          * KPI key-value per phase (flexible)
          */
-        if (!Schema::hasTable('mkt_seo_phase_kpis')) {
+        if (! Schema::hasTable('mkt_seo_phase_kpis')) {
             Schema::create('mkt_seo_phase_kpis', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('plan_id')->index();
@@ -54,7 +54,7 @@ return new class extends Migration
         /**
          * Budget items per phase (optional but useful)
          */
-        if (!Schema::hasTable('mkt_seo_phase_budget_items')) {
+        if (! Schema::hasTable('mkt_seo_phase_budget_items')) {
             Schema::create('mkt_seo_phase_budget_items', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('plan_id')->index();

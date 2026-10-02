@@ -49,7 +49,7 @@ final class SalesCommissionPagesCharacterizationTest extends TestCase
         $this->seedShippableOrder();
 
         $this->actingAs($this->admin)
-            ->get('/sales/commissions/export/excel')
+            ->get('/sales/commissions/exports/excel')
             ->assertOk()
             ->assertHeader(
                 'content-type',
@@ -63,7 +63,7 @@ final class SalesCommissionPagesCharacterizationTest extends TestCase
         $this->seedShippableOrder();
 
         $response = $this->actingAs($this->admin)
-            ->get('/sales/commissions/export/pdf')
+            ->get('/sales/commissions/exports/pdf')
             ->assertOk();
 
         $this->assertStringContainsString(

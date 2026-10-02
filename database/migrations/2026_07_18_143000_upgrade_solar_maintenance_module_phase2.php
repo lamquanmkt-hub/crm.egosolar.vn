@@ -9,7 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('solar_maintenance_schedules')) {
+        if (! Schema::hasTable('solar_maintenance_schedules')) {
             return;
         }
 
@@ -37,7 +37,7 @@ return new class extends Migration
             }
         }
 
-        if (!Schema::hasTable('solar_maintenance_schedules')) {
+        if (! Schema::hasTable('solar_maintenance_schedules')) {
             return;
         }
 
@@ -52,9 +52,11 @@ return new class extends Migration
             'approval_note',
         ] as $column) {
             if (Schema::hasColumn('solar_maintenance_schedules', $column)) {
-                Schema::table('solar_maintenance_schedules', function (Blueprint $table) use ($column) {
-                    $table->dropColumn($column);
-                });
+                if (Schema::hasTable('solar_maintenance_schedules')) {
+                    Schema::table('solar_maintenance_schedules', function (Blueprint $table) use ($column) {
+                        $table->dropColumn($column);
+                    });
+                }
             }
         }
     }
@@ -73,28 +75,36 @@ return new class extends Migration
         ];
 
         foreach ($definitions as $column => $definition) {
-            if (!Schema::hasColumn('solar_maintenance_schedules', $column)) {
-                Schema::table('solar_maintenance_schedules', $definition);
+            if (! Schema::hasColumn('solar_maintenance_schedules', $column)) {
+                if (Schema::hasTable('solar_maintenance_schedules')) {
+                    Schema::table('solar_maintenance_schedules', $definition);
+                }
             }
         }
     }
 
     private function upgradeAssigneesTable(): void
     {
-        if (!Schema::hasTable('solar_maintenance_assignees')) {
+        if (! Schema::hasTable('solar_maintenance_assignees')) {
             return;
         }
 
-        if (!Schema::hasColumn('solar_maintenance_assignees', 'assignment_role')) {
+        if (! Schema::hasColumn('solar_maintenance_assignees', 'assignment_role')) {
             Schema::table('solar_maintenance_assignees', function (Blueprint $table) {
-                $table->string('assignment_role', 30)->default('member')->index()->after('role');
+                if (! Schema::hasColumn('solar_maintenance_assignees', 'assignment_role')) {
+                    $table->string('assignment_role', 30)->default('member')->index()->after('role');
+                }
             });
         }
 
-        if (!Schema::hasColumn('solar_maintenance_assignees', 'is_leader')) {
-            Schema::table('solar_maintenance_assignees', function (Blueprint $table) {
-                $table->boolean('is_leader')->default(false)->index()->after('assignment_role');
-            });
+        if (! Schema::hasColumn('solar_maintenance_assignees', 'is_leader')) {
+            if (Schema::hasTable('solar_maintenance_assignees')) {
+                Schema::table('solar_maintenance_assignees', function (Blueprint $table) {
+                    if (! Schema::hasColumn('solar_maintenance_assignees', 'is_leader')) {
+                        $table->boolean('is_leader')->default(false)->index()->after('assignment_role');
+                    }
+                });
+            }
         }
     }
 

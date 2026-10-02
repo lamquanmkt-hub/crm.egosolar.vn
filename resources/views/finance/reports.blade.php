@@ -46,8 +46,7 @@
     })->values();
 @endphp
 
-<style>
-    .finance-report-page {
+<style> .finance-report-page{
         padding: 18px;
         background:
             radial-gradient(circle at top left, rgba(59, 130, 246, .08), transparent 30%),
@@ -55,9 +54,7 @@
             #f5f7fb;
         min-height: 100%;
         overflow-x: hidden;
-    }
-
-    .fr-hero {
+    }.fr-hero{
         position: relative;
         overflow: hidden;
         border-radius: 30px;
@@ -67,9 +64,7 @@
             radial-gradient(circle at top right, rgba(56,189,248,.38), transparent 36%),
             linear-gradient(135deg, #071124 0%, #102a63 52%, #2563eb 100%);
         box-shadow: 0 24px 60px rgba(37, 99, 235, .22);
-    }
-
-    .fr-hero:after {
+    }.fr-hero:after{
         content: "";
         position: absolute;
         width: 360px;
@@ -78,14 +73,10 @@
         right: -150px;
         bottom: -160px;
         background: rgba(255,255,255,.08);
-    }
-
-    .fr-hero-inner {
+    }.fr-hero-inner{
         position: relative;
         z-index: 2;
-    }
-
-    .fr-pill {
+    }.fr-pill{
         display: inline-flex;
         align-items: center;
         gap: 8px;
@@ -96,57 +87,41 @@
         font-size: 12px;
         font-weight: 900;
         letter-spacing: .04em;
-    }
-
-    .fr-title {
+    }.fr-title{
         font-size: clamp(28px, 3vw, 42px);
         font-weight: 900;
         letter-spacing: -.04em;
         margin: 14px 0 8px;
-    }
-
-    .fr-subtitle {
+    }.fr-subtitle{
         max-width: 840px;
         opacity: .78;
         margin: 0;
-    }
-
-    .fr-filter {
+    }.fr-filter{
         margin-top: 22px;
         padding: 16px;
         border-radius: 22px;
         background: rgba(255,255,255,.11);
         border: 1px solid rgba(255,255,255,.18);
-    }
-
-    .fr-filter label {
+    }.fr-filter label{
         font-size: 12px;
         font-weight: 800;
         color: rgba(255,255,255,.76);
         margin-bottom: 7px;
-    }
-
-    .fr-filter .form-control {
+    }.fr-filter .fr-input{
         border: 0;
         border-radius: 15px;
         min-height: 45px;
-    }
-
-    .fr-card {
+    }.fr-card{
         background: #fff;
         border: 1px solid rgba(15,23,42,.06);
         border-radius: 24px;
         box-shadow: 0 16px 40px rgba(15,23,42,.065);
-    }
-
-    .fr-stat {
+    }.fr-stat{
         height: 100%;
         padding: 20px;
         overflow: hidden;
         position: relative;
-    }
-
-    .fr-stat:after {
+    }.fr-stat:after{
         content: "";
         position: absolute;
         width: 100px;
@@ -155,34 +130,24 @@
         right: -34px;
         bottom: -36px;
         background: #eff6ff;
-    }
-
-    .fr-stat-content {
+    }.fr-stat-content{
         position: relative;
         z-index: 2;
-    }
-
-    .fr-label {
+    }.fr-label{
         color: #64748b;
         font-size: 13px;
         font-weight: 800;
         margin-bottom: 6px;
-    }
-
-    .fr-number {
+    }.fr-number{
         color: #0f172a;
         font-size: 25px;
         font-weight: 900;
         letter-spacing: -.04em;
         margin-bottom: 4px;
-    }
-
-    .fr-hint {
+    }.fr-hint{
         color: #64748b;
         font-size: 12px;
-    }
-
-    .fr-icon {
+    }.fr-icon{
         width: 46px;
         height: 46px;
         border-radius: 17px;
@@ -192,48 +157,27 @@
         font-size: 21px;
         background: #eff6ff;
         color: #2563eb;
-    }
-
-    .fr-icon.green { background: #dcfce7; color: #16a34a; }
-    .fr-icon.red { background: #fee2e2; color: #dc2626; }
-    .fr-icon.amber { background: #fef3c7; color: #d97706; }
-    .fr-icon.purple { background: #ede9fe; color: #7c3aed; }
-
-    .fr-section-title {
+    }.fr-icon.green{ background: #dcfce7; color: #16a34a; }.fr-icon.red{ background: #fee2e2; color: #dc2626; }.fr-icon.amber{ background: #fef3c7; color: #d97706; }.fr-icon.purple{ background: #ede9fe; color: #7c3aed; }.fr-section-title{
         color: #0f172a;
         font-size: 18px;
         font-weight: 900;
         margin: 0;
-    }
-
-    .fr-muted {
+    }.fr-muted{
         color: #64748b;
         font-size: 13px;
-    }
-
-    .fr-progress {
+    }.fr-progress{
         height: 10px;
         border-radius: 999px;
         background: #eaf0f8;
         overflow: hidden;
-    }
-
-    .fr-progress span {
+    }.fr-progress span{
         display: block;
         height: 100%;
         border-radius: 999px;
         background: linear-gradient(90deg, #2563eb, #38bdf8);
-    }
-
-    .fr-progress span.success { background: linear-gradient(90deg, #16a34a, #86efac); }
-    .fr-progress span.warning { background: linear-gradient(90deg, #f59e0b, #fde68a); }
-    .fr-progress span.danger { background: linear-gradient(90deg, #dc2626, #fb7185); }
-
-    .fr-table {
+    }.fr-progress span.success{ background: linear-gradient(90deg, #16a34a, #86efac); }.fr-progress span.warning{ background: linear-gradient(90deg, #f59e0b, #fde68a); }.fr-progress span.danger{ background: linear-gradient(90deg, #dc2626, #fb7185); }.fr-table{
         margin-bottom: 0;
-    }
-
-    .fr-table thead th {
+    }.fr-table thead th{
         color: #64748b;
         font-size: 12px;
         font-weight: 900;
@@ -241,14 +185,10 @@
         letter-spacing: .04em;
         border-bottom: 1px solid #e2e8f0;
         white-space: nowrap;
-    }
-
-    .fr-table tbody td {
+    }.fr-table tbody td{
         vertical-align: middle;
         border-bottom: 1px solid #eef2f7;
-    }
-
-    .fr-badge {
+    }.fr-badge{
         display: inline-flex;
         align-items: center;
         gap: 7px;
@@ -257,27 +197,16 @@
         font-size: 12px;
         font-weight: 900;
         white-space: nowrap;
-    }
-
-    .fr-badge.success { background: #dcfce7; color: #166534; }
-    .fr-badge.warning { background: #fef3c7; color: #92400e; }
-    .fr-badge.danger { background: #fee2e2; color: #991b1b; }
-    .fr-badge.primary { background: #dbeafe; color: #1d4ed8; }
-
-    .fr-chart {
+    }.fr-badge.success{ background: #dcfce7; color: #166534; }.fr-badge.warning{ background: #fef3c7; color: #92400e; }.fr-badge.danger{ background: #fee2e2; color: #991b1b; }.fr-badge.primary{ background: #dbeafe; color: #1d4ed8; }.fr-chart{
         height: 300px;
-    }
-
-    .fr-empty {
+    }.fr-empty{
         border: 1px dashed #cbd5e1;
         border-radius: 20px;
         padding: 28px;
         background: #f8fafc;
         color: #64748b;
         text-align: center;
-    }
-
-    .fr-quick {
+    }.fr-quick{
         display: block;
         text-decoration: none;
         padding: 14px;
@@ -287,47 +216,31 @@
         color: #0f172a;
         transition: all .18s ease;
         margin-bottom: 12px;
-    }
-
-    .fr-quick:hover {
+    }.fr-quick:hover{
         transform: translateY(-2px);
         border-color: #bfdbfe;
         background: #eff6ff;
         color: #1d4ed8;
-    }
-
-    @media print {
-        .ego-sidebar,
-        .ego-topbar,
-        .fr-filter,
-        .fr-print-hide,
-        #chat-widget,
-        .chat-widget {
+    }@media print{.ego-sidebar,
+    .ego-topbar,
+    .fr-filter,
+    .fr-print-hide,
+    #chat-widget,
+    .chat-widget{
             display: none !important;
-        }
-
-        .finance-report-page {
+        }.finance-report-page{
             padding: 0;
             background: #fff;
-        }
-
-        .fr-card,
-        .fr-hero {
+        }.fr-card,
+    .fr-hero{
             box-shadow: none;
         }
-    }
-
-    @media (max-width: 767.98px) {
-        .finance-report-page {
+    }@media (max-width: 767.98px){.finance-report-page{
             padding: 12px;
-        }
-
-        .fr-hero {
+        }.fr-hero{
             padding: 22px;
             border-radius: 22px;
-        }
-
-        .fr-chart {
+        }.fr-chart{
             height: 240px;
         }
     }
@@ -335,61 +248,77 @@
 
 <div class="finance-report-page">
     {{-- HERO --}}
-    <div class="fr-hero mb-4">
+    <div class="fr-hero tw:mb-6">
         <div class="fr-hero-inner">
-            <div class="d-flex flex-column flex-xl-row justify-content-between gap-3">
+            <div class="tw:flex flex-column flex-xl-row tw:justify-between tw:gap-4">
                 <div>
                     <div class="fr-pill">
                         <i class="bi bi-graph-up-arrow"></i>
                         FINANCE REPORT CENTER
                     </div>
 
-                    <h1 class="fr-title">Báo cáo tài chính</h1>
+                    <h1 class="fr-title">{{ $pageTitle ?? 'Báo cáo tài chính' }}</h1>
 
                     <p class="fr-subtitle">
                         Tổng hợp doanh thu, chi phí, dòng tiền, ngân sách, đề nghị thanh toán và công nợ
-                        theo tháng để theo dõi tình hình tài chính nhanh hơn.
+                        theo đúng kỳ báo cáo đang chọn.
                     </p>
                 </div>
 
-                <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end fr-print-hide">
-                    <a href="{{ route('finance.index') }}" class="btn btn-light rounded-pill px-4 fw-bold">
+                <div class="tw:flex flex-wrap tw:gap-2 tw:items-start justify-content-xl-end fr-print-hide">
+                    <x-ui.button href="{{ route('finance.index') }}" variant="light" class="rounded-pill tw:px-6 tw:font-bold">
                         <i class="bi bi-speedometer2 me-1"></i>
                         Tổng quan
-                    </a>
+                    </x-ui.button>
 
-                    <a href="{{ route('finance.budget') }}" class="btn btn-outline-light rounded-pill px-4 fw-bold">
+                    <x-ui.button href="{{ route('finance.budget') }}" variant="outline-light" class="rounded-pill tw:px-6 tw:font-bold">
                         <i class="bi bi-wallet2 me-1"></i>
                         Ngân sách
-                    </a>
+                    </x-ui.button>
 
-                    <button type="button" onclick="window.print()" class="btn btn-warning rounded-pill px-4 fw-bold">
+                    <x-ui.button variant="warning" type="button" onclick="window.print()" class="rounded-pill tw:px-6 tw:font-bold">
                         <i class="bi bi-printer me-1"></i>
                         In báo cáo
-                    </button>
+                    </x-ui.button>
                 </div>
             </div>
 
             <form method="GET" action="{{ route('finance.reports') }}" class="fr-filter fr-print-hide">
-                <div class="row g-3 align-items-end">
-                    <div class="col-lg-4">
-                        <label>Tháng báo cáo</label>
-                        <input type="month" name="month" class="form-control"
-                               value="{{ $month ?? now()->format('Y-m') }}">
-                    </div>
+                <div class="tw:row tw:g-3 tw:items-end">
+                    <input type="hidden" name="period" value="{{ $period ?? 'quarter' }}">
 
-                    <div class="col-lg-5">
+                    @if(($period ?? 'quarter') === 'quarter')
+                        <div class="tw:min-[62rem]:col12-2">
+                            <label>Quý báo cáo</label>
+                            <x-ui.select name="quarter" class="fr-input">
+                                @for($q = 1; $q <= 4; $q++)
+                                    <option value="{{ $q }}" @selected((int)($quarter ?? 1) === $q)>Quý {{ $q }}</option>
+                                @endfor
+                            </x-ui.select>
+                        </div>
+                        <div class="tw:min-[62rem]:col12-2">
+                            <label>Năm</label>
+                            <x-ui.input type="number" name="year" min="2000" max="2100" class="fr-input" value="{{ $year ?? now()->year }}" />
+                        </div>
+                    @else
+                        <div class="tw:min-[62rem]:col12-4">
+                            <label>Năm báo cáo</label>
+                            <x-ui.input type="number" name="year" min="2000" max="2100" class="fr-input" value="{{ $year ?? now()->year }}" />
+                        </div>
+                    @endif
+
+                    <div class="tw:min-[62rem]:col12-5">
                         <label>Khoảng dữ liệu</label>
-                        <input type="text" class="form-control"
-                               value="{{ isset($monthStart) ? date('d/m/Y', strtotime($monthStart)) : '' }} - {{ isset($monthEnd) ? date('d/m/Y', strtotime($monthEnd)) : '' }}"
-                               readonly>
+                        <x-ui.input type="text" class="fr-input"
+                               value="{{ isset($rangeStart) ? date('d/m/Y', strtotime($rangeStart)) : '' }} - {{ isset($rangeEnd) ? date('d/m/Y', strtotime($rangeEnd)) : '' }}"
+                               readonly />
                     </div>
 
-                    <div class="col-lg-3 d-grid">
-                        <button class="btn btn-warning rounded-pill fw-bold">
+                    <div class="tw:min-[62rem]:col12-3 d-grid">
+                        <x-ui.button variant="warning" type="submit" class="rounded-pill tw:font-bold">
                             <i class="bi bi-funnel me-1"></i>
                             Lọc báo cáo
-                        </button>
+                        </x-ui.button>
                     </div>
                 </div>
             </form>
@@ -397,14 +326,14 @@
     </div>
 
     {{-- KPI --}}
-    <div class="row g-4 mb-4">
-        <div class="col-md-6 col-xl-3">
+    <div class="tw:row tw:g-4 tw:mb-6">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="fr-card fr-stat">
-                <div class="fr-stat-content d-flex justify-content-between align-items-start">
+                <div class="fr-stat-content tw:flex tw:justify-between tw:items-start">
                     <div>
                         <div class="fr-label">Tổng thu</div>
-                        <div class="fr-number text-success">{{ $money($summary['total_receipts'] ?? 0) }}</div>
-                        <div class="fr-hint">{{ $summary['receipt_count'] ?? 0 }} phiếu thu trong tháng</div>
+                        <div class="fr-number tw:text-[#198754]!">{{ $money($summary['total_receipts'] ?? 0) }}</div>
+                        <div class="fr-hint">{{ $summary['receipt_count'] ?? 0 }} phiếu thu trong kỳ</div>
                     </div>
                     <div class="fr-icon green">
                         <i class="bi bi-arrow-down-circle"></i>
@@ -413,13 +342,13 @@
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="fr-card fr-stat">
-                <div class="fr-stat-content d-flex justify-content-between align-items-start">
+                <div class="fr-stat-content tw:flex tw:justify-between tw:items-start">
                     <div>
                         <div class="fr-label">Tổng chi</div>
-                        <div class="fr-number text-danger">{{ $money($summary['total_payments'] ?? 0) }}</div>
-                        <div class="fr-hint">{{ $summary['payment_count'] ?? 0 }} phiếu chi trong tháng</div>
+                        <div class="fr-number tw:text-[#dc3545]!">{{ $money($summary['total_payments'] ?? 0) }}</div>
+                        <div class="fr-hint">{{ $summary['payment_count'] ?? 0 }} phiếu chi trong kỳ</div>
                     </div>
                     <div class="fr-icon red">
                         <i class="bi bi-arrow-up-circle"></i>
@@ -428,9 +357,9 @@
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="fr-card fr-stat">
-                <div class="fr-stat-content d-flex justify-content-between align-items-start">
+                <div class="fr-stat-content tw:flex tw:justify-between tw:items-start">
                     <div>
                         <div class="fr-label">Dòng tiền ròng</div>
                         <div class="fr-number {{ $netCashFlow >= 0 ? 'text-success' : 'text-danger' }}">
@@ -450,21 +379,21 @@
     </div>
 
     {{-- KPI 2 --}}
-    <div class="row g-4 mb-4">
-        <div class="col-md-6 col-xl-3">
+    <div class="tw:row tw:g-4 tw:mb-6">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="fr-card fr-stat">
-                <div class="fr-label">Ngân sách tháng</div>
+                <div class="fr-label">Ngân sách kỳ</div>
                 <div class="fr-number">{{ $money($summary['total_budget'] ?? 0) }}</div>
                 <div class="fr-hint">{{ $summary['budget_count'] ?? 0 }} hạng mục ngân sách</div>
 
-                <div class="fr-progress mt-3">
+                <div class="fr-progress tw:mt-4">
                     <span class="{{ $safeBudgetRate >= 100 ? 'danger' : ($safeBudgetRate >= 80 ? 'warning' : 'success') }}"
                           style="width: {{ $safeBudgetRate }}%"></span>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="fr-card fr-stat">
                 <div class="fr-label">Còn lại so với ngân sách</div>
                 <div class="fr-number {{ ($summary['budget_remain'] ?? 0) < 0 ? 'text-danger' : 'text-success' }}">
@@ -474,7 +403,7 @@
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="fr-card fr-stat">
                 <div class="fr-label">Đề nghị chờ xử lý</div>
                 <div class="fr-number">{{ $summary['pending_requests_count'] ?? 0 }}</div>
@@ -482,28 +411,28 @@
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="fr-card fr-stat">
                 <div class="fr-label">Công nợ còn lại</div>
-                <div class="fr-number text-danger">{{ $money($summary['customer_remain_total'] ?? 0) }}</div>
+                <div class="fr-number tw:text-[#dc3545]!">{{ $money($summary['customer_remain_total'] ?? 0) }}</div>
                 <div class="fr-hint">Tổng đơn hàng - đã thanh toán</div>
             </div>
         </div>
     </div>
 
-    <div class="row g-4">
+    <div class="tw:row tw:g-4">
         {{-- MAIN LEFT --}}
-        <div class="col-xl-8">
-            <div class="fr-card p-4 mb-4">
-                <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+        <div class="tw:min-[75rem]:col12-8">
+            <div class="fr-card tw:p-6 tw:mb-6">
+                <div class="tw:flex flex-column flex-md-row tw:justify-between tw:gap-2 tw:mb-4">
                     <div>
                         <h3 class="fr-section-title">Biểu đồ thu - chi - ngân sách</h3>
-                        <div class="fr-muted">So sánh nhanh dữ liệu tài chính trong tháng {{ $month ?? now()->format('Y-m') }}.</div>
+                        <div class="fr-muted">So sánh nhanh dữ liệu tài chính trong {{ $periodLabel ?? '' }}.</div>
                     </div>
 
                     <span class="fr-badge primary">
                         <i class="bi bi-calendar3"></i>
-                        {{ $month ?? now()->format('Y-m') }}
+                        {{ $periodLabel ?? '' }}
                     </span>
                 </div>
 
@@ -512,10 +441,10 @@
                 </div>
             </div>
 
-            <div class="row g-4 mb-4">
-                <div class="col-lg-6">
-                    <div class="fr-card p-4 h-100">
-                        <div class="mb-3">
+            <div class="tw:row tw:g-4 tw:mb-6">
+                <div class="tw:min-[62rem]:col12-6">
+                    <div class="fr-card tw:p-6 tw:h-full">
+                        <div class="tw:mb-4">
                             <h3 class="fr-section-title">Thu theo hạng mục</h3>
                             <div class="fr-muted">Tổng hợp từ phiếu thu.</div>
                         </div>
@@ -527,7 +456,7 @@
                                         <tr>
                                             <th>Hạng mục</th>
                                             <th>Số phiếu</th>
-                                            <th class="text-end">Tổng thu</th>
+                                            <th class="tw:text-right">Tổng thu</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -535,7 +464,7 @@
                                             <tr>
                                                 <td><strong>{{ $item->category ?: 'Chưa phân loại' }}</strong></td>
                                                 <td>{{ $item->total_count ?? 0 }}</td>
-                                                <td class="text-end fw-bold text-success">{{ $money($item->total_amount ?? 0) }}</td>
+                                                <td class="tw:text-right tw:font-bold tw:text-[#198754]!">{{ $money($item->total_amount ?? 0) }}</td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -543,16 +472,16 @@
                             </div>
                         @else
                             <div class="fr-empty">
-                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                Chưa có dữ liệu phiếu thu trong tháng này.
+                                <i class="bi bi-inbox fs-1 tw:block tw:mb-2"></i>
+                                Chưa có dữ liệu phiếu thu trong kỳ này.
                             </div>
                         @endif
                     </div>
                 </div>
 
-                <div class="col-lg-6">
-                    <div class="fr-card p-4 h-100">
-                        <div class="mb-3">
+                <div class="tw:min-[62rem]:col12-6">
+                    <div class="fr-card tw:p-6 tw:h-full">
+                        <div class="tw:mb-4">
                             <h3 class="fr-section-title">Chi theo hạng mục</h3>
                             <div class="fr-muted">Tổng hợp từ phiếu chi.</div>
                         </div>
@@ -564,7 +493,7 @@
                                         <tr>
                                             <th>Hạng mục</th>
                                             <th>Số phiếu</th>
-                                            <th class="text-end">Tổng chi</th>
+                                            <th class="tw:text-right">Tổng chi</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -572,7 +501,7 @@
                                             <tr>
                                                 <td><strong>{{ $item->category ?: 'Chưa phân loại' }}</strong></td>
                                                 <td>{{ $item->total_count ?? 0 }}</td>
-                                                <td class="text-end fw-bold text-danger">{{ $money($item->total_amount ?? 0) }}</td>
+                                                <td class="tw:text-right tw:font-bold tw:text-[#dc3545]!">{{ $money($item->total_amount ?? 0) }}</td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -580,25 +509,25 @@
                             </div>
                         @else
                             <div class="fr-empty">
-                                <i class="bi bi-receipt fs-1 d-block mb-2"></i>
-                                Chưa có dữ liệu phiếu chi trong tháng này.
+                                <i class="bi bi-receipt fs-1 tw:block tw:mb-2"></i>
+                                Chưa có dữ liệu phiếu chi trong kỳ này.
                             </div>
                         @endif
                     </div>
                 </div>
             </div>
 
-            <div class="fr-card p-4">
-                <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+            <div class="fr-card tw:p-6">
+                <div class="tw:flex flex-column flex-md-row tw:justify-between tw:gap-2 tw:mb-4">
                     <div>
-                        <h3 class="fr-section-title">Ngân sách trong tháng</h3>
+                        <h3 class="fr-section-title">Ngân sách trong kỳ</h3>
                         <div class="fr-muted">Lấy từ bảng ngân sách tài chính bạn vừa tạo.</div>
                     </div>
 
-                    <a href="{{ route('finance.budget', ['month' => $month ?? now()->format('Y-m')]) }}"
-                       class="btn btn-sm btn-primary rounded-pill px-3 fw-bold fr-print-hide">
+                    <x-ui.button href="{{ route('finance.budget', ['month' => isset($rangeStart) ? date('Y-m', strtotime($rangeStart)) : now()->format('Y-m')]) }}"
+                       variant="primary" size="sm" class="rounded-pill tw:px-4 tw:font-bold fr-print-hide">
                         Quản lý ngân sách
-                    </a>
+                    </x-ui.button>
                 </div>
 
                 @if($budgets->count())
@@ -615,7 +544,7 @@
                                 @foreach($budgets as $item)
                                     <tr>
                                         <td><strong>{{ $item->category }}</strong></td>
-                                        <td class="fw-bold">{{ $money($item->budget_amount ?? 0) }}</td>
+                                        <td class="tw:font-bold">{{ $money($item->budget_amount ?? 0) }}</td>
                                         <td class="fr-muted">{{ $item->note ?: '-' }}</td>
                                     </tr>
                                 @endforeach
@@ -624,17 +553,17 @@
                     </div>
                 @else
                     <div class="fr-empty">
-                        <i class="bi bi-wallet2 fs-1 d-block mb-2"></i>
-                        Chưa có ngân sách cho tháng này.
+                        <i class="bi bi-wallet2 fs-1 tw:block tw:mb-2"></i>
+                        Chưa có ngân sách cho kỳ này.
                     </div>
                 @endif
             </div>
         </div>
 
         {{-- RIGHT --}}
-        <div class="col-xl-4">
-            <div class="fr-card p-4 mb-4">
-                <div class="d-flex justify-content-between align-items-start mb-3">
+        <div class="tw:min-[75rem]:col12-4">
+            <div class="fr-card tw:p-6 tw:mb-6">
+                <div class="tw:flex tw:justify-between tw:items-start tw:mb-4">
                     <div>
                         <h3 class="fr-section-title">Cơ cấu chi phí</h3>
                         <div class="fr-muted">Biểu đồ theo hạng mục chi.</div>
@@ -649,65 +578,65 @@
                 </div>
             </div>
 
-            <div class="fr-card p-4 mb-4">
-                <h3 class="fr-section-title mb-3">Tóm tắt công nợ</h3>
+            <div class="fr-card tw:p-6 tw:mb-6">
+                <h3 class="fr-section-title tw:mb-4">Tóm tắt công nợ</h3>
 
-                <div class="d-flex justify-content-between border-bottom py-2">
+                <div class="tw:flex tw:justify-between border-bottom tw:py-2">
                     <span class="fr-muted">Tổng giá trị đơn hàng</span>
                     <strong>{{ $money($summary['customer_debt_total'] ?? 0) }}</strong>
                 </div>
 
-                <div class="d-flex justify-content-between border-bottom py-2">
+                <div class="tw:flex tw:justify-between border-bottom tw:py-2">
                     <span class="fr-muted">Đã thanh toán</span>
-                    <strong class="text-success">{{ $money($summary['customer_paid_total'] ?? 0) }}</strong>
+                    <strong class="tw:text-[#198754]">{{ $money($summary['customer_paid_total'] ?? 0) }}</strong>
                 </div>
 
-                <div class="d-flex justify-content-between py-2">
+                <div class="tw:flex tw:justify-between tw:py-2">
                     <span class="fr-muted">Còn phải thu</span>
-                    <strong class="text-danger">{{ $money($summary['customer_remain_total'] ?? 0) }}</strong>
+                    <strong class="tw:text-[#dc3545]">{{ $money($summary['customer_remain_total'] ?? 0) }}</strong>
                 </div>
             </div>
 
-            <div class="fr-card p-4 mb-4">
-                <h3 class="fr-section-title mb-3">Đề nghị thanh toán</h3>
+            <div class="fr-card tw:p-6 tw:mb-6">
+                <h3 class="fr-section-title tw:mb-4">Đề nghị thanh toán</h3>
 
-                <div class="d-flex justify-content-between border-bottom py-2">
+                <div class="tw:flex tw:justify-between border-bottom tw:py-2">
                     <span class="fr-muted">Chờ xử lý</span>
                     <strong>{{ $summary['pending_requests_count'] ?? 0 }} phiếu</strong>
                 </div>
 
-                <div class="d-flex justify-content-between border-bottom py-2">
+                <div class="tw:flex tw:justify-between border-bottom tw:py-2">
                     <span class="fr-muted">Giá trị chờ xử lý</span>
-                    <strong class="text-warning">{{ $money($summary['pending_requests_amount'] ?? 0) }}</strong>
+                    <strong class="tw:text-[#ffc107]">{{ $money($summary['pending_requests_amount'] ?? 0) }}</strong>
                 </div>
 
-                <div class="d-flex justify-content-between border-bottom py-2">
-                    <span class="fr-muted">Đã duyệt trong tháng</span>
+                <div class="tw:flex tw:justify-between border-bottom tw:py-2">
+                    <span class="fr-muted">Đã duyệt trong kỳ</span>
                     <strong>{{ $summary['approved_requests_count'] ?? 0 }} phiếu</strong>
                 </div>
 
-                <div class="d-flex justify-content-between py-2">
+                <div class="tw:flex tw:justify-between tw:py-2">
                     <span class="fr-muted">Giá trị đã duyệt</span>
-                    <strong class="text-success">{{ $money($summary['approved_requests_amount'] ?? 0) }}</strong>
+                    <strong class="tw:text-[#198754]">{{ $money($summary['approved_requests_amount'] ?? 0) }}</strong>
                 </div>
             </div>
 
-            <div class="fr-card p-4">
-                <h3 class="fr-section-title mb-3">Đi nhanh</h3>
+            <div class="fr-card tw:p-6">
+                <h3 class="fr-section-title tw:mb-4">Đi nhanh</h3>
 
                 <a href="{{ route('finance.index') }}" class="fr-quick">
-                    <strong><i class="bi bi-speedometer2 me-2"></i>Tổng quan tài chính</strong>
-                    <div class="fr-muted mt-1">Quay lại dashboard tổng quan.</div>
+                    <strong><i class="bi bi-speedometer2 tw:mr-2"></i>Tổng quan tài chính</strong>
+                    <div class="fr-muted tw:mt-1">Quay lại dashboard tổng quan.</div>
                 </a>
 
                 <a href="{{ route('finance.budget') }}" class="fr-quick">
-                    <strong><i class="bi bi-wallet2 me-2"></i>Ngân sách</strong>
-                    <div class="fr-muted mt-1">Tạo và quản lý ngân sách tháng.</div>
+                    <strong><i class="bi bi-wallet2 tw:mr-2"></i>Ngân sách</strong>
+                    <div class="fr-muted tw:mt-1">Tạo và quản lý ngân sách tháng.</div>
                 </a>
 
-                <a href="{{ route('payment_requests.index') }}" class="fr-quick mb-0">
-                    <strong><i class="bi bi-receipt me-2"></i>Đề nghị thanh toán</strong>
-                    <div class="fr-muted mt-1">Xem các đề nghị đang chờ duyệt.</div>
+                <a href="{{ route('payment_requests.index') }}" class="fr-quick tw:mb-0">
+                    <strong><i class="bi bi-receipt tw:mr-2"></i>Đề nghị thanh toán</strong>
+                    <div class="fr-muted tw:mt-1">Xem các đề nghị đang chờ duyệt.</div>
                 </a>
             </div>
         </div>

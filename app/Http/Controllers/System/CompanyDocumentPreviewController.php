@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\System;
 
 use App\Http\Controllers\Controller;
+use App\Support\ProbeFailureLog;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Writer\Html;
 
@@ -123,6 +124,8 @@ class CompanyDocumentPreviewController extends Controller
                 $tables[] = reset($arr);
             }
         } catch (\Throwable $e) {
+            ProbeFailureLog::warn('CompanyDocumentPreviewController::findFile', $e);
+
             $tables = [];
         }
 
@@ -147,7 +150,7 @@ class CompanyDocumentPreviewController extends Controller
 
         foreach ($tables as $table) {
             try {
-                if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'id')) {
+                if (! SchemaCache::hasTable($table) || ! SchemaCache::hasColumn($table, 'id')) {
                     continue;
                 }
 
@@ -237,6 +240,8 @@ class CompanyDocumentPreviewController extends Controller
                     ];
                 }
             } catch (\Throwable $e) {
+                ProbeFailureLog::warn('CompanyDocumentPreviewController::findFile', $e);
+
                 continue;
             }
         }

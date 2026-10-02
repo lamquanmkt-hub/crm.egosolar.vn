@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models\CRM\Orders;
 
-use App\Models\Concerns\LockedToEgoInternational;
 use App\Enums\OrderDepartment;
 use App\Models\Core\Company;
 use App\Models\Core\Warehouse;
@@ -73,7 +72,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Order extends Model
 {
-    use LockedToEgoInternational;
     use HasFactory;
     use SoftDeletes;
 

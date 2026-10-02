@@ -508,7 +508,8 @@
                                     <td class="adsx-right">{{ $money($r->spend) }}</td>
                                     <td class="adsx-right">{{ $num($r->leads) }}</td>
                                     <td>
-                                        <form method="POST" action="{{ url('/marketing/report/ads/delete') }}" onsubmit="event.stopPropagation(); return confirm('Xóa dòng này?');">
+                                        <form method="POST" action="{{ route('marketing.report.ads.delete') }}" onsubmit="event.stopPropagation(); return confirm('Xóa dòng này?');">
+                                            @method('DELETE')
                                             @csrf
                                             <input type="hidden" name="date" value="{{ $r->date }}">
                                             <input type="hidden" name="channel" value="{{ $r->channel }}">

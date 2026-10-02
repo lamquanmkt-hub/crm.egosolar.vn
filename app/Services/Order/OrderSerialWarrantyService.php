@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Order;
 
 use App\Enums\SerialUnitState;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Serial theo đơn hàng: liệt kê serial khả dụng, xác thực lựa chọn
@@ -34,7 +34,7 @@ class OrderSerialWarrantyService
      */
     public function getSerialPayload(int $orderId): array
     {
-        if (! Schema::hasTable('crm_order_items') || ! Schema::hasTable('crm_serial_units')) {
+        if (! SchemaCache::hasTable('crm_order_items') || ! SchemaCache::hasTable('crm_serial_units')) {
             return [];
         }
 
@@ -140,7 +140,7 @@ class OrderSerialWarrantyService
      */
     public function activateWarrantyForOrder(int $orderId, array $serials, string $shipDate, int $months, ?string $note = null): void
     {
-        if (! Schema::hasTable('crm_serial_warranties')) {
+        if (! SchemaCache::hasTable('crm_serial_warranties')) {
             return;
         }
 
@@ -191,14 +191,14 @@ class OrderSerialWarrantyService
             ]
         );
 
-        if (Schema::hasColumn('crm_serial_units', 'warehouse_id')) {
+        if (SchemaCache::hasColumn('crm_serial_units', 'warehouse_id')) {
             DB::table('crm_serial_units')->where('id', $unitId)->update([
                 'warehouse_id' => null,
                 'updated_at' => now(),
             ]);
         }
 
-        if (Schema::hasTable('crm_order_item_serial_units')) {
+        if (SchemaCache::hasTable('crm_order_item_serial_units')) {
             DB::table('crm_order_item_serial_units')->updateOrInsert(
                 ['serial_unit_id' => $unitId],
                 [
@@ -226,7 +226,7 @@ class OrderSerialWarrantyService
             ]
         );
 
-        if (Schema::hasTable('crm_serial_warranty_events')) {
+        if (SchemaCache::hasTable('crm_serial_warranty_events')) {
             DB::table('crm_serial_warranty_events')->insert([
                 'serial_unit_id' => $unitId,
                 'serial_code' => $code,
@@ -258,7 +258,7 @@ class OrderSerialWarrantyService
             return (int) $order->customer_id;
         }
 
-        if (! empty($order->lead_id) && Schema::hasTable('crm_leads')) {
+        if (! empty($order->lead_id) && SchemaCache::hasTable('crm_leads')) {
             return (int) DB::table('crm_leads')->where('id', (int) $order->lead_id)->value('customer_id');
         }
 

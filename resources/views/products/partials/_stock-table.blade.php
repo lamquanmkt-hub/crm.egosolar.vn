@@ -1,3 +1,14 @@
+{{--
+    EGO_VIEW_CHET — VIEW CHẾT, KHÔNG AI RENDER (rà soát 2026-09-04)
+
+    Không @include nào gọi partial này.
+
+    Partial mồ côi.
+
+    CHƯA XOÁ theo yêu cầu: chỉ đánh dấu để lần sau khỏi rà lại.
+    Nếu bạn đấu view này vào một route/@include, hãy XOÁ dấu này —
+    tests/Feature/View/DeadViewsMarkedTest.php sẽ báo đỏ để nhắc.
+--}}
 @php
     $formData = $formData ?? [];
     $warehouseQty = $formData['warehouseQty'] ?? [];
@@ -5,13 +16,13 @@
     $totalQty = (int)($formData['totalQty'] ?? 0);
 @endphp
 
-<div class="mb-2 d-flex justify-content-between align-items-center">
-    <label class="form-label mb-0 fw-bold">Tồn kho theo kho</label>
-    <div class="d-flex align-items-center gap-2">
-        <span class="text-muted">Tổng:</span>
+<div class="tw:mb-2 tw:flex tw:justify-between tw:items-center">
+    <label class="form-label tw:mb-0 tw:font-bold">Tồn kho theo kho</label>
+    <div class="tw:flex tw:items-center tw:gap-2">
+        <span class="tw:text-[rgba(33,37,41,0.75)]">Tổng:</span>
         <input type="text"
                id="total_qty_display"
-               class="form-control form-control-sm text-center fw-bold"
+               class="form-control form-control-sm tw:text-center tw:font-bold"
                style="width:100px"
                value="{{ (int)old('total_qty_display', $totalQty) }}"
                disabled>
@@ -19,12 +30,12 @@
 </div>
 
 <div class="table-responsive mb-3">
-    <table class="table table-bordered align-middle mb-0">
+    <table class="table table-bordered align-middle tw:mb-0">
         <thead class="table-light">
         <tr>
             <th>Kho</th>
-            <th style="width:140px" class="text-center">Số lượng</th>
-            <th class="serial-column text-center" style="width:180px;">Serial/IMEI</th>
+            <th style="width:140px" class="tw:text-center">Số lượng</th>
+            <th class="serial-column tw:text-center" style="width:180px;">Serial/IMEI</th>
         </tr>
         </thead>
 
@@ -39,9 +50,9 @@
 
             <tr>
                 <td>
-                    <div class="fw-semibold">{{ $w->name }}</div>
+                    <div class="tw:font-semibold">{{ $w->name }}</div>
                     @if(!empty($w->location))
-                        <div class="text-muted small">{{ $w->location }}</div>
+                        <div class="tw:text-[rgba(33,37,41,0.75)] small">{{ $w->location }}</div>
                     @endif
                 </td>
 
@@ -52,13 +63,13 @@
 
                     <input type="number"
                            min="0"
-                           class="form-control form-control-sm text-center js-warehouse-qty"
+                           class="form-control form-control-sm tw:text-center js-warehouse-qty"
                            data-warehouse-id="{{ $w->id }}"
                            name="stocks[{{ $w->id }}][qty]"
                            value="{{ old("stocks.{$w->id}.qty", $currentQty) }}">
                 </td>
 
-                <td class="serial-column text-center">
+                <td class="serial-column tw:text-center">
                     <button type="button"
                             class="btn btn-sm {{ $serialCount > 0 ? 'btn-outline-success' : 'btn-outline-primary' }} js-open-serial"
                             data-warehouse-id="{{ $w->id }}"
@@ -78,7 +89,7 @@
     </table>
 </div>
 
-<small class="text-muted d-block mb-0">
+<small class="tw:text-[rgba(33,37,41,0.75)] tw:block tw:mb-0">
     <i class="bi bi-info-circle"></i>
     Nếu bật Serial/IMEI: số lượng mỗi kho tự tính theo số serial đã nhập.
 </small>

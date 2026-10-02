@@ -6,9 +6,10 @@ namespace App\Services;
 
 use App\Enums\MaterialRequestStatus;
 use App\Models\Projects\Site;
+use App\Models\Projects\SiteWarrantyReminder;
+use App\Support\SchemaCache;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Service quản lý công trình điện mặt trời (Site): CRUD, đợt thanh toán, thiết bị, vật tư, tài chính.
@@ -61,7 +62,7 @@ class SiteService
         $columns = [];
 
         foreach ($want as $col) {
-            if (Schema::hasColumn('sites', $col)) {
+            if (SchemaCache::hasColumn('sites', $col)) {
                 $columns[] = $col;
             }
         }
@@ -81,7 +82,11 @@ class SiteService
      */
     public function create(array $data): Site
     {
-        return Site::create($data);
+        [$attributes, $reminders] = $this->extractWarrantyReminders($data);
+        $site = Site::create($attributes);
+        $this->saveWarrantyReminders($site, $reminders);
+
+        return $site;
     }
 
     /**
@@ -89,9 +94,49 @@ class SiteService
      */
     public function update(Site $site, array $data): Site
     {
-        $site->update($data);
+        [$attributes, $reminders] = $this->extractWarrantyReminders($data);
+        $site->update($attributes);
+        $this->saveWarrantyReminders($site, $reminders);
 
         return $site->refresh();
+    }
+
+    /**
+     * Tách các ô `warranty_reminder_N_at` của form khỏi thuộc tính công trình: từ đợt CONTRACT
+     * (migration 2026_09_07_150000) mốc nhắc nằm ở `site_warranty_reminders`, không còn là cột của `sites`.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{0: array<string, mixed>, 1: array<int, ?string>} [thuộc tính `sites`, sequence => ngày|null — chỉ các ô có gửi lên]
+     */
+    private function extractWarrantyReminders(array $data): array
+    {
+        $reminders = [];
+        foreach (SiteWarrantyReminder::FORM_FIELDS as $field => $sequence) {
+            if (array_key_exists($field, $data)) {
+                $value = $data[$field];
+                $reminders[$sequence] = ($value === null || $value === '') ? null : (string) $value;
+                unset($data[$field]);
+            }
+        }
+
+        return [$data, $reminders];
+    }
+
+    /**
+     * Ô bỏ trống = xoá mốc, ô có ngày = tạo/sửa mốc; ô không gửi lên thì không đụng.
+     *
+     * @param  array<int, ?string>  $reminders
+     */
+    private function saveWarrantyReminders(Site $site, array $reminders): void
+    {
+        foreach ($reminders as $sequence => $date) {
+            if ($date === null) {
+                $site->warrantyReminders()->where('sequence', $sequence)->delete();
+
+                continue;
+            }
+            $site->warrantyReminders()->updateOrCreate(['sequence' => $sequence], ['remind_at' => $date]);
+        }
     }
 
     /**
@@ -108,8 +153,8 @@ class SiteService
 
             foreach ($childTables as $table) {
                 if (
-                    Schema::hasTable($table)
-                    && Schema::hasColumn($table, 'site_id')
+                    SchemaCache::hasTable($table)
+                    && SchemaCache::hasColumn($table, 'site_id')
                 ) {
                     DB::table($table)
                         ->where('site_id', $site->id)
@@ -132,7 +177,7 @@ class SiteService
         Site $site,
         array $rows
     ): void {
-        if (! Schema::hasTable('site_payment_terms')) {
+        if (! SchemaCache::hasTable('site_payment_terms')) {
             return;
         }
 
@@ -229,12 +274,12 @@ class SiteService
                     $paid = 0.0;
 
                     if (
-                        Schema::hasTable('receipts')
-                        && Schema::hasColumn(
+                        SchemaCache::hasTable('receipts')
+                        && SchemaCache::hasColumn(
                             'receipts',
                             'site_payment_term_id'
                         )
-                        && Schema::hasColumn(
+                        && SchemaCache::hasColumn(
                             'receipts',
                             'amount'
                         )
@@ -291,8 +336,8 @@ class SiteService
 
             foreach ($removedIds as $removedId) {
                 $hasReceipts = (
-                    Schema::hasTable('receipts')
-                    && Schema::hasColumn(
+                    SchemaCache::hasTable('receipts')
+                    && SchemaCache::hasColumn(
                         'receipts',
                         'site_payment_term_id'
                     )
@@ -325,14 +370,14 @@ class SiteService
      */
     public function getPaymentTerms(Site $site): array
     {
-        if (! Schema::hasTable('site_payment_terms')) {
+        if (! SchemaCache::hasTable('site_payment_terms')) {
             return [];
         }
 
         $canReadReceipts =
-            Schema::hasTable('receipts')
-            && Schema::hasColumn('receipts', 'amount')
-            && Schema::hasColumn('receipts', 'site_payment_term_id');
+            SchemaCache::hasTable('receipts')
+            && SchemaCache::hasColumn('receipts', 'amount')
+            && SchemaCache::hasColumn('receipts', 'site_payment_term_id');
 
         return DB::table('site_payment_terms')
             ->where('site_id', $site->id)
@@ -385,45 +430,45 @@ class SiteService
      */
     public function getPaymentReceipts(Site $site): array
     {
-        if (! Schema::hasTable('receipts')) {
+        if (! SchemaCache::hasTable('receipts')) {
             return [];
         }
 
-        if (! Schema::hasColumn('receipts', 'site_id')) {
+        if (! SchemaCache::hasColumn('receipts', 'site_id')) {
             return [];
         }
 
         $select = [];
 
-        $select[] = Schema::hasColumn('receipts', 'id')
+        $select[] = SchemaCache::hasColumn('receipts', 'id')
             ? 'r.id'
             : DB::raw('0 as id');
 
-        $select[] = Schema::hasColumn('receipts', 'site_id')
+        $select[] = SchemaCache::hasColumn('receipts', 'site_id')
             ? 'r.site_id'
             : DB::raw('0 as site_id');
 
-        $select[] = Schema::hasColumn('receipts', 'site_payment_term_id')
+        $select[] = SchemaCache::hasColumn('receipts', 'site_payment_term_id')
             ? 'r.site_payment_term_id'
             : DB::raw('NULL as site_payment_term_id');
 
-        $select[] = Schema::hasColumn('receipts', 'amount')
+        $select[] = SchemaCache::hasColumn('receipts', 'amount')
             ? 'r.amount'
             : DB::raw('0 as amount');
 
-        $select[] = Schema::hasColumn('receipts', 'payment_method')
+        $select[] = SchemaCache::hasColumn('receipts', 'payment_method')
             ? 'r.payment_method'
             : DB::raw("'' as payment_method");
 
-        $select[] = Schema::hasColumn('receipts', 'paid_at')
+        $select[] = SchemaCache::hasColumn('receipts', 'paid_at')
             ? 'r.paid_at'
             : DB::raw('NULL as paid_at');
 
-        $select[] = Schema::hasColumn('receipts', 'note')
+        $select[] = SchemaCache::hasColumn('receipts', 'note')
             ? 'r.note'
             : DB::raw("'' as note");
 
-        $select[] = Schema::hasColumn('receipts', 'created_at')
+        $select[] = SchemaCache::hasColumn('receipts', 'created_at')
             ? 'r.created_at'
             : DB::raw('NULL as created_at');
 
@@ -431,8 +476,8 @@ class SiteService
             ->where('r.site_id', $site->id);
 
         if (
-            Schema::hasTable('site_payment_terms')
-            && Schema::hasColumn('receipts', 'site_payment_term_id')
+            SchemaCache::hasTable('site_payment_terms')
+            && SchemaCache::hasColumn('receipts', 'site_payment_term_id')
         ) {
             $query->leftJoin('site_payment_terms as spt', 'spt.id', '=', 'r.site_payment_term_id');
             $select[] = DB::raw('spt.name as term_name');
@@ -442,9 +487,9 @@ class SiteService
 
         $query->select($select);
 
-        if (Schema::hasColumn('receipts', 'paid_at')) {
+        if (SchemaCache::hasColumn('receipts', 'paid_at')) {
             $query->orderByDesc('r.paid_at');
-        } elseif (Schema::hasColumn('receipts', 'created_at')) {
+        } elseif (SchemaCache::hasColumn('receipts', 'created_at')) {
             $query->orderByDesc('r.created_at');
         } else {
             $query->orderByDesc('r.id');
@@ -479,9 +524,9 @@ class SiteService
 
         $receivedAmount = 0;
         if (
-            Schema::hasTable('receipts')
-            && Schema::hasColumn('receipts', 'site_id')
-            && Schema::hasColumn('receipts', 'amount')
+            SchemaCache::hasTable('receipts')
+            && SchemaCache::hasColumn('receipts', 'site_id')
+            && SchemaCache::hasColumn('receipts', 'amount')
         ) {
             $receivedAmount = (float) DB::table('receipts')
                 ->where('site_id', $siteId)
@@ -490,14 +535,14 @@ class SiteService
 
         $materialCost = 0;
         if (
-            Schema::hasTable('material_requests')
-            && Schema::hasColumn('material_requests', 'site_id')
-            && Schema::hasColumn('material_requests', 'total_cost')
+            SchemaCache::hasTable('material_requests')
+            && SchemaCache::hasColumn('material_requests', 'site_id')
+            && SchemaCache::hasColumn('material_requests', 'total_cost')
         ) {
             $query = DB::table('material_requests')
                 ->where('site_id', $siteId);
 
-            if (Schema::hasColumn('material_requests', 'status')) {
+            if (SchemaCache::hasColumn('material_requests', 'status')) {
                 $query->where('status', MaterialRequestStatus::EXPORTED->value);
             }
 
@@ -506,9 +551,9 @@ class SiteService
 
         $otherPaymentCost = 0;
         if (
-            Schema::hasTable('payments')
-            && Schema::hasColumn('payments', 'site_id')
-            && Schema::hasColumn('payments', 'amount')
+            SchemaCache::hasTable('payments')
+            && SchemaCache::hasColumn('payments', 'site_id')
+            && SchemaCache::hasColumn('payments', 'amount')
         ) {
             $otherPaymentCost = (float) DB::table('payments')
                 ->where('site_id', $siteId)
@@ -517,14 +562,14 @@ class SiteService
 
         $approvedRequestCost = 0;
         if (
-            Schema::hasTable('payment_requests')
-            && Schema::hasColumn('payment_requests', 'site_id')
-            && Schema::hasColumn('payment_requests', 'amount')
+            SchemaCache::hasTable('payment_requests')
+            && SchemaCache::hasColumn('payment_requests', 'site_id')
+            && SchemaCache::hasColumn('payment_requests', 'amount')
         ) {
             $query = DB::table('payment_requests')
                 ->where('site_id', $siteId);
 
-            if (Schema::hasColumn('payment_requests', 'status')) {
+            if (SchemaCache::hasColumn('payment_requests', 'status')) {
                 $query->where('status', 'accounting_approved');
             }
 
@@ -635,7 +680,7 @@ class SiteService
      */
     public function syncPlannedMaterials(Site $site, array $plannedRows): void
     {
-        if (! Schema::hasTable('site_planned_materials')) {
+        if (! SchemaCache::hasTable('site_planned_materials')) {
             return;
         }
 
@@ -677,7 +722,7 @@ class SiteService
      */
     public function getPlannedMaterials(Site $site): array
     {
-        if (! Schema::hasTable('site_planned_materials')) {
+        if (! SchemaCache::hasTable('site_planned_materials')) {
             return [];
         }
 
@@ -726,7 +771,7 @@ class SiteService
      */
     public function getDevices(Site $site): array
     {
-        if (! Schema::hasTable('site_devices')) {
+        if (! SchemaCache::hasTable('site_devices')) {
             return [];
         }
 
@@ -799,7 +844,7 @@ class SiteService
      */
     public function syncDevices(Site $site, array $deviceRows): void
     {
-        if (! Schema::hasTable('site_devices')) {
+        if (! SchemaCache::hasTable('site_devices')) {
             return;
         }
 
@@ -872,8 +917,8 @@ class SiteService
     private function getActualMaterialsForEdit(Site $site)
     {
         if (
-            ! Schema::hasTable('material_request_items')
-            || ! Schema::hasTable('material_requests')
+            ! SchemaCache::hasTable('material_request_items')
+            || ! SchemaCache::hasTable('material_requests')
         ) {
             return collect();
         }
@@ -888,31 +933,31 @@ class SiteService
             'mr.status as request_status',
         ];
 
-        if (Schema::hasColumn('material_request_items', 'unit')) {
+        if (SchemaCache::hasColumn('material_request_items', 'unit')) {
             $select[] = 'mri.unit';
         } else {
             $select[] = DB::raw("'' as unit");
         }
 
-        if (Schema::hasColumn('material_request_items', 'unit_cost')) {
+        if (SchemaCache::hasColumn('material_request_items', 'unit_cost')) {
             $select[] = 'mri.unit_cost';
         } else {
             $select[] = DB::raw('0 as unit_cost');
         }
 
-        if (Schema::hasColumn('material_request_items', 'vat_percent')) {
+        if (SchemaCache::hasColumn('material_request_items', 'vat_percent')) {
             $select[] = 'mri.vat_percent';
         } else {
             $select[] = DB::raw('0 as vat_percent');
         }
 
-        if (Schema::hasColumn('material_request_items', 'line_total')) {
+        if (SchemaCache::hasColumn('material_request_items', 'line_total')) {
             $select[] = 'mri.line_total';
         } else {
             $select[] = DB::raw('0 as line_total');
         }
 
-        if (Schema::hasTable('crm_product_catalog')) {
+        if (SchemaCache::hasTable('crm_product_catalog')) {
             $select[] = 'p.name as product_name';
             $select[] = 'p.sku as product_sku';
             $select[] = 'p.unit as product_unit';

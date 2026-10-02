@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -41,9 +41,14 @@ class OfficeExpenseController extends Controller
 
         $total = (float) $expenses->sum('amount');
 
-        $categoryStats = collect($categories)->map(function ($label, $key) use ($expenses) {
+        // Id hạng mục lấy MỘT lần. View trước đây tra lại theo slug cho từng
+        // hạng mục ngay trong vòng lặp — đo được 7 câu truy vấn cho 7 hạng mục.
+        $categoryIds = $this->categoryIds();
+
+        $categoryStats = collect($categories)->map(function ($label, $key) use ($expenses, $categoryIds) {
             return [
                 'key' => $key,
+                'id' => $categoryIds[$key] ?? null,
                 'label' => $label,
                 'total' => (float) $expenses->where('category', $key)->sum('amount'),
                 'count' => $expenses->where('category', $key)->count(),
@@ -163,9 +168,26 @@ class OfficeExpenseController extends Controller
      *
      * @return array<string, string>
      */
+    /**
+     * Id hạng mục theo slug, một câu truy vấn.
+     *
+     * @return array<string, int>
+     */
+    private function categoryIds(): array
+    {
+        if (! SchemaCache::hasTable('hr_office_expense_categories')) {
+            return [];
+        }
+
+        return DB::table('hr_office_expense_categories')
+            ->pluck('id', 'slug')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+    }
+
     private function categories(): array
     {
-        if (! Schema::hasTable('hr_office_expense_categories')) {
+        if (! SchemaCache::hasTable('hr_office_expense_categories')) {
             return [
                 'van_phong_pham' => 'Văn phòng phẩm',
                 'nuoc_uong_tiep_khach' => 'Nước uống / tiếp khách',
@@ -188,7 +210,7 @@ class OfficeExpenseController extends Controller
      */
     private function ensureDefaultCategories(): void
     {
-        if (! Schema::hasTable('hr_office_expense_categories')) {
+        if (! SchemaCache::hasTable('hr_office_expense_categories')) {
             return;
         }
 

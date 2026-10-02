@@ -1,1121 +1,1395 @@
 @extends('layouts.app')
 
-@section('title', 'Công việc O&M')
+@section('title', 'Chi tiết Bảo trì & Bảo hành')
 
 @section('styles')
-<link rel="stylesheet" href="{{ asset('css/technical-maintenance-v10.css') }}?v={{ file_exists(public_path('css/technical-maintenance-v10.css')) ? filemtime(public_path('css/technical-maintenance-v10.css')) : time() }}">
+<link rel="stylesheet" href="{{ asset('css/technical-maintenance-detail-v9.css') }}?v={{ file_exists(public_path('css/technical-maintenance-detail-v9.css')) ? filemtime(public_path('css/technical-maintenance-detail-v9.css')) : time() }}">
+<link rel="stylesheet" href="{{ asset('css/technical-maintenance-proposal-v1.css') }}?v={{ file_exists(public_path('css/technical-maintenance-proposal-v1.css')) ? filemtime(public_path('css/technical-maintenance-proposal-v1.css')) : time() }}">
+<link rel="stylesheet" href="{{ asset('css/technical-maintenance-experience-v2.css') }}?v={{ file_exists(public_path('css/technical-maintenance-experience-v2.css')) ? filemtime(public_path('css/technical-maintenance-experience-v2.css')) : time() }}">
+<link rel="stylesheet" href="{{ asset('css/technical-maintenance-round-v8.css') }}?v={{ file_exists(public_path('css/technical-maintenance-round-v8.css')) ? filemtime(public_path('css/technical-maintenance-round-v8.css')) : time() }}">
+<link rel="stylesheet" href="{{ asset('css/technical-maintenance-round-v9.css') }}?v={{ file_exists(public_path('css/technical-maintenance-round-v9.css')) ? filemtime(public_path('css/technical-maintenance-round-v9.css')) : time() }}">
+<link rel="stylesheet" href="{{ asset('css/technical-maintenance-assignment-v10.css') }}?v={{ file_exists(public_path('css/technical-maintenance-assignment-v10.css')) ? filemtime(public_path('css/technical-maintenance-assignment-v10.css')) : time() }}">
+<link rel="stylesheet" href="{{ asset('css/technical-maintenance-execution-v11.css') }}?v={{ file_exists(public_path('css/technical-maintenance-execution-v11.css')) ? filemtime(public_path('css/technical-maintenance-execution-v11.css')) : time() }}">
+<link rel="stylesheet" href="{{ asset('css/technical-maintenance-incident-v12.css') }}?v={{ file_exists(public_path('css/technical-maintenance-incident-v12.css')) ? filemtime(public_path('css/technical-maintenance-incident-v12.css')) : time() }}">
 @endsection
 
 @section('content')
+
 @php
-    $tab = request('tab','work');
-    if (!in_array($tab,['work','files','history'],true)) $tab='work';
 
-    // V3: status=completed là hoàn thành hợp lệ, không còn bắt buộc phê duyệt cuối.
-    // Trạng thái approved cũ vẫn được coi là hoàn thành nếu dữ liệu duyệt cũ hợp lệ.
-    $isCompleted = $schedule->status === 'completed'
-        || ($schedule->status === 'approved' && $schedule->approval_status === 'approved');
-    $isIntegrityIssue = false;
-    $isPending = $schedule->status === 'pending_approval' || $schedule->approval_status === 'pending';
-    // Không còn bước nhập báo cáo riêng. revision_requested quay thẳng về checklist để bổ sung.
-    $isReport = $schedule->status === 'waiting_submission';
-    $isDoing = in_array($schedule->status,['in_progress','waiting_material','revision_requested'],true);
-    $isAssigned = in_array($schedule->status,['assigned','customer_confirmed','travelling'],true);
-    $isUnassigned = in_array($schedule->status,['draft','scheduled','unassigned','postponed'],true);
-
-    // V13: duyệt phân công là cổng nằm trong Bước 2, không tạo thêm bước mới.
-    $assignmentApprovalStatus = (string)($schedule->assignment_approval_status ?: 'not_required');
-    $isAssignmentLegacy = $assignmentApprovalStatus === 'not_required';
-    $isAssignmentApproved = in_array($assignmentApprovalStatus,['approved','not_required'],true);
-    $isAssignmentPending = $assignmentApprovalStatus === 'pending';
-    $isAssignmentRevision = in_array($assignmentApprovalStatus,['revision_requested','rejected'],true);
-    $isAssignmentDraft = $assignmentApprovalStatus === 'draft';
-    $isReadyToStart = $isAssigned && $isAssignmentApproved;
-    $isAdminWorkflowEditor = (bool)($permissions['admin'] ?? false);
-    $canEditAssignment = $isAdminWorkflowEditor
-        ? ((string)$schedule->status !== 'cancelled')
-        : (
-            ($permissions['assign'] ?? false)
-            && !$isCompleted && !$isPending && !$isIntegrityIssue && !$isDoing && !$isReport
-            && !$isAssignmentPending
-            && !(int)($schedule->external_labor_payment_request_id ?? 0)
-        );
-
-    $externalFinanceLocked = $isAdminWorkflowEditor
-        && (int)($schedule->external_labor_payment_request_id ?? 0) > 0;
-
-    if ($isCompleted) $displayStatus = 'Hoàn thành';
-    elseif ($isPending) $displayStatus = 'Hồ sơ cũ chờ hoàn tất';
-    elseif ($isReport) $displayStatus = 'Sẵn sàng hoàn tất';
-    elseif ($isDoing) $displayStatus = 'Đang thực hiện';
-    elseif ($isAssignmentPending) $displayStatus = 'Chờ duyệt phân công';
-    elseif ($isAssignmentRevision) $displayStatus = 'Sửa phân công';
-    elseif ($isReadyToStart) $displayStatus = 'Sẵn sàng thực hiện';
-    elseif ($isAssigned) $displayStatus = 'Chưa gửi duyệt phân công';
-    else $displayStatus = 'Chờ phân công';
-
-    // V13.2: giao diện gom còn 3 bước chính.
-    // Backend vẫn giữ các trạng thái báo cáo/duyệt/hoàn thành hiện có để không phá dữ liệu,
-    // nhưng Báo cáo + Duyệt + Hoàn thành đều được hiển thị như trạng thái con của Bước 3.
-    $workflowStep = ($isReadyToStart || $isDoing || $isReport || $isPending || $isCompleted || $isIntegrityIssue) ? 3 : 2;
-    $workflowFinished = $isCompleted;
-    $steps = ['Kế hoạch','Phân công','Thực hiện & Hoàn tất'];
-
-    // V13.3: Admin có thể mở lại giao diện của bước đã qua để chỉnh dữ liệu,
-    // nhưng không lùi status/approval của workflow hiện tại.
-    $adminRequestedStep = $isAdminWorkflowEditor ? (int)request('admin_step', 0) : 0;
-    $adminViewStep = (
-        $adminRequestedStep >= 1
-        && $adminRequestedStep <= 3
-        && $adminRequestedStep <= $workflowStep
-    ) ? $adminRequestedStep : 0;
-    $isAdminReviewingPastStep = $isAdminWorkflowEditor
-        && $adminViewStep > 0
-        && $adminViewStep < $workflowStep;
-
-    $step2Text = 'Chưa phân công';
-    if ($workflowStep > 2) {
-        $step2Text = $isAssignmentLegacy ? 'Đã xong' : 'Sếp đã phê duyệt';
-    } elseif ($isAssignmentPending) {
-        $step2Text = 'Phê duyệt từ sếp · Đang chờ';
-    } elseif ($isAssignmentRevision) {
-        $step2Text = 'Phê duyệt từ sếp · Cần chỉnh sửa';
-    } elseif ($isAssigned || $isAssignmentDraft) {
-        $step2Text = 'Phê duyệt từ sếp · Chưa gửi';
-    }
-
-    $step3Text = 'Chưa mở';
-    if ($isCompleted) {
-        $step3Text = 'Hoàn thành';
-    } elseif ($isPending) {
-        $step3Text = 'Hồ sơ cũ chờ hoàn tất';
-    } elseif ($isReport) {
-        $step3Text = 'Sẵn sàng hoàn tất';
-    } elseif ($isDoing) {
-        $step3Text = $schedule->status === 'revision_requested' ? 'Cần bổ sung hồ sơ' : 'Đang thực hiện';
-    } elseif ($isReadyToStart) {
-        $step3Text = 'Sẵn sàng bắt đầu';
-    }
-    $leader = $schedule->leader?->user;
-    $team = $schedule->assignees->pluck('user')->filter()->values();
-    $checkTotal = $schedule->checklistItems->count();
-    $checkDone = $schedule->checklistItems->where('is_done',true)->count();
-    $requiredItems = $schedule->checklistItems->where('is_required',true);
-    $requiredTotal = $requiredItems->count();
-    $requiredDone = $requiredItems->where('is_done',true)->count();
-    $missingEvidenceItems = $requiredItems->filter(function ($item) {
-        return $item->requires_evidence && $item->attachments->count() < max(1, (int)$item->min_evidence);
-    });
-    $checkReady = $requiredTotal > 0 && $requiredDone === $requiredTotal && $missingEvidenceItems->isEmpty();
-    $checkPercent = $requiredTotal ? round($requiredDone/$requiredTotal*100) : 0;
-    $evidenceCount = $schedule->attachments->whereIn('category',['before','during','after','report','fault','serial','checklist'])->count();
-    $cycleOptions = $siblings;
-    $approvedRoundCount = $cycleOptions->filter(function ($item) {
-        return $item->status === 'completed'
-            || ($item->status === 'approved' && $item->approval_status === 'approved');
-    })->count();
-    $activeChecklistId = optional($schedule->checklistItems->firstWhere('is_done',false))->id
-        ?: optional($schedule->checklistItems->first())->id;
-    $canDeleteFiles = $permissions['upload'] && !$isCompleted && !$isPending && !$isIntegrityIssue;
-    $filePreviewKind = function ($file) {
-        $mime = strtolower((string) ($file->mime_type ?? ''));
-        $extension = strtolower((string) pathinfo((string) $file->original_name, PATHINFO_EXTENSION));
-        if (str_starts_with($mime, 'image/') || in_array($extension, ['jpg','jpeg','png','webp'], true)) return 'image';
-        if ($mime === 'application/pdf' || $extension === 'pdf') return 'pdf';
-        if (str_starts_with($mime, 'video/') || $extension === 'mp4') return 'video';
-        if (in_array($extension, ['xls','xlsx'], true)) return 'spreadsheet';
-        return 'file';
+    $roundNo = max(1, (int) ($schedule->round_no ?: 1));
+    $totalRounds = max(1, (int) ($schedule->total_rounds ?: 1));
+    $siteName = $schedule->site?->name ?: $schedule->site_name ?: 'Công trình chưa đặt tên';
+    $siteAddress = $schedule->site?->address ?: $schedule->address ?: 'Chưa cập nhật địa chỉ';
+    $customerName = $schedule->site?->contact_name ?: $schedule->customer_name ?: 'Chưa cập nhật khách hàng';
+    $leaderName = $schedule->leader?->user?->name ?: $schedule->assigned_name ?: 'Chưa phân công';
+    $statusLabel = $statuses[$schedule->status] ?? $schedule->status;
+    $approvalLabel = $approvalStatuses[$schedule->approval_status] ?? $schedule->approval_status;
+    $isOverdue = $schedule->isOverdue();
+    $overdueDays = $isOverdue ? max(1, (int) $schedule->scheduled_date->diffInDays(today())) : 0;
+    $editMode = request()->boolean('edit') && ($permissions['update'] ?? false);
+    $workflowPercent = count($workflowSteps) > 0 ? (int) round(($currentWorkflowStep / count($workflowSteps)) * 100) : 0;
+    $displayProgress = $workSummary['total'] > 0 ? $workSummary['progress'] : $workflowPercent;
+    $statusTone = match (true) {
+        in_array($schedule->status, ['completed','approved'], true) => 'success',
+        in_array($schedule->status, ['pending_approval','waiting_submission','waiting_material','revision_requested'], true) => 'warning',
+        in_array($schedule->status, ['cancelled'], true) => 'danger',
+        in_array($schedule->status, ['in_progress','travelling','assigned','customer_confirmed'], true) => 'primary',
+        default => 'muted',
     };
+    $roundCompleted = in_array($schedule->status, ['approved', 'completed'], true);
+    $assignedCount = $schedule->assignees->count();
+    $completedRounds = $siblings->whereIn('status', ['approved', 'completed'])->count();
+    $attachmentCount = $schedule->attachments->count();
+    $requiredChecklist = max($workSummary['total'], $attachmentCount > 0 ? $attachmentCount : 2);
+    $completedChecklist = $workSummary['total'] > 0 ? $workSummary['completed'] : min($requiredChecklist, $attachmentCount);
+    $checklistPercent = $requiredChecklist > 0 ? min(100, (int) round(($completedChecklist / $requiredChecklist) * 100)) : 0;
+    $assignmentApproved = ($assignmentApprovalStatus ?? 'pending') === 'approved';
+    $currentUserAccepted = (bool) ($currentAssignment?->accepted_at ?? null);
+    $hasIncident = (bool) (($schedule->incident_kind && $schedule->incident_kind !== 'none') || (isset($maintenanceProposals) && $maintenanceProposals->isNotEmpty()));
+    $planDone = (bool) $schedule->scheduled_date;
+    $assignmentDone = $assignedCount > 0 && $assignmentApproved;
+    $executionStarted = $workSummary['total'] > 0 || in_array($schedule->status, ['in_progress','waiting_material','waiting_submission','pending_approval','approved','completed'], true);
+    $executionDone = $roundCompleted || ($workSummary['total'] > 0 && $workSummary['completed'] === $workSummary['total']);
+    $roundStages = ['summary', 'plan', 'assignment', 'perform', 'incident', 'complete'];
+    $activeStage = request('round_step', 'summary');
+    $activeStage = in_array($activeStage, $roundStages, true) ? $activeStage : 'summary';
+
 @endphp
 
-<div class="ego-container om10-page om10-detail om13-work-page">
-    <nav class="om10-breadcrumb"><a href="{{ route('ky-thuat.maintenance.index') }}">Bảo hành & O&M</a><i class="bi bi-chevron-right"></i><span>{{ $schedule->schedule_code ?: '#'.$schedule->id }}</span></nav>
+<div class="emd9-page" data-emd9-root data-emx2-initial-stage="{{ $activeStage }}">
+    <nav class="emd9-breadcrumb" aria-label="Breadcrumb">
+        <a href="{{ route('projects-unified.index') }}">Dự án</a>
+        <i class="bi bi-chevron-right"></i>
+        <a href="{{ route('projects-unified.maintenance.index') }}">Bảo trì &amp; Bảo hành</a>
+        <i class="bi bi-chevron-right"></i>
+        
+@if($schedule->site_id)
 
-    @if(session('success'))<div class="om10-alert success"><i class="bi bi-check-circle-fill"></i><span>{{ session('success') }}</span></div>@endif
-    @if(session('error'))<div class="om10-alert danger"><i class="bi bi-exclamation-octagon-fill"></i><span>{{ session('error') }}</span></div>@endif
-    @if($errors->any())<div class="om10-alert danger"><i class="bi bi-exclamation-triangle-fill"></i><div><strong>Chưa thể thực hiện</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>@endif
-
-    <section class="om10-detail-head om13-work-header">
-        <div class="om10-detail-title">
-            <div class="om10-badges"><span>{{ $types[$schedule->type] ?? $schedule->type }}</span><span>Đợt {{ $schedule->round_no ?: 1 }}/{{ $schedule->total_rounds ?: 1 }}</span></div>
-            <h1>{{ $schedule->site?->name ?: $schedule->site_name ?: 'Công trình' }}</h1>
-            <p><strong>{{ $schedule->schedule_code ?: '#'.$schedule->id }}</strong> · {{ $schedule->address ?: $schedule->site?->address ?: 'Chưa có địa chỉ' }}</p>
-        </div>
-        <div class="om10-detail-facts">
-            <div><small>Ngày dự kiến</small><strong class="{{ $schedule->isOverdue() ? 'danger' : '' }}">{{ optional($schedule->scheduled_date)->format('d/m/Y') ?: '—' }}</strong></div>
-            <div><small>Nhóm thực hiện</small><strong>{{ $team->count() ? $team->count().' người' : 'Chưa phân công' }}</strong></div>
-            <div><small>Phụ trách chính</small><strong>{{ $leader?->name ?: 'Chưa có' }}</strong></div>
-            <div><small>Trạng thái</small><strong class="{{ $isIntegrityIssue ? 'danger' : '' }}">{{ $displayStatus }}</strong></div>
-        </div>
-        <div class="om10-detail-actions">
-            @if($permissions['admin'])<a class="om10-btn light" href="{{ route('ky-thuat.maintenance.checklist-settings.index') }}"><i class="bi bi-sliders"></i> Cài đặt checklist</a>@endif
-            @if($schedule->site_id)<a class="om10-btn light" href="{{ route('ky-thuat.maintenance.site',['site'=>$schedule->site_id]) }}"><i class="bi bi-folder2-open"></i> Hồ sơ công trình</a>@endif
-@if(($permissions['assign'] ?? false) || ($permissions['admin'] ?? false))
-<button
-    type="button"
-    class="om10-btn light"
-    data-bs-toggle="modal"
-    data-bs-target="#omRoundsModal"
->
-    <i class="bi bi-calendar2-range"></i>
-    Sửa số đợt
-</button>
+            <a href="{{ route('projects-unified.maintenance.site', ['site' => $schedule->site_id]) }}">Chi tiết công trình</a>
+            <i class="bi bi-chevron-right"></i>
+        
 @endif
-            <a class="om10-btn light" href="{{ route('ky-thuat.maintenance.index') }}"><i class="bi bi-arrow-left"></i> Quay lại</a>
-        </div>
-    </section>
 
-    @if($isIntegrityIssue)
-        <div class="om11-integrity-warning">
-            <i class="bi bi-shield-exclamation"></i>
-            <div><strong>Hồ sơ hoàn thành chưa hợp lệ</strong><span>Bản ghi này được đánh dấu hoàn thành nhưng không có đủ thông tin người duyệt và thời gian duyệt. Hệ thống không tính đợt này vào số liệu hoàn thành.</span></div>
-            @if($permissions['reopen'])
-                <form method="POST" action="{{ route('ky-thuat.maintenance.approval.reopen',$schedule) }}">@csrf<input name="comment" required value="Mở lại hồ sơ hoàn thành thiếu phê duyệt" aria-label="Lý do mở lại"><button class="om10-btn danger-outline" type="submit">Mở lại để hoàn thiện</button></form>
-            @endif
-        </div>
-    @endif
+        <span>{{ $schedule->schedule_code ?: '#'.$schedule->id }}</span>
+    </nav>
 
-    <section class="om14-rounds-board">
-        <header>
-            <div><span>CHU KỲ BẢO TRÌ</span><h2>Toàn bộ {{ $cycleOptions->count() }} đợt công việc</h2><p>Mỗi đợt là một hồ sơ độc lập. Bấm trực tiếp vào thẻ để mở.</p></div>
-            <div><span class="om10-status {{ $isCompleted?'done':($isPending?'approval':($isReport?'report':($isDoing?'doing':'assigned'))) }}">{{ $statuses[$schedule->status] ?? $schedule->status }}</span><small>Đang mở đợt {{ $schedule->round_no ?: 1 }}/{{ $schedule->total_rounds ?: 1 }}</small></div>
-        </header>
-        <div class="om14-round-grid" role="tablist" aria-label="Danh sách đợt bảo trì">
-            @foreach($cycleOptions as $item)
-                @php
-                    $roundIsActive = (int)$item->id === (int)$schedule->id;
-                    $roundIsDone = $item->status === 'completed'
-                        || ($item->status === 'approved' && $item->approval_status === 'approved');
-                    $roundIsPending = $item->status === 'pending_approval' || $item->approval_status === 'pending';
-                    $roundIsRevision = $item->status === 'revision_requested';
-                    $roundIsOverdue = !$roundIsDone && $item->isOverdue();
-                    $roundIcon = $roundIsDone ? 'bi-check-lg' : ($roundIsPending ? 'bi-shield-check' : (($roundIsRevision || $roundIsOverdue) ? 'bi-exclamation-lg' : 'bi-calendar3'));
-                    $roundTone = $roundIsDone ? 'done' : ($roundIsPending ? 'approval' : ($roundIsRevision ? 'revision' : (in_array($item->status,['in_progress','waiting_material','waiting_submission'],true) ? 'doing' : 'plan')));
-                @endphp
-                <a role="tab" aria-selected="{{ $roundIsActive ? 'true' : 'false' }}" @if($roundIsActive) aria-current="page" @endif class="om14-round-card {{ $roundIsActive?'active':'' }} {{ $roundIsDone?'is-done':'' }} {{ $roundIsOverdue?'is-overdue':'' }}" href="{{ route('ky-thuat.maintenance.show',$item) }}">
-                    <span class="om14-round-top"><b>Đợt {{ $item->round_no ?: 1 }}/{{ $item->total_rounds ?: $cycleOptions->count() }}</b><i class="bi {{ $roundIcon }}"></i></span>
-                    <strong>{{ optional($item->scheduled_date)->format('d/m/Y') ?: 'Chưa có ngày' }}</strong>
-                    <span class="om10-status {{ $roundTone }}">{{ $roundIsRevision ? 'Cần bổ sung' : ($statuses[$item->status] ?? $item->status) }}</span>
-                    @if($roundIsOverdue)<small><i class="bi bi-clock-history"></i> Quá hạn</small>@elseif($roundIsActive)<small><i class="bi bi-eye"></i> Đang mở</small>@else<small>Mở hồ sơ <i class="bi bi-arrow-right"></i></small>@endif
-                </a>
+@if(session('success'))
+
+        <div class="emd9-alert success"><i class="bi bi-check-circle-fill"></i><span>{{ session('success') }}</span></div>
+    
+@endif
+
+@if(session('error'))
+
+        <div class="emd9-alert danger"><i class="bi bi-exclamation-octagon-fill"></i><span>{{ session('error') }}</span></div>
+    
+@endif
+
+@if($errors->any())
+
+        <div class="emd9-alert danger align-start"><i class="bi bi-exclamation-triangle-fill"></i><div><strong>Chưa thể thực hiện</strong><ul>
+@foreach($errors->all() as $error)
+<li>{{ $error }}</li>
+@endforeach
+</ul></div></div>
+    
+@endif
+
+    
+@if(!$schedule->site_id || !$schedule->site)
+
+        <div class="emd9-alert warning"><i class="bi bi-link-45deg"></i><span>Phiếu chưa liên kết công trình hợp lệ. Dữ liệu cũ vẫn được giữ nguyên để Ban quản lý xử lý.</span></div>
+    
+@endif
+
+    <header class="emd9-hero">
+        <div class="emd9-hero-title">
+            <div class="emd9-kickers">
+                <span><i class="bi {{ $isWarrantyFlow ? 'bi-shield-check' : 'bi-calendar2-check' }}"></i> {{ $isWarrantyFlow ? 'Bảo hành / Sự cố' : ($types[$schedule->type] ?? 'Bảo trì định kỳ') }}</span>
+                <b>Đợt {{ $roundNo }}/{{ $totalRounds }}</b>
+            </div>
+            <h1>{{ $siteName }}</h1>
+            <p><a class="emx2-schedule-code" href="#">{{ $schedule->schedule_code ?: '#'.$schedule->id }}</a><span> · {{ $siteAddress }}</span></p>
+        </div>
+
+        <div class="emd9-hero-meta">
+            <div><small>Ngày dự kiến</small><strong>{{ optional($schedule->scheduled_date)->format('d/m/Y') ?: '—' }}</strong>
+@if($isOverdue)
+<em>Quá hạn {{ $overdueDays }} ngày</em>
+@endif
+</div>
+            <div><small>Nhóm thực hiện</small><strong>{{ $assignedCount > 0 ? $assignedCount.' kỹ thuật viên' : 'Chưa phân công' }}</strong></div>
+            <div><small>Phụ trách chính</small><strong>{{ $leaderName }}</strong></div>
+            <div><small>Trạng thái</small><strong class="emd9-badge {{ $statusTone }}">{{ $statusLabel }}</strong></div>
+        </div>
+
+        <div class="emd9-head-actions">
+            @if($schedule->site_id)<a class="emd9-btn light" href="{{ route('projects-unified.maintenance.site', ['site'=>$schedule->site_id]) }}"><i class="bi bi-folder2-open"></i> Hồ sơ công trình</a>@endif
+            @if($permissions['update'])<button class="emd9-btn light" type="button" data-emx2-stage="plan"><i class="bi bi-journal-text"></i> Sửa số đợt</button>@endif
+            <a class="emd9-btn light" href="{{ route('projects-unified.maintenance.index') }}"><i class="bi bi-arrow-left"></i> Quay lại</a>
+            
+            <details class="emd9-more">
+                <summary class="emd9-btn light"><i class="bi bi-three-dots"></i></summary>
+                <div>
+                    
+@if($schedule->site_id)
+<a href="{{ route('projects-unified.maintenance.site', ['site'=>$schedule->site_id]) }}">Hồ sơ công trình</a>
+@endif
+
+@if($permissions['reopen'] && in_array($schedule->status, ['approved','completed','pending_approval','revision_requested'], true))
+<button type="button" data-emp1-open="complete">Mở lại công việc</button>
+@endif
+
+                </div>
+            </details>
+        </div>
+    </header>
+
+    <section class="emx2-cycle" aria-label="Chu kỳ bảo trì">
+        <header class="emx2-cycle-head"><div><span>CHU KỲ BẢO TRÌ</span><h2>Toàn bộ {{ max($totalRounds, $siblings->count()) }} đợt công việc</h2><p>Mỗi đợt là một hồ sơ độc lập. Bấm trực tiếp vào thẻ để mở.</p></div><div><span class="emd9-badge {{ $roundCompleted ? 'success' : 'primary' }}">{{ $roundCompleted ? 'Hoàn thành' : 'Đã lên lịch' }}</span><small>Đang mở đợt {{ $roundNo }}/{{ $totalRounds }}</small></div></header>
+        <div class="emx2-round-grid">
+            @foreach($siblings as $item)
+                <?php $itemDone = in_array($item->status, ['approved','completed'], true); ?>
+                <?php $itemCurrent = (int) $item->id === (int) $schedule->id; ?>
+                <?php $itemOverdue = $item->scheduled_date && $item->scheduled_date->isPast() && !in_array($item->status, ['completed','approved','cancelled'], true); ?>
+                <a href="{{ route('projects-unified.maintenance.show', ['schedule'=>$item->id]) }}" class="emx2-round {{ $itemDone ? 'is-done' : '' }} {{ $itemCurrent ? 'is-active' : '' }} {{ $itemOverdue ? 'is-overdue' : '' }}"><div><span>Đợt {{ $item->round_no ?: 1 }}/{{ max(1, (int) ($item->total_rounds ?: $totalRounds)) }}</span><i class="bi {{ $itemDone ? 'bi-check-lg' : 'bi-calendar3' }}"></i></div><strong>{{ optional($item->scheduled_date)->format('d/m/Y') ?: 'Chưa đặt ngày' }}</strong><span class="emd9-badge {{ $itemDone ? 'success' : ($itemOverdue ? 'warning' : 'primary') }}">{{ $statuses[$item->status] ?? $item->status }}</span><footer><span>{{ $itemCurrent ? 'Đang mở' : 'Mở hồ sơ' }}</span><i class="bi {{ $itemCurrent ? 'bi-eye' : 'bi-arrow-right' }}"></i></footer></a>
             @endforeach
         </div>
-        <footer><span><i class="bi bi-check2-circle"></i> Đã hoàn thành <strong>{{ $approvedRoundCount }}/{{ $cycleOptions->count() }}</strong> đợt</span><span>Đợt đang mở: <strong>{{ $requiredDone }}/{{ $requiredTotal }}</strong> mục bắt buộc · <strong>{{ $evidenceCount }}</strong> file</span></footer>
+        <footer class="emx2-cycle-foot"><span><i class="bi bi-check2-circle"></i> Đã hoàn thành <b>{{ $completedRounds }}/{{ max($totalRounds, $siblings->count()) }}</b> đợt</span><span>Đợt đang mở: <b>{{ $completedChecklist }}/{{ $requiredChecklist }}</b> mục bắt buộc · <b>{{ $attachmentCount }}</b> file</span></footer>
     </section>
 
-    <div class="om13-workspace-shell">
-    <nav class="om13-step-rail om19-step-rail" aria-label="Tiến trình công việc">
-        @foreach($steps as $i=>$label)
-            @php
-                $n = $i + 1;
-                $isStepDone = $n < $workflowStep || ($n === 3 && $workflowFinished);
-                $isStepCurrent = $n === $workflowStep && !$isStepDone;
-                $stepText = $n === 1 ? 'Đã xong' : ($n === 2 ? $step2Text : $step3Text);
-                $adminCanOpenStep = $isAdminWorkflowEditor && $n <= $workflowStep;
-                $adminIsViewing = $adminViewStep === $n;
-                $stepClass = trim(
-                    ($isStepDone ? 'done ' : ($isStepCurrent ? 'current ' : ''))
-                    .($adminCanOpenStep ? 'admin-editable ' : '')
-                    .($adminIsViewing ? 'admin-viewing' : '')
-                );
-            @endphp
+    <div class="emp1-layout">
+        <aside class="emp1-rail" aria-label="Quy trình một đợt bảo trì bảo hành">
+            <div class="emx2-process-heading">QUY TRÌNH</div>
+            <button class="emp1-step emx2-process-step" type="button" data-emp1-target="summary" data-emp1-tab="summary"><span>1</span><div><b>Tổng quan</b><small>Trạng thái cả đợt</small></div></button>
+            <button class="emp1-step emx2-process-step {{ $planDone ? 'is-done' : '' }}" type="button" data-emp1-target="plan" data-emp1-tab="plan"><span>{{ $planDone ? '✓' : '2' }}</span><div><b>Kế hoạch</b><small>{{ $planDone ? 'Đã lập kế hoạch' : 'Chưa lập kế hoạch' }}</small></div></button>
+            <button class="emp1-step emx2-process-step {{ $assignmentDone ? 'is-done' : '' }}" type="button" data-emp1-target="assignment" data-emp1-tab="assignment"><span>{{ $assignmentDone ? '✓' : '3' }}</span><div><b>Phân công</b><small>{{ $assignedCount === 0 ? 'Chưa chọn người' : ($assignmentApproved ? ($currentUserAccepted ? 'Đã nhận việc' : 'Chờ nhận việc') : 'Chờ Admin duyệt') }}</small></div></button>
+            <button class="emp1-step emx2-process-step {{ $executionDone ? 'is-done' : (!$assignmentDone ? 'is-locked' : '') }}" type="button" data-emp1-target="perform" data-emp1-tab="perform"><span>{{ $executionDone ? '✓' : '4' }}</span><div><b>Thực hiện</b><small>{{ !$assignmentDone ? 'Mở sau phân công' : ($executionStarted ? 'Đang cập nhật' : 'Chưa bắt đầu') }}</small></div></button>
+            <button class="emp1-step emx2-process-step {{ $hasIncident ? 'is-done' : '' }}" type="button" data-emp1-target="incident" data-emp1-tab="incident"><span>{{ $hasIncident ? '✓' : '5' }}</span><div><b>Phát sinh</b><small>{{ $hasIncident ? 'Có phát sinh' : 'Chưa ghi nhận' }}</small></div></button>
+            <button class="emp1-step emx2-process-step {{ $roundCompleted ? 'is-done' : (!$executionStarted ? 'is-locked' : '') }}" type="button" data-emp1-target="complete" data-emp1-tab="complete"><span>{{ $roundCompleted ? '✓' : '6' }}</span><div><b>Hoàn tất</b><small>{{ $roundCompleted ? 'Đã đóng đợt' : 'Chờ hoàn thành' }}</small></div></button>
+        </aside>
+        <div class="emp1-content">
 
-            @if($adminCanOpenStep)
-                <a
-                    class="{{ $stepClass }}"
-                    href="{{ route('ky-thuat.maintenance.show',$schedule) }}?tab=work&admin_step={{ $n }}"
-                    title="{{ $n < $workflowStep ? 'Admin: mở lại bước đã qua để chỉnh sửa' : 'Xem bước hiện tại' }}"
-                >
-                    <span>@if($isStepDone)<i class="bi bi-check-lg"></i>@else{{ $n }}@endif</span>
-                    <div>
-                        <strong>{{ $label }}</strong>
-                        <small>{{ $stepText }}</small>
-                        @if($n < $workflowStep)<em><i class="bi bi-pencil-square"></i> Admin có thể sửa</em>@endif
-                    </div>
-                </a>
-            @else
-                <div class="{{ $stepClass }}">
-                    <span>@if($isStepDone)<i class="bi bi-check-lg"></i>@else{{ $n }}@endif</span>
-                    <div><strong>{{ $label }}</strong><small>{{ $stepText }}</small></div>
-                </div>
-            @endif
-        @endforeach
-    </nav>
-    <div class="om13-workspace-main">
-    <nav class="om10-detail-tabs om13-work-tabs">
-        <a class="{{ $tab==='work'?'active':'' }}" href="{{ route('ky-thuat.maintenance.show',$schedule) }}?tab=work"><i class="bi bi-tools"></i> Công việc</a>
-        <a class="{{ $tab==='files'?'active':'' }}" href="{{ route('ky-thuat.maintenance.show',$schedule) }}?tab=files"><i class="bi bi-folder2-open"></i> Hồ sơ <b>{{ $schedule->attachments->count() }}</b></a>
-        <a class="{{ $tab==='history'?'active':'' }}" href="{{ route('ky-thuat.maintenance.show',$schedule) }}?tab=history"><i class="bi bi-clock-history"></i> Lịch sử</a>
+    <header class="emr9-workspace-head">
+        <div><span>HỒ SƠ TỪNG ĐỢT</span><strong data-emr9-current-title>Tổng quan</strong><small>Đợt {{ $roundNo }}/{{ $totalRounds }} · {{ $schedule->schedule_code ?: '#'.$schedule->id }}</small></div>
+        <div class="emr9-head-state"><i></i><span>{{ $statusLabel }}</span></div>
+    </header>
+
+    <section class="emd9-workflow" aria-label="Quy trình xử lý">
+        
+@foreach($workflowSteps as $step)
+
+            <article class="{{ $step['state'] }}" title="{{ $step['actor'] }} · {{ $step['time'] }}">
+                <span>{{ $step['state'] === 'done' ? '✓' : $step['number'] }}</span>
+                <div><b>{{ $step['label'] }}</b><small>{{ $step['actor'] }}</small><em>{{ $step['time'] }}</em></div>
+            </article>
+        
+@endforeach
+
+    </section>
+
+    <nav class="emd9-tabs emx2-tabs" role="tablist">
+        <button class="active" type="button" data-emd9-tab="summary"><i class="bi bi-grid-1x2"></i> Nội dung bước</button>
+        <button type="button" data-emd9-tab="documents"><i class="bi bi-folder2-open"></i> Hồ sơ <span>{{ $attachmentCount }}</span></button>
+        <button type="button" data-emd9-tab="history"><i class="bi bi-clock-history"></i> Lịch sử</button>
     </nav>
 
-    @if($tab==='work')
-        <div class="om10-work-layout">
+    <section class="emd9-panel active" data-emd9-panel="summary">
+        <section class="emd9-card emp1-word-card">
+            <div class="emr8-summary-head"><div><span class="emp1-kicker">ĐỢT BẢO TRÌ {{ $roundNo }}/{{ $totalRounds }}</span><h2>Tổng quan hồ sơ từng đợt</h2><p>Một nơi duy nhất để theo dõi kế hoạch, nhân sự, thực hiện, phát sinh và hoàn tất.</p></div><div class="emr8-progress" style="--emr8-progress:{{ $displayProgress }}"><strong>{{ $displayProgress }}%</strong><small>Tiến độ</small></div></div>
+            <div class="emr8-state-grid">
+                <button type="button" data-emx2-stage="plan" class="{{ $planDone ? 'done' : 'pending' }}"><span>2</span><div><small>Kế hoạch</small><strong>{{ $planDone ? 'Đã xong' : 'Chưa xong' }}</strong></div><i class="bi bi-chevron-right"></i></button>
+                <button type="button" data-emx2-stage="assignment" class="{{ $assignmentDone ? 'done' : 'pending' }}"><span>3</span><div><small>Phân công</small><strong>{{ $assignmentDone ? ($currentUserAccepted ? 'Đã nhận việc' : 'Chờ nhận việc') : ($assignedCount ? 'Chờ duyệt' : 'Chưa chọn người') }}</strong></div><i class="bi bi-chevron-right"></i></button>
+                <button type="button" data-emx2-stage="perform" class="{{ $executionDone ? 'done' : ($executionStarted ? 'active' : 'pending') }}"><span>4</span><div><small>Thực hiện</small><strong>{{ $executionDone ? 'Đã xong' : ($executionStarted ? 'Đang thực hiện' : 'Chưa bắt đầu') }}</strong></div><i class="bi bi-chevron-right"></i></button>
+                <button type="button" data-emx2-stage="incident" class="{{ $hasIncident ? 'warning' : 'neutral' }}"><span>5</span><div><small>Phát sinh</small><strong>{{ $hasIncident ? 'Có phát sinh' : 'Chưa có' }}</strong></div><i class="bi bi-chevron-right"></i></button>
+                <button type="button" data-emx2-stage="complete" class="{{ $roundCompleted ? 'done' : 'pending' }}"><span>6</span><div><small>Hoàn tất</small><strong>{{ $roundCompleted ? 'Đã đóng đợt' : 'Chưa hoàn tất' }}</strong></div><i class="bi bi-chevron-right"></i></button>
+            </div>
+            <dl class="emp1-summary-list emp1-summary-meta emr8-summary-meta">
+                <div><dt>Ngày dự kiến</dt><dd>{{ optional($schedule->scheduled_date)->format('d/m/Y') ?: 'Chưa đặt ngày' }}</dd></div>
+                <div><dt>Nhóm thực hiện</dt><dd>{{ $schedule->assignee_names ?: 'Chưa phân công' }}</dd></div>
+                <div><dt>Phụ trách chính</dt><dd>{{ $leaderName }}</dd></div>
+                <div><dt>Trạng thái</dt><dd>{{ $statusLabel }}</dd></div>
+            </dl>
+        </section>
+    </section>
+
+    <section class="emd9-panel" data-emd9-panel="legacy-overview">
+        <div class="emd9-main-grid">
             <main>
-                @if($isAdminReviewingPastStep && $adminViewStep === 1)
-                    <section class="om10-card om19-admin-past-step">
-                        <div class="om19-admin-review-banner">
-                            <div>
-                                <i class="bi bi-shield-lock-fill"></i>
-                                <span>
-                                    <strong>ADMIN · ĐANG CHỈNH BƯỚC ĐÃ QUA</strong>
-                                    <small>Chỉnh Kế hoạch không làm lùi tiến trình hiện tại: {{ $displayStatus }}.</small>
-                                </span>
-                            </div>
-                            <a class="om10-btn light" href="{{ route('ky-thuat.maintenance.show',$schedule) }}?tab=work">
-                                <i class="bi bi-arrow-return-right"></i> Về bước hiện tại
-                            </a>
+                <section class="emd9-card">
+                    <div class="emd9-card-head"><div><h2>Thông tin công trình &amp; đợt</h2><p>Tổng quan nhanh; cập nhật dữ liệu tại đúng bước ở cột trái.</p></div></div>
+
+                    <div class="emd9-read-view {{ $editMode ? 'hidden' : '' }}" data-emd9-read>
+                        <div class="emd9-info-grid">
+                            <div class="wide"><small>Công trình</small><strong>{{ $siteName }}</strong><span>{{ $siteAddress }}</span></div>
+                            <div><small>Khách hàng</small><strong>{{ $customerName }}</strong></div>
+                            <div><small>Loại lịch</small><strong>{{ $types[$schedule->type] ?? $schedule->type }}</strong></div>
+                            <div><small>Đợt bảo trì</small><strong>Đợt {{ $roundNo }} / {{ $totalRounds }}</strong></div>
+                            <div><small>Ngày dự kiến</small><strong>{{ optional($schedule->scheduled_date)->format('d/m/Y') ?: '—' }}</strong></div>
+                            <div><small>Trưởng nhóm</small><strong>{{ $leaderName }}</strong></div>
+                            <div><small>Thành viên</small><strong>{{ $schedule->assignee_names }}</strong></div>
+                            <div><small>Ưu tiên</small><strong>{{ $priorities[$schedule->priority] ?? $schedule->priority }}</strong></div>
+                            <div class="wide"><small>Mô tả công việc</small><p>{{ $schedule->issue_note ?: 'Chưa cập nhật mô tả.' }}</p></div>
+                            <div class="wide"><small>Ghi chú kỹ thuật</small><p>{{ $schedule->technical_note ?: 'Chưa có ghi chú.' }}</p></div>
+                            <div class="wide"><small>Kết quả xử lý</small><p>{{ $schedule->result_note ?: 'Chưa cập nhật kết quả.' }}</p></div>
                         </div>
+                    </div>
 
-                        <div class="om10-section-head">
-                            <div>
-                                <span>BƯỚC 1/3 · KẾ HOẠCH</span>
-                                <h2>Chỉnh lại kế hoạch</h2>
-                                <p>Admin được sửa thông tin kế hoạch đã qua. Hệ thống giữ nguyên phân công, checklist, báo cáo và trạng thái hiện tại.</p>
-                            </div>
-                            <span class="om10-status plan">Chỉnh sửa có nhật ký</span>
-                        </div>
+@if($permissions['update'])
 
-                        <form
-                            method="POST"
-                            action="{{ route('ky-thuat.maintenance.admin-plan.update',$schedule) }}"
-                            class="om19-admin-plan-form"
-                        >
-                            @csrf
-                            <div class="om19-admin-plan-grid">
-                                <label>
-                                    <span>Ngày thực hiện *</span>
-                                    <input
-                                        type="date"
-                                        name="scheduled_date"
-                                        value="{{ old('scheduled_date', optional($schedule->scheduled_date)->format('Y-m-d')) }}"
-                                        required
-                                    >
-                                </label>
+                    <form class="emd9-edit-form {{ $editMode ? 'active' : '' }}" data-emd9-form method="POST" action="{{ route('projects-unified.maintenance.update', ['schedule'=>$schedule->id]) }}">
+                        @csrf @method('PUT')
+                        <label><span>Ngày dự kiến</span><input type="date" name="scheduled_date" value="{{ optional($schedule->scheduled_date)->format('Y-m-d') }}" required></label>
+                        <label><span>Loại lịch</span><select name="type">
+@foreach($types as $key=>$label)
+<option value="{{ $key }}" @selected($schedule->type===$key)>{{ $label }}</option>
+@endforeach
+</select></label>
+                        <label><span>Ưu tiên</span><select name="priority">
+@foreach($priorities as $key=>$label)
+<option value="{{ $key }}" @selected($schedule->priority===$key)>{{ $label }}</option>
+@endforeach
+</select></label>
+                        <label><span>Trưởng nhóm kỹ thuật</span><select name="leader_user_id"><option value="">Chưa chọn</option>
+@foreach($technicalUsers as $user)
+<option value="{{ $user->id }}" @selected((int)$leaderId===(int)$user->id)>{{ $user->name }}</option>
+@endforeach
+</select></label>
+                        <label class="wide"><span>Thành viên thực hiện</span><select name="member_user_ids[]" multiple size="5">
+@foreach($technicalUsers as $user)
+<option value="{{ $user->id }}" @selected(in_array((int)$user->id,$memberIds,true))>{{ $user->name }}{{ $user->department?->name ? ' — '.$user->department->name : '' }}</option>
+@endforeach
+</select><small>Giữ Ctrl để chọn nhiều người.</small></label>
+                        <label><span>Công suất kWp</span><input type="number" step="0.01" min="0" name="system_kwp" value="{{ $schedule->system_kwp }}"></label>
+                        <label><span>Inverter / thiết bị</span><input name="inverter_info" value="{{ $schedule->inverter_info }}"></label>
+                        <label class="wide"><span>Mô tả công việc</span><textarea name="issue_note" rows="3">{{ $schedule->issue_note }}</textarea></label>
+                        <label class="wide"><span>Ghi chú kỹ thuật</span><textarea name="technical_note" rows="3">{{ $schedule->technical_note }}</textarea></label>
+                        <label class="wide"><span>Kết quả xử lý</span><textarea name="result_note" rows="4">{{ $schedule->result_note }}</textarea></label>
+                        <div class="wide emd9-form-actions"><button class="emd9-btn light" type="button" data-emd9-cancel-edit>Hủy</button><button class="emd9-btn primary" type="submit"><i class="bi bi-save"></i> Lưu cập nhật</button></div>
+                    </form>
+                    
+@endif
 
-                                <label>
-                                    <span>Loại công việc *</span>
-                                    <select name="type" required>
-                                        @foreach($types as $key=>$label)
-                                            <option value="{{ $key }}" @selected(old('type',$schedule->type)===$key)>{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </label>
+                </section>
 
-                                <label>
-                                    <span>Ưu tiên *</span>
-                                    <select name="priority" required>
-                                        @foreach($priorities as $key=>$label)
-                                            <option value="{{ $key }}" @selected(old('priority',$schedule->priority)===$key)>{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </label>
+@if($warrantyClaim)
 
-                                <label>
-                                    <span>Công suất hệ thống (kWp)</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        name="system_kwp"
-                                        value="{{ old('system_kwp',$schedule->system_kwp) }}"
-                                    >
-                                </label>
+                <section class="emd9-card">
+                    <div class="emd9-card-head"><div><h2>Thông tin phiếu bảo hành / sự cố</h2><p>{{ $warrantyClaim->claim_code }} · {{ $warrantyStatuses[$warrantyClaim->status] ?? $warrantyClaim->status }}</p></div></div>
+                    <div class="emd9-info-grid compact">
+                        <div><small>Serial lỗi</small><strong>{{ $warrantyClaim->serial_code ?: 'Chưa xác định' }}</strong></div>
+                        <div><small>Người phụ trách</small><strong>{{ $warrantyClaim->assignee?->name ?: $warrantyClaim->assigned_name ?: 'Chưa phân công' }}</strong></div>
+                        <div class="wide"><small>Mô tả sự cố</small><p>{{ $warrantyClaim->issue_description ?: '—' }}</p></div>
+                        <div class="wide"><small>Chẩn đoán</small><p>{{ $warrantyClaim->diagnosis ?: 'Chưa cập nhật' }}</p></div>
+                        <div class="wide"><small>Phương án</small><p>{{ $warrantyClaim->proposed_solution ?: 'Chưa cập nhật' }}</p></div>
+                        <div class="wide"><small>Kết quả</small><p>{{ $warrantyClaim->resolution ?: 'Chưa cập nhật' }}</p></div>
+                    </div>
+                </section>
+                
+@endif
 
-                                <label class="wide">
-                                    <span>Thông tin inverter / thiết bị</span>
-                                    <input
-                                        name="inverter_info"
-                                        value="{{ old('inverter_info',$schedule->inverter_info) }}"
-                                        placeholder="Model, công suất, serial nếu cần..."
-                                    >
-                                </label>
-
-                                <label class="wide">
-                                    <span>Nội dung / yêu cầu công việc</span>
-                                    <textarea
-                                        name="issue_note"
-                                        rows="4"
-                                        placeholder="Nội dung bảo hành, bảo trì, sự cố cần xử lý..."
-                                    >{{ old('issue_note',$schedule->issue_note) }}</textarea>
-                                </label>
-
-                                <label class="wide">
-                                    <span>Ghi chú kỹ thuật</span>
-                                    <textarea
-                                        name="technical_note"
-                                        rows="3"
-                                        placeholder="Ghi chú bổ sung cho kế hoạch..."
-                                    >{{ old('technical_note',$schedule->technical_note) }}</textarea>
-                                </label>
-                            </div>
-
-                            <div class="om19-admin-form-footer">
-                                <div>
-                                    <i class="bi bi-clock-history"></i>
-                                    Mọi lần sửa của Admin được lưu vào Lịch sử. Không reset bước 2 hoặc bước 3.
-                                </div>
-                                <button class="om10-btn primary" type="submit">
-                                    <i class="bi bi-save2"></i> Lưu lại Kế hoạch
-                                </button>
-                            </div>
-                        </form>
-                    </section>
-
-                @elseif($isAdminReviewingPastStep && $adminViewStep === 2)
-                    <section class="om10-card om19-admin-past-step">
-                        <div class="om19-admin-review-banner">
-                            <div>
-                                <i class="bi bi-shield-lock-fill"></i>
-                                <span>
-                                    <strong>ADMIN · ĐANG CHỈNH BƯỚC ĐÃ QUA</strong>
-                                    <small>Chỉnh Phân công không làm lùi tiến trình hiện tại: {{ $displayStatus }}.</small>
-                                </span>
-                            </div>
-                            <a class="om10-btn light" href="{{ route('ky-thuat.maintenance.show',$schedule) }}?tab=work">
-                                <i class="bi bi-arrow-return-right"></i> Về bước hiện tại
-                            </a>
-                        </div>
-
-                        <div class="om10-section-head">
-                            <div>
-                                <span>BƯỚC 2/3 · PHÂN CÔNG</span>
-                                <h2>Xem lại & chỉnh phân công</h2>
-                                <p>Admin có thể thay đổi người phụ trách và thành viên ngay cả khi hồ sơ đã sang Bước 3. Lần sửa được ghi lịch sử và không xóa dữ liệu thực hiện.</p>
-                            </div>
-                            <button class="om10-btn primary" type="button" data-bs-toggle="modal" data-bs-target="#om10TeamModal">
-                                <i class="bi bi-pencil-square"></i> Chỉnh sửa phân công
-                            </button>
-                        </div>
-
-                        <div class="om18-assignment-summary">
-                            <div><small>Phụ trách chính</small><strong>{{ $leader?->name ?: 'Chưa chọn' }}</strong></div>
-                            <div><small>Nhân sự nội bộ</small><strong>{{ $team->count() }} người</strong></div>
-                            <div><small>Nhân công ngoài</small><strong>{{ $schedule->external_labor_enabled ? ((int)$schedule->external_labor_headcount).' người' : 'Không' }}</strong></div>
-                            <div><small>Trạng thái công việc</small><strong>{{ $displayStatus }}</strong></div>
-                        </div>
-
-                        @if($schedule->external_labor_enabled)
-                            <div class="om18-external-detail">
-                                <div><span>Đơn vị/người nhận</span><b>{{ $schedule->external_labor_name ?: 'Chưa cập nhật' }}</b></div>
-                                <div><span>SĐT</span><b>{{ $schedule->external_labor_phone ?: '—' }}</b></div>
-                                <div><span>Tổng tiền công</span><b>{{ number_format((float)$schedule->external_labor_total_cost,0,',','.') }} đ</b></div>
-                                <div><span>Tạm ứng / ĐNTT</span><b>{{ number_format((float)$schedule->external_labor_advance_amount,0,',','.') }} đ</b></div>
-                            </div>
-                        @endif
-
-                        @if((int)($schedule->external_labor_payment_request_id ?? 0) > 0)
-                            <div class="om19-admin-finance-lock">
-                                <i class="bi bi-lock-fill"></i>
-                                <div>
-                                    <strong>Chi phí nhân công ngoài đã phát sinh ĐNTT #{{ $schedule->external_labor_payment_request_id }}</strong>
-                                    <span>Admin vẫn sửa được nhân sự nội bộ. Các thông tin tiền công / tạm ứng / ngân hàng được khóa để không lệch Tài chính.</span>
-                                </div>
-                                @if(\Illuminate\Support\Facades\Route::has('payment_requests.show'))
-                                    <a class="om10-btn light" href="{{ route('payment_requests.show',$schedule->external_labor_payment_request_id) }}">Xem ĐNTT</a>
-                                @endif
-                            </div>
-                        @else
-                            <div class="om19-admin-edit-note">
-                                <i class="bi bi-info-circle"></i>
-                                Nếu Admin sửa Phân công sau khi bước này đã qua, hệ thống ghi nhận lần sửa như đã được Admin xác nhận và giữ nguyên Bước 3.
-                            </div>
-                        @endif
-                    </section>
-
-                @else
-                    @if($isIntegrityIssue)
-                    <section class="om10-card">
-                        <div class="om10-section-head"><div><span>KIỂM SOÁT DỮ LIỆU</span><h2>Đợt này chưa được công nhận hoàn thành</h2><p>Admin mở lại hồ sơ để bổ sung checklist và minh chứng, sau đó gửi duyệt lại đúng quy trình.</p></div><span class="om10-status revision">Thiếu phê duyệt</span></div>
-                        @include('technical.maintenance.partials.report-review', ['schedule'=>$schedule,'checkDone'=>$checkDone,'checkTotal'=>$checkTotal,'reportConclusions'=>$reportConclusions])
-                    </section>
-                @elseif($isUnassigned)
-                    <section class="om10-focus-card">
-                        <div class="om10-focus-number">2</div>
-                        <div class="om10-focus-copy"><span>BƯỚC 2/3 · PHÂN CÔNG</span><h2>Phân công nhóm kỹ thuật</h2><p>Một chuyến có thể chọn 1, 2, 3 hoặc nhiều kỹ thuật viên. Chỉ định một người phụ trách chính để tổng hợp báo cáo.</p></div>
-                        @if($permissions['assign'])<button class="om10-btn primary" type="button" data-bs-toggle="modal" data-bs-target="#om10TeamModal"><i class="bi bi-people"></i> Chọn nhóm thực hiện</button>@endif
-                    </section>
-                @elseif($isAssigned && !$isAssignmentApproved)
-                    <section class="om10-card om18-assignment-gate">
-                        <div class="om10-section-head">
-                            <div>
-                                <span>BƯỚC 2/3 · PHÂN CÔNG · PHÊ DUYỆT TỪ SẾP</span>
-                                <h2>{{ $isAssignmentPending ? 'Phân công đang chờ sếp duyệt' : ($isAssignmentRevision ? 'Cần chỉnh sửa phân công' : 'Phân công đã lưu - chưa gửi duyệt') }}</h2>
-                                <p>Bước Thực hiện & Hoàn tất chỉ mở sau khi sếp phê duyệt phân công.</p>
-                            </div>
-                            <span class="om10-status {{ $isAssignmentPending ? 'approval' : ($isAssignmentRevision ? 'revision' : 'plan') }}">
-                                {{ $assignmentApprovalStatuses[$assignmentApprovalStatus] ?? $assignmentApprovalStatus }}
-                            </span>
-                        </div>
-
-                        @if($isAssignmentRevision && $schedule->assignment_approval_note)
-                            <div class="om18-assignment-note"><i class="bi bi-exclamation-triangle"></i><div><strong>Ý kiến của người duyệt</strong><span>{{ $schedule->assignment_approval_note }}</span></div></div>
-                        @endif
-
-                        <div class="om18-assignment-summary">
-                            <div><small>Phụ trách chính</small><strong>{{ $leader?->name ?: 'Chưa chọn' }}</strong></div>
-                            <div><small>Nhân sự nội bộ</small><strong>{{ $team->count() }} người</strong></div>
-                            <div><small>Nhân công ngoài</small><strong>{{ $schedule->external_labor_enabled ? ((int)$schedule->external_labor_headcount).' người' : 'Không' }}</strong></div>
-                            <div><small>Tiền công ngoài</small><strong>{{ $schedule->external_labor_enabled ? number_format((float)$schedule->external_labor_total_cost,0,',','.').' đ' : '0 đ' }}</strong></div>
-                        </div>
-
-                        @if($schedule->external_labor_enabled)
-                            <div class="om18-external-detail">
-                                <div><span>Đơn vị/người nhận</span><b>{{ $schedule->external_labor_name ?: 'Chưa cập nhật' }}</b></div>
-                                <div><span>SĐT</span><b>{{ $schedule->external_labor_phone ?: '—' }}</b></div>
-                                <div><span>Đề nghị/tạm ứng</span><b>{{ number_format((float)$schedule->external_labor_advance_amount,0,',','.') }} đ</b></div>
-                                <div><span>Ngân hàng</span><b>{{ $schedule->external_labor_bank_info ?: '—' }}</b></div>
-                            </div>
-                        @endif
-
-                        @if($isAssignmentPending)
-                            <div class="om18-waiting-banner"><i class="bi bi-lock-fill"></i><span>Nút <b>Bắt đầu công việc</b> đang khóa cho tới khi phân công được duyệt.</span></div>
-                            @if($permissions['assignment_approve'] ?? false)
-                                <div class="om10-approval-actions om18-assignment-actions">
-                                    <form method="POST" action="{{ route('ky-thuat.maintenance.assignment-approval.revision',$schedule) }}">@csrf<textarea name="comment" rows="3" required placeholder="Nội dung cần chỉnh sửa trong phân công..."></textarea><button class="om10-btn danger-outline" type="submit">Trả lại chỉnh sửa</button></form>
-                                    <form method="POST" action="{{ route('ky-thuat.maintenance.assignment-approval.approve',$schedule) }}" data-om11-confirm="Duyệt phân công và mở bước Thực hiện? Nếu có nhân công ngoài, hệ thống sẽ tự tạo ĐNTT.">@csrf<textarea name="comment" rows="3" placeholder="Nhận xét duyệt (không bắt buộc)"></textarea><button class="om10-btn success" type="submit"><i class="bi bi-patch-check"></i> Duyệt phân công</button></form>
-                                </div>
-                                <form class="om18-reject-assignment" method="POST" action="{{ route('ky-thuat.maintenance.assignment-approval.reject',$schedule) }}">@csrf<input name="comment" required placeholder="Lý do từ chối phân công"><button class="om10-btn danger-outline" type="submit">Từ chối</button></form>
-                            @endif
-                        @else
-                            <div class="om18-assignment-actions-row">
-                                @if($canEditAssignment)
-                                    <button class="om10-btn light" type="button" data-bs-toggle="modal" data-bs-target="#om10TeamModal"><i class="bi bi-pencil-square"></i> Chỉnh sửa phân công</button>
-                                @endif
-                                @if($permissions['assign'])
-                                    <form method="POST" action="{{ route('ky-thuat.maintenance.assignment-approval.submit',$schedule) }}">@csrf<input type="text" name="comment" placeholder="Ghi chú gửi sếp duyệt (không bắt buộc)"><button class="om10-btn primary" type="submit"><i class="bi bi-send-check"></i> Gửi sếp duyệt</button></form>
-                                @endif
-                            </div>
-                        @endif
-                    </section>
-                @elseif($isReadyToStart)
-                    <section class="om10-focus-card">
-                        <div class="om10-focus-number">3</div>
-                        <div class="om10-focus-copy"><span>BƯỚC 3/3 · THỰC HIỆN & HOÀN TẤT</span><h2>Sẵn sàng thực hiện</h2><p>{{ $isAssignmentLegacy ? 'Hồ sơ cũ được giữ nguyên luồng để không ảnh hưởng công việc đang có.' : 'Phân công đã được sếp duyệt.' }} Kỹ thuật có thể bắt đầu để mở checklist hiện trường.</p></div>
-                        @if($permissions['update'])
-                            <form method="POST" action="{{ route('ky-thuat.maintenance.work.start',$schedule) }}">@csrf<button class="om10-btn primary" type="submit"><i class="bi bi-play-fill"></i> Bắt đầu công việc</button></form>
-                        @endif
-                    </section>
-                    @if($schedule->external_labor_enabled)
-                        <section class="om10-card om18-approved-external"><div><i class="bi bi-people-fill"></i><span><strong>Nhân công ngoài đã được duyệt</strong><small>{{ (int)$schedule->external_labor_headcount }} người · {{ number_format((float)$schedule->external_labor_total_cost,0,',','.') }} đ</small></span></div>@if($schedule->external_labor_payment_request_id && ($permissions['assignment_approve'] ?? false))<a class="om10-btn light" href="{{ route('payment_requests.show',$schedule->external_labor_payment_request_id) }}">Xem ĐNTT #{{ $schedule->external_labor_payment_request_id }}</a>@endif</section>
-                    @endif
-                @elseif($isDoing)
-                    <section class="om10-card om10-checklist-card om13-checklist-workspace">
-                        <div class="om13-checklist-heading"><div><span>BƯỚC 3/3 · THỰC HIỆN & HOÀN TẤT</span><h2>Checklist hiện trường</h2><p>Mở từng bước, ghi kết quả và thêm minh chứng ngay tại bước đó.</p>@if($schedule->status==='revision_requested' && $schedule->approval_note)<div class="om10-revision-note">Cần bổ sung: {{ $schedule->approval_note }}</div>@endif</div><div><strong>{{ $requiredDone }}/{{ $requiredTotal }}</strong><span>{{ $missingEvidenceItems->isEmpty() ? $checkPercent.'%' : $missingEvidenceItems->count().' bước thiếu file' }}</span></div></div>
-                        <div class="om10-progress"><span style="width:{{ $checkPercent }}%"></span></div>
-                        <form id="om12ChecklistForm" method="POST" action="{{ route('ky-thuat.maintenance.checklist.save',$schedule) }}">@csrf</form>
-                        <div class="om13-check-queue">
-                            @foreach($schedule->checklistItems as $index => $item)
-                                @php
-                                    $itemFiles = $item->attachments;
-                                    $minimumFiles = $item->requires_evidence ? max(1, (int)$item->min_evidence) : 0;
-                                    $hasEnoughFiles = !$item->requires_evidence || $itemFiles->count() >= $minimumFiles;
-                                @endphp
-                                <article class="om13-check-task {{ (int)$item->id===(int)$activeChecklistId?'active':'' }} {{ $item->is_done?'is-done':'' }} {{ !$hasEnoughFiles?'needs-file':'' }}" data-om13-check-task>
-                                    <button class="om13-check-summary" type="button" data-om13-check-open aria-expanded="{{ (int)$item->id===(int)$activeChecklistId?'true':'false' }}"><span class="om13-check-number">{{ str_pad($index+1,2,'0',STR_PAD_LEFT) }}</span><span class="om13-check-name"><strong>{{ $item->label }}</strong><small>{{ $item->is_required?'Bắt buộc':'Tùy chọn' }} · {{ $item->requires_evidence ? $itemFiles->count().' file · tối thiểu '.$minimumFiles : 'Không yêu cầu file' }}</small></span><span class="om13-check-result {{ $item->is_done&&$hasEnoughFiles?'ready':'waiting' }}"><i class="bi {{ $item->is_done&&$hasEnoughFiles?'bi-check-circle-fill':'bi-circle' }}"></i>{{ $item->is_done?'Đã xong':'Chưa xong' }}</span><i class="bi bi-chevron-down"></i></button>
-                                    <div class="om13-check-detail" @if((int)$item->id!==(int)$activeChecklistId) hidden @endif>
-                                        <div class="om13-check-instruction"><span class="om10-status {{ $item->is_required?'revision':'plan' }}">{{ $item->is_required?'Bắt buộc':'Tùy chọn' }}</span><p>{{ $item->template?->description ?: 'Ghi nhận kết quả kiểm tra hoặc thông số đo được tại hiện trường.' }}</p></div>
-                                        <div class="om13-check-completion">
-                                            <label class="om12-complete-toggle">
-                                                <input form="om12ChecklistForm" type="checkbox" name="checked[]" value="{{ $item->id }}" @checked($item->is_done) data-om12-check data-evidence-ready="{{ $hasEnoughFiles ? 1 : 0 }}">
-                                                <span><i class="bi bi-check-lg"></i></span>
-                                                <b>{{ $item->is_done ? 'Đã hoàn thành' : 'Đánh dấu xong' }}</b>
-                                            </label>
-                                        </div>
-                                        <label class="om13-note-field"><span>Kết quả / ghi chú kỹ thuật</span><textarea form="om12ChecklistForm" name="notes[{{ $item->id }}]" rows="3" placeholder="Nhập tình trạng, thông số hoặc nội dung đã xử lý...">{{ $item->note }}</textarea></label>
-
-                                        <div class="om13-evidence-zone {{ $hasEnoughFiles?'ready':'missing' }}">
-                                            <div class="om12-evidence-status {{ $hasEnoughFiles ? 'ready' : 'missing' }}">
-                                                <i class="bi {{ $hasEnoughFiles ? 'bi-shield-check' : 'bi-cloud-arrow-up' }}"></i>
-                                                <div><strong>Minh chứng: {{ $itemFiles->count() }} file</strong><span>{{ $item->requires_evidence ? ($hasEnoughFiles ? 'Đã đủ tối thiểu '.$minimumFiles.' file · vẫn có thể thêm' : 'Cần thêm '.($minimumFiles-$itemFiles->count()).' file') : 'Không yêu cầu file' }}</span></div>
-                                            </div>
-                                            @if($permissions['upload'] && $item->requires_evidence)
-                                                <form class="om13-item-upload" method="POST" action="{{ route('ky-thuat.maintenance.schedule-files.store',$schedule) }}" enctype="multipart/form-data" data-om15-auto-upload>
-                                                    @csrf
-                                                    <input type="hidden" name="category" value="checklist">
-                                                    <input type="hidden" name="checklist_item_id" value="{{ $item->id }}">
-                                                    <label><input type="file" name="files[]" multiple required accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.mp4"><i class="bi bi-plus-circle"></i><span>Thêm ảnh hoặc file</span></label>
-                                                </form>
-                                            @endif
-                                        </div>
-
-                                        @if($itemFiles->isNotEmpty())
-                                            <div class="om13-proof-list">
-                                                @foreach($itemFiles as $file)
-                                                    @php $previewKind = $filePreviewKind($file); @endphp
-                                                    <span><i class="bi bi-file-earmark-check"></i><button class="om16-file-name" type="button" data-om16-preview data-kind="{{ $previewKind }}" data-name="{{ e($file->original_name) }}" data-preview-url="{{ route('ky-thuat.maintenance.schedule-files.preview',$file) }}" data-download-url="{{ route('ky-thuat.maintenance.schedule-files.download',$file) }}" @if($canDeleteFiles) data-delete-url="{{ route('ky-thuat.maintenance.schedule-files.destroy',$file) }}" @endif>{{ $file->original_name }}</button><small>{{ number_format(($file->file_size??0)/1024,1) }} KB</small><button class="om16-preview-action" type="button" title="Xem trước file" data-om16-preview data-kind="{{ $previewKind }}" data-name="{{ e($file->original_name) }}" data-preview-url="{{ route('ky-thuat.maintenance.schedule-files.preview',$file) }}" data-download-url="{{ route('ky-thuat.maintenance.schedule-files.download',$file) }}" @if($canDeleteFiles) data-delete-url="{{ route('ky-thuat.maintenance.schedule-files.destroy',$file) }}" @endif><i class="bi bi-eye"></i></button>@if($canDeleteFiles)<form method="POST" action="{{ route('ky-thuat.maintenance.schedule-files.destroy',$file) }}" data-om11-confirm="Xóa file minh chứng này?">@csrf @method('DELETE')<button class="om17-delete-file" type="submit" title="Xóa file"><i class="bi bi-trash3"></i></button></form>@endif</span>
-                                                @endforeach
-                                            </div>
-                                        @endif
-                                    </div>
-                                </article>
-                            @endforeach
-                        </div>
-                        <div class="om13-check-actions">
-                            <span><i class="bi bi-info-circle"></i> Mục bắt buộc chỉ được hoàn thành khi đủ số file quy định.</span>
-                            <button form="om12ChecklistForm" class="om10-btn light" type="submit"><i class="bi bi-save"></i> Lưu checklist</button>
-                        </div>
-                        @if(($permissions['submit'] ?? false) || ($permissions['update'] ?? false))
-                            <form class="om10-finish-form om12-finish-form" method="POST" action="{{ route('ky-thuat.maintenance.work.finish',$schedule) }}" data-om11-confirm="Hoàn tất đợt bảo trì này? Sau khi hoàn tất, hồ sơ được lưu ngay và không cần gửi duyệt.">
-                                @csrf
-                                <div><strong>{{ $checkReady ? 'Hồ sơ đã đủ để hoàn tất' : 'Chưa thể hoàn tất' }}</strong><span>{{ $checkReady ? 'Checklist và minh chứng bắt buộc đã đầy đủ. Bấm Hoàn tất là xong, không có bước gửi duyệt phía sau.' : 'Còn '.$missingEvidenceItems->count().' mục thiếu minh chứng hoặc '.($requiredTotal-$requiredDone).' mục chưa hoàn thành.' }}</span></div>
-                                <button class="om10-btn primary" type="submit" @disabled(!$checkReady)><i class="bi bi-check2-circle"></i> Hoàn tất đợt bảo trì</button>
-                            </form>
-                        @endif
-                    </section>
-                @elseif($isReport)
-                    <section class="om10-card">
-                        <div class="om10-section-head"><div><span>BƯỚC 3/3 · THỰC HIỆN & HOÀN TẤT</span><h2>Hồ sơ đã sẵn sàng hoàn tất</h2><p>Đây là trạng thái cũ. Checklist và minh chứng đã được nộp; bấm Hoàn tất là kết thúc đợt, không cần gửi duyệt.</p></div><span class="om10-status report">Sẵn sàng hoàn tất</span></div>
-                        @include('technical.maintenance.partials.report-review', ['schedule'=>$schedule,'checkDone'=>$checkDone,'checkTotal'=>$checkTotal,'reportConclusions'=>$reportConclusions])
-                        @if(($permissions['submit'] ?? false) || ($permissions['update'] ?? false))
-                            <form method="POST" action="{{ route('ky-thuat.maintenance.work.finish',$schedule) }}" class="om10-submit-approval" data-om11-confirm="Hoàn tất đợt bảo trì này? Hồ sơ sẽ được lưu ngay, không cần gửi duyệt.">@csrf<button class="om10-btn primary" type="submit"><i class="bi bi-check2-circle"></i> Hoàn tất đợt bảo trì</button></form>
-                        @endif
-                    </section>
-                @elseif($isPending)
-                    <section class="om10-card">
-                        <div class="om10-section-head"><div><span>BƯỚC 3/3 · THỰC HIỆN & HOÀN TẤT</span><h2>Hồ sơ cũ đang ở trạng thái chờ duyệt</h2><p>Quy trình mới không cần duyệt cuối. Nếu checklist và minh chứng đã đủ, bấm Hoàn tất để đóng đợt ngay.</p></div><span class="om10-status report">Chờ hoàn tất</span></div>
-                        @include('technical.maintenance.partials.report-review', ['schedule'=>$schedule,'checkDone'=>$checkDone,'checkTotal'=>$checkTotal,'reportConclusions'=>$reportConclusions])
-                        @if(($permissions['submit'] ?? false) || ($permissions['update'] ?? false) || ($permissions['approve'] ?? false))
-                            <form method="POST" action="{{ route('ky-thuat.maintenance.work.finish',$schedule) }}" class="om10-submit-approval" data-om11-confirm="Hoàn tất hồ sơ cũ này mà không qua bước duyệt?">@csrf<button class="om10-btn primary" type="submit" @disabled(!$checkReady)><i class="bi bi-check2-circle"></i> Hoàn tất đợt bảo trì</button></form>
-                        @endif
-                    </section>
-                @elseif($isCompleted)
-                    <section class="om10-card">
-                        <div class="om10-section-head"><div><span>BƯỚC 3/3 · THỰC HIỆN & HOÀN TẤT</span><h2>Đợt đã hoàn thành</h2><p>Checklist và minh chứng đã được lưu vào hồ sơ công trình. Không có bước phê duyệt cuối.</p></div><span class="om10-status done">Hoàn thành</span></div>
-                        @include('technical.maintenance.partials.report-review', ['schedule'=>$schedule,'checkDone'=>$checkDone,'checkTotal'=>$checkTotal,'reportConclusions'=>$reportConclusions])
-                        @if($permissions['reopen'])<form method="POST" action="{{ route('ky-thuat.maintenance.approval.reopen',$schedule) }}" class="om10-reopen">@csrf<input name="comment" required placeholder="Lý do mở lại"><button class="om10-btn light" type="submit">Mở lại công việc</button></form>@endif
-                    </section>
-                    @endif
-                @endif
             </main>
 
             <aside>
-                <section class="om10-card om13-readiness-card"><div class="om10-side-head"><strong>Hồ sơ tại chỗ</strong><span class="om10-status {{ $checkReady?'done':'revision' }}">{{ $checkReady?'Sẵn sàng':'Đang bổ sung' }}</span></div><div class="om13-readiness-ring" style="--om13-progress:{{ $checkPercent }}%"><strong>{{ $checkPercent }}%</strong><span>checklist bắt buộc</span></div><dl><div><dt>Hoàn thành</dt><dd>{{ $requiredDone }}/{{ $requiredTotal }}</dd></div><div><dt>Thiếu minh chứng</dt><dd>{{ $missingEvidenceItems->count() }} bước</dd></div><div><dt>Tổng file</dt><dd>{{ $evidenceCount }}</dd></div></dl>@if($schedule->attachments->isNotEmpty())<div class="om13-recent-proofs">@foreach($schedule->attachments->take(4) as $file)@php $previewKind = $filePreviewKind($file); @endphp<div class="om17-recent-file"><button type="button" data-om16-preview data-kind="{{ $previewKind }}" data-name="{{ e($file->original_name) }}" data-preview-url="{{ route('ky-thuat.maintenance.schedule-files.preview',$file) }}" data-download-url="{{ route('ky-thuat.maintenance.schedule-files.download',$file) }}" @if($canDeleteFiles) data-delete-url="{{ route('ky-thuat.maintenance.schedule-files.destroy',$file) }}" @endif><i class="bi bi-eye"></i><span>{{ \Illuminate\Support\Str::limit($file->original_name,28) }}</span></button>@if($canDeleteFiles)<form method="POST" action="{{ route('ky-thuat.maintenance.schedule-files.destroy',$file) }}" data-om11-confirm="Xóa file minh chứng này?">@csrf @method('DELETE')<button type="submit" title="Xóa file"><i class="bi bi-trash3"></i></button></form>@endif</div>@endforeach</div>@endif</section>
-                <section class="om10-card om10-team-card">
-                    <div class="om10-side-head"><strong>Nhóm thực hiện</strong>@if($canEditAssignment)<button type="button" data-bs-toggle="modal" data-bs-target="#om10TeamModal">Chỉnh sửa</button>@endif</div>
-                    @forelse($schedule->assignees as $assignee)
-                        <div class="om10-person"><span>{{ mb_strtoupper(mb_substr($assignee->user?->name ?: '?',0,1)) }}</span><div><strong>{{ $assignee->user?->name ?: 'Người dùng' }}</strong><small>{{ $assignee->is_leader || $assignee->role==='leader' ? 'Phụ trách chính' : 'Thành viên' }}</small></div></div>
-                    @empty<div class="om10-empty mini">Chưa phân công.</div>@endforelse
-                    @if($schedule->external_labor_enabled)
-                        <div class="om18-side-external"><i class="bi bi-person-workspace"></i><div><strong>Nhân công ngoài</strong><small>{{ (int)$schedule->external_labor_headcount }} người · {{ number_format((float)$schedule->external_labor_total_cost,0,',','.') }} đ</small></div></div>
-                    @endif
-                    @if($isAssigned)
-                        <div class="om18-side-approval"><span>Duyệt phân công</span><b>{{ $assignmentApprovalStatuses[$assignmentApprovalStatus] ?? $assignmentApprovalStatus }}</b></div>
-                    @endif
+                <section class="emd9-card emd9-progress-card">
+                    <div class="emd9-card-head"><div><h2>Tiến độ xử lý</h2><p>{{ $workSummary['total'] > 0 ? 'Tính theo công việc kỹ thuật' : 'Tính theo quy trình nghiệp vụ' }}</p></div><strong>{{ $displayProgress }}%</strong></div>
+                    <div class="emd9-progress"><i style="width:{{ $displayProgress }}%"></i></div>
+                    <div class="emd9-kpi-mini">
+                        <div><b>{{ $workSummary['total'] }}</b><small>Tổng việc</small></div>
+                        <div><b>{{ $workSummary['completed'] }}</b><small>Hoàn thành</small></div>
+                        <div><b>{{ $workSummary['in_progress'] }}</b><small>Đang làm</small></div>
+                        <div><b>{{ $workSummary['blocked'] }}</b><small>Đang vướng</small></div>
+                    </div>
+                    <div class="emd9-step-list">
+@foreach($workflowSteps as $step)
+<div class="{{ $step['state'] }}"><span>{{ $step['state']==='done'?'✓':$step['number'] }}</span><div><b>{{ $step['label'] }}</b><small>{{ $step['actor'] }}</small></div><em>{{ $step['time'] }}</em></div>
+@endforeach
+</div>
                 </section>
-                <section class="om10-card om10-info-card"><strong>Thông tin công việc</strong><dl><div><dt>Khách hàng</dt><dd>{{ $schedule->customer_name ?: $schedule->site?->contact_name ?: '—' }}</dd></div><div><dt>Ưu tiên</dt><dd>{{ $priorities[$schedule->priority] ?? $schedule->priority }}</dd></div><div><dt>Checklist</dt><dd>{{ $checkDone }}/{{ $checkTotal }}</dd></div><div><dt>Minh chứng</dt><dd>{{ $evidenceCount }} file</dd></div><div><dt>Hoàn tất</dt><dd>{{ optional($schedule->completed_at ?: $schedule->execution_finished_at)->format('d/m/Y H:i') ?: 'Chưa hoàn tất' }}</dd></div></dl></section>
+
+                <section class="emd9-card">
+                    <div class="emd9-card-head"><h2>SLA &amp; hệ thống</h2></div>
+                    <dl class="emd9-meta-list">
+                        <div><dt>Mã phiếu</dt><dd>{{ $schedule->schedule_code ?: '#'.$schedule->id }}</dd></div>
+                        <div><dt>Người tạo</dt><dd>{{ $schedule->creator?->name ?: 'Hệ thống' }}</dd></div>
+                        <div><dt>Ngày tạo</dt><dd>{{ optional($schedule->created_at)->format('d/m/Y H:i') ?: '—' }}</dd></div>
+                        <div><dt>Duyệt</dt><dd>{{ $approvalLabel }}</dd></div>
+                        <div><dt>Cập nhật cuối</dt><dd>{{ optional($schedule->updated_at)->format('d/m/Y H:i') ?: '—' }}</dd></div>
+                        <div><dt>SLA</dt><dd class="{{ $isOverdue ? 'danger' : 'success' }}">{{ $isOverdue ? 'Quá hạn '.$overdueDays.' ngày' : 'Trong hạn' }}</dd></div>
+                    </dl>
+                </section>
             </aside>
         </div>
-    @elseif($tab==='files')
-        <section class="om10-card">
-            <div class="om10-section-head"><div><span>HỒ SƠ CÔNG VIỆC</span><h2>Ảnh, biên bản & tài liệu</h2><p>Toàn bộ minh chứng của đợt được lưu tại đây.</p></div></div>
-            @if($permissions['upload'] && !$isCompleted && !$isPending && !$isIntegrityIssue)
-            <form class="om10-file-upload" method="POST" action="{{ route('ky-thuat.maintenance.schedule-files.store',$schedule) }}" enctype="multipart/form-data">@csrf<select name="category" required><option value="before">Ảnh trước</option><option value="during">Trong quá trình</option><option value="after">Ảnh sau</option><option value="fault">Thiết bị lỗi</option><option value="serial">Serial</option><option value="report">Biên bản / báo cáo</option><option value="other">Khác</option></select><input type="file" name="files[]" multiple required><input name="description" placeholder="Ghi chú file"><button class="om10-btn primary" type="submit">Tải lên</button></form>
-            @endif
-            <div class="om10-files-grid">@forelse($schedule->attachments as $file)@php $previewKind = $filePreviewKind($file); @endphp<article><div class="om10-file-icon"><i class="bi bi-file-earmark"></i></div><div><strong>{{ $file->original_name }}</strong><span>{{ strtoupper($file->category) }} · {{ number_format(($file->file_size ?? 0)/1024,1) }} KB</span><small>{{ $file->uploader?->name ?: 'Hệ thống' }} · {{ optional($file->created_at)->format('d/m/Y H:i') }}</small></div><div><button type="button" title="Xem trước" data-om16-preview data-kind="{{ $previewKind }}" data-name="{{ e($file->original_name) }}" data-preview-url="{{ route('ky-thuat.maintenance.schedule-files.preview',$file) }}" data-download-url="{{ route('ky-thuat.maintenance.schedule-files.download',$file) }}" @if($canDeleteFiles) data-delete-url="{{ route('ky-thuat.maintenance.schedule-files.destroy',$file) }}" @endif><i class="bi bi-eye"></i></button><a title="Tải xuống" href="{{ route('ky-thuat.maintenance.schedule-files.download',$file) }}"><i class="bi bi-download"></i></a>@if($canDeleteFiles)<form method="POST" action="{{ route('ky-thuat.maintenance.schedule-files.destroy',$file) }}" data-om11-confirm="Xóa file minh chứng này?">@csrf @method('DELETE')<button class="om17-delete-file" type="submit" title="Xóa file"><i class="bi bi-trash3"></i></button></form>@endif</div></article>@empty<div class="om10-empty">Chưa có file.</div>@endforelse</div>
+    </section>
+
+    <section class="emd9-panel" data-emd9-panel="plan">
+        <section class="emd9-card emp1-step-card">
+            <div class="emd9-card-head"><div><span class="emp1-kicker">KẾ HOẠCH - ĐỢT {{ $roundNo }}/{{ $totalRounds }}</span><h2>Kế hoạch bảo trì / bảo hành</h2><p>Cập nhật trực tiếp tại bước Kế hoạch, không chuyển sang màn hình khác.</p></div></div>
+@if($permissions['update'])
+            <form class="emp1-form" method="POST" action="{{ route('projects-unified.maintenance.update', ['schedule'=>$schedule->id]) }}">
+                @csrf @method('PUT')
+                <label><span>Ngày thực hiện <b>*</b></span><input type="date" name="scheduled_date" value="{{ optional($schedule->scheduled_date)->format('Y-m-d') }}" required></label>
+                <label><span>Loại công việc</span><select name="type">@foreach($types as $key=>$label)<option value="{{ $key }}" @selected($schedule->type===$key)>{{ $label }}</option>@endforeach</select></label>
+                <label><span>Ưu tiên</span><select name="priority">@foreach($priorities as $key=>$label)<option value="{{ $key }}" @selected($schedule->priority===$key)>{{ $label }}</option>@endforeach</select></label>
+                <label><span>Công suất kWp</span><input type="number" step="0.01" min="0" name="system_kwp" value="{{ $schedule->system_kwp }}"></label>
+                <label class="wide"><span>Thông tin inverter / thiết bị</span><input name="inverter_info" value="{{ $schedule->inverter_info }}" placeholder="Model, công suất, serial nếu cần..."></label>
+                <label class="wide"><span>Nội dung / yêu cầu công việc</span><textarea name="issue_note" rows="4">{{ $schedule->issue_note }}</textarea></label>
+                <label class="wide"><span>Ghi chú kỹ thuật</span><textarea name="technical_note" rows="3">{{ $schedule->technical_note }}</textarea></label>
+                <fieldset class="wide emp1-checklist"><legend>CHECKLIST</legend>
+                    <?php $checkedPlan = collect($schedule->plan_checklist ?? []); ?>
+                    <label><input type="checkbox" name="plan_checklist[]" value="system" @checked($checkedPlan->contains('system'))> Kiểm tra hệ thống</label>
+                    <label><input type="checkbox" name="plan_checklist[]" value="inverter" @checked($checkedPlan->contains('inverter'))> Kiểm tra inverter</label>
+                    <label><input type="checkbox" name="plan_checklist[]" value="panels" @checked($checkedPlan->contains('panels'))> Vệ sinh tấm pin</label>
+                    <label><input type="checkbox" name="plan_checklist[]" value="electrical" @checked($checkedPlan->contains('electrical'))> Kiểm tra tủ điện</label>
+                </fieldset>
+                <div class="wide emp1-actions"><button class="emd9-btn primary" type="submit"><i class="bi bi-save"></i> Lưu kế hoạch</button></div>
+            </form>
+@else
+            <div class="emd9-info-grid"><div><small>Ngày thực hiện</small><strong>{{ optional($schedule->scheduled_date)->format('d/m/Y') ?: 'Chưa đặt ngày' }}</strong></div><div><small>Loại công việc</small><strong>{{ $types[$schedule->type] ?? $schedule->type }}</strong></div><div class="wide"><small>Nội dung</small><p>{{ $schedule->issue_note ?: 'Chưa cập nhật.' }}</p></div></div>
+@endif
         </section>
-    @else
-        <section class="om10-card">
-            <div class="om10-section-head"><div><span>NHẬT KÝ</span><h2>Lịch sử công việc</h2><p>Mọi thay đổi trạng thái, bổ sung hồ sơ và lịch sử cũ đều được lưu.</p></div></div>
-            <div class="om10-timeline">
-                @foreach($schedule->approvals as $a)<article><span></span><div><strong>{{ strtoupper(str_replace('_',' ',$a->action)) }}</strong><p>{{ $a->comment ?: ($approvalStatuses[$a->status] ?? $a->status) }}</p><small>{{ $a->approver?->name ?: $a->submitter?->name ?: 'Hệ thống' }} · {{ optional($a->reviewed_at ?: $a->submitted_at ?: $a->created_at)->format('d/m/Y H:i') }}</small></div></article>@endforeach
-                @foreach($schedule->statusHistories as $h)<article><span></span><div><strong>{{ $statuses[$h->to_status] ?? $h->to_status }}</strong><p>{{ $h->reason ?: $h->note ?: 'Cập nhật trạng thái' }}</p><small>{{ $h->user?->name ?: 'Hệ thống' }} · {{ optional($h->changed_at)->format('d/m/Y H:i') }}</small></div></article>@endforeach
+    </section>
+
+    <section class="emd9-panel" data-emd9-panel="assignment">
+        <section class="emd9-card ema10-card">
+            <div class="ema10-heading"><div><span class="emp1-kicker">PHÂN CÔNG · ĐỢT {{ $roundNo }}/{{ $totalRounds }}</span><h2>Nhóm thực hiện</h2><p>Chọn nhân sự, Admin xác nhận, sau đó từng kỹ thuật viên chủ động nhận việc.</p></div>@if($permissions['assignment_manage'])<button class="emd9-btn primary" type="button" data-emx2-open-assignment><i class="bi bi-person-plus"></i> {{ $assignedCount ? 'Chỉnh sửa nhân sự' : 'Thêm nhân sự' }}</button>@endif</div>
+
+            <div class="ema10-flow" aria-label="Quy trình phân công">
+                <div class="done"><i class="bi bi-people-fill"></i><span><small>Bước 1</small><strong>Chọn người</strong></span></div>
+                <b></b><div class="{{ $assignmentApproved ? 'done' : ($assignedCount ? 'current' : '') }}"><i class="bi bi-shield-check"></i><span><small>Bước 2</small><strong>{{ $assignmentApproved ? 'Admin đã duyệt' : 'Admin duyệt' }}</strong></span></div>
+                <b></b><div class="{{ $currentUserAccepted ? 'done' : ($assignmentApproved ? 'current' : '') }}"><i class="bi bi-person-check"></i><span><small>Bước 3</small><strong>Nhận việc</strong></span></div>
             </div>
+
+            <div class="ema10-layout"><div class="ema10-main">
+                <section class="ema10-section"><header><div><h3>Nhân sự nội bộ</h3><p>{{ $assignedCount }} người được chọn · 1 người phụ trách chính</p></div></header>
+                    <div class="ema10-members">@forelse($schedule->assignees as $assignee)<article><span class="ema10-avatar">{{ mb_strtoupper(mb_substr($assignee->user?->name ?: '?',0,1)) }}</span><div><strong>{{ $assignee->user?->name ?: 'Nhân sự' }}</strong><small>{{ $assignee->user?->department?->name ?: 'Kỹ thuật' }}</small></div><span class="ema10-role {{ (int)$assignee->user_id === (int)$leaderId ? 'lead' : '' }}">{{ (int)$assignee->user_id === (int)$leaderId ? 'Phụ trách chính' : 'Thành viên' }}</span><span class="ema10-accept {{ $assignee->accepted_at ? 'accepted' : '' }}"><i class="bi {{ $assignee->accepted_at ? 'bi-check-circle-fill' : 'bi-clock' }}"></i>{{ $assignee->accepted_at ? 'Đã nhận việc' : ($assignmentApproved ? 'Chờ nhận việc' : 'Chờ duyệt') }}</span></article>@empty<div class="ema10-empty"><i class="bi bi-person-plus"></i><strong>Chưa có nhân sự</strong><span>Chọn nhóm thực hiện để bắt đầu quy trình.</span></div>@endforelse</div>
+                </section>
+
+                <details class="ema10-external" @if($schedule->external_labor_enabled) open @endif><summary><span><i class="bi bi-buildings"></i><b>Nhân công ngoài</b><small>{{ $schedule->external_labor_enabled ? ($schedule->external_labor_name ?: 'Đang sử dụng') : 'Không sử dụng' }}</small></span><i class="bi bi-chevron-down"></i></summary><div>
+                    @if($permissions['assignment_manage'])<form method="POST" action="{{ route('projects-unified.maintenance.update', ['schedule'=>$schedule->id]) }}" class="ema10-external-form">@csrf @method('PUT')<label class="ema10-switch"><input type="hidden" name="external_labor_enabled" value="0"><input type="checkbox" name="external_labor_enabled" value="1" @checked($schedule->external_labor_enabled)><span></span> Có thuê nhân công ngoài</label><label>Đơn vị / người nhận việc<input name="external_labor_name" value="{{ $schedule->external_labor_name }}" placeholder="Ví dụ: Đội thi công ABC"></label><label>Điện thoại / liên hệ<input name="external_labor_contact" value="{{ $schedule->external_labor_contact }}" placeholder="Số điện thoại"></label>@if($canViewCosts)<label>Chi phí dự kiến<input type="number" min="0" name="external_labor_estimated_cost" value="{{ $schedule->external_labor_estimated_cost }}" placeholder="0"></label>@endif<button class="emd9-btn light" type="submit"><i class="bi bi-save"></i> Lưu thuê ngoài</button></form>@else<div class="ema10-external-read">{{ $schedule->external_labor_enabled ? (($schedule->external_labor_name ?: 'Chưa nhập đơn vị').' · '.($schedule->external_labor_contact ?: 'Chưa có liên hệ')) : 'Đợt này không sử dụng nhân công ngoài.' }}</div>@endif
+                </div></details>
+            </div><aside class="ema10-approval"><div class="ema10-approval-head"><span class="{{ $assignmentApproved ? 'approved' : 'waiting' }}"><i class="bi {{ $assignmentApproved ? 'bi-patch-check-fill' : 'bi-hourglass-split' }}"></i></span><div><small>TRẠNG THÁI PHÂN CÔNG</small><h3>{{ $assignmentApproved ? 'Đã được Admin duyệt' : ($assignedCount ? 'Chờ Admin duyệt' : 'Chưa chọn nhân sự') }}</h3></div></div>
+                <dl><div><dt>Phụ trách chính</dt><dd>{{ $leaderName }}</dd></div><div><dt>Số thành viên</dt><dd>{{ $assignedCount }} người</dd></div><div><dt>Người đã nhận</dt><dd>{{ $schedule->assignees->whereNotNull('accepted_at')->count() }}/{{ $assignedCount }}</dd></div>@if($assignmentApproval)<div><dt>Cập nhật duyệt</dt><dd>{{ optional($assignmentApproval->reviewed_at ?: $assignmentApproval->submitted_at ?: $assignmentApproval->created_at)->format('d/m/Y H:i') }}</dd></div>@endif</dl>
+                @if($assignedCount > 0 && !$assignmentApproved && $permissions['assignment_admin'])<form method="POST" action="{{ route('projects-unified.maintenance.assignment.approve', ['schedule'=>$schedule->id]) }}">@csrf<button class="emd9-btn success" type="submit"><i class="bi bi-shield-check"></i> Duyệt phân công</button></form>@endif
+                @if($assignmentApproved && $permissions['assignment_accept'] && !$currentUserAccepted && !$roundCompleted)<form method="POST" action="{{ route('projects-unified.maintenance.assignment.accept', ['schedule'=>$schedule->id]) }}">@csrf<button class="emd9-btn primary" type="submit"><i class="bi bi-person-check"></i> Nhận việc</button></form>@endif
+                @if($currentUserAccepted)<div class="ema10-confirm"><i class="bi bi-check-circle-fill"></i><span><strong>Bạn đã nhận việc</strong><small>{{ optional($currentAssignment->accepted_at)->format('d/m/Y H:i') }}</small></span></div>@endif
+                <p class="ema10-rule"><i class="bi bi-info-circle"></i> Chỉ người đã được duyệt và nhận việc mới được cập nhật bước Thực hiện.</p>
+            </aside></div>
         </section>
-    @endif
-    </div>
-    </div>
+    </section>
+
+    <section class="emd9-panel" data-emd9-panel="perform">
+        <section class="emd9-card eme11-card">
+            <?php $executionCompleted = $workItems->where('status','completed')->count(); ?>
+            <?php $executionTotal = $workItems->count(); ?>
+            <?php $executionPercent = $executionTotal ? (int) round($executionCompleted / $executionTotal * 100) : 0; ?>
+            <header class="eme11-head"><div><span class="emp1-kicker">THỰC HIỆN · ĐỢT {{ $roundNo }}/{{ $totalRounds }}</span><h2>Checklist hiện trường</h2><p>Mở từng hạng mục, ghi kết quả và tải minh chứng ngay tại đúng mục.</p></div><div class="eme11-counter"><strong>{{ $executionCompleted }}/{{ $executionTotal }}</strong><span>hạng mục hoàn thành</span>@if($permissions['assignment_admin'])<button class="emd9-btn light" type="button" data-eme11-settings-open><i class="bi bi-sliders"></i> Cài đặt hồ sơ</button>@endif</div></header>
+            <div class="eme11-progress"><i style="width:{{ $executionPercent }}%"></i></div>
+
+            <div class="eme11-list">@forelse($workItems as $workItem)
+                <?php $itemConfig = str_starts_with((string)$workItem->description,'__ego_checklist__') ? (json_decode(substr((string)$workItem->description,17),true) ?: []) : []; ?>
+                <?php $itemRequired = (bool)($itemConfig['required'] ?? true); ?>
+                <?php $itemMinimum = (int)($itemConfig['min'] ?? 1); ?>
+                <?php $itemMaximum = (int)($itemConfig['max'] ?? 0); ?>
+                <?php $itemFiles = $workItem->attachments; ?>
+                <?php $itemHasFiles = !$itemRequired || $itemFiles->count() >= $itemMinimum; ?>
+                <?php $itemDone = $workItem->status === 'completed'; ?>
+                <details class="eme11-item {{ $itemDone ? 'is-done' : '' }}" @if($loop->first && !$itemDone) open @endif><summary><span class="eme11-number">{{ str_pad((string)$loop->iteration,2,'0',STR_PAD_LEFT) }}</span><span class="eme11-title"><strong>{{ $workItem->title }}</strong><small>{{ $itemRequired ? 'Bắt buộc' : 'Không bắt buộc' }} · {{ $itemFiles->count() }}{{ $itemMaximum ? '/'.$itemMaximum : '' }} file · tối thiểu {{ $itemMinimum }}</small></span><span class="eme11-state {{ $itemDone ? 'done' : ($itemHasFiles ? 'ready' : 'pending') }}"><i class="bi {{ $itemDone ? 'bi-check-circle-fill' : 'bi-clock' }}"></i>{{ $itemDone ? 'Hoàn thành' : ($itemHasFiles ? 'Đủ minh chứng' : 'Chưa xong') }}</span><i class="bi bi-chevron-down eme11-chevron"></i></summary><div class="eme11-body">
+                    @if($itemRequired)<span class="eme11-required">Bắt buộc</span>@endif
+                    @if($permissions['update'])<form class="eme11-result" method="POST" action="{{ route('projects-unified.maintenance.work-items.update',['schedule'=>$schedule->id,'workItem'=>$workItem->id]) }}">@csrf @method('PUT')<label>Kết quả / ghi chú kỹ thuật<textarea name="result_note" rows="3" placeholder="Nhập tình trạng, thông số hoặc nội dung đã xử lý...">{{ $workItem->result_note }}</textarea></label><input type="hidden" name="status" value="{{ $itemDone ? 'completed' : 'in_progress' }}"><input type="hidden" name="progress_percent" value="{{ $itemDone ? 100 : 50 }}"><button class="emd9-btn light" type="submit"><i class="bi bi-save"></i> Lưu ghi chú</button></form>@elseif($workItem->result_note)<p class="eme11-read-note">{{ $workItem->result_note }}</p>@endif
+
+                    <div class="eme11-evidence"><div><i class="bi bi-cloud-arrow-up"></i><span><strong>Minh chứng · {{ $itemFiles->count() }} file</strong><small>{{ $itemHasFiles ? 'Đã đủ số file yêu cầu' : 'Cần thêm '.max(0,$itemMinimum-$itemFiles->count()).' file' }}{{ !empty($itemConfig['extensions']) ? ' · '.strtoupper($itemConfig['extensions']) : '' }}</small></span></div>@if($permissions['upload'] && (!$itemMaximum || $itemFiles->count() < $itemMaximum))<form method="POST" action="{{ route('projects-unified.maintenance.schedule-files.store',['schedule'=>$schedule->id]) }}" enctype="multipart/form-data">@csrf<input type="hidden" name="work_item_id" value="{{ $workItem->id }}"><input type="hidden" name="category" value="during"><label class="emd9-btn light"><i class="bi bi-plus-circle"></i> Thêm ảnh hoặc file<input type="file" name="files[]" multiple required @if(!empty($itemConfig['extensions'])) accept="{{ collect(explode(',',$itemConfig['extensions']))->map(fn($extension)=>'.'.trim($extension))->implode(',') }}" @endif onchange="this.form.submit()"></label></form>@endif</div>
+
+                    @if($itemFiles->isNotEmpty())<div class="eme11-files">@foreach($itemFiles as $attachment)<div><a href="{{ route('projects-unified.maintenance.schedule-files.preview',['attachment'=>$attachment->id]) }}" target="_blank"><i class="bi bi-paperclip"></i> {{ \Illuminate\Support\Str::limit($attachment->original_name,48) }}</a>@if($permissions['assignment_admin'] || (int)$attachment->uploaded_by === (int)auth()->id())<form method="POST" action="{{ route('projects-unified.maintenance.schedule-files.destroy',['attachment'=>$attachment->id]) }}" onsubmit="return confirm('Xóa tệp minh chứng này?')">@csrf @method('DELETE')<button type="submit" title="Xóa tệp"><i class="bi bi-trash3"></i></button></form>@endif</div>@endforeach</div>@endif
+
+                    @if($permissions['update'] && !$itemDone)<form class="eme11-mark" method="POST" action="{{ route('projects-unified.maintenance.work-items.update',['schedule'=>$schedule->id,'workItem'=>$workItem->id]) }}">@csrf @method('PUT')<input type="hidden" name="status" value="completed"><input type="hidden" name="progress_percent" value="100"><button class="emd9-btn {{ $itemHasFiles ? 'success' : 'light' }}" type="submit" @disabled(!$itemHasFiles)><i class="bi bi-check2-circle"></i> Đánh dấu hoàn thành</button></form>@endif
+                </div></details>
+            @empty<div class="eme11-empty"><i class="bi bi-card-checklist"></i><strong>Chưa có hạng mục hồ sơ</strong><span>Admin thêm các mục cần thực hiện và quy định file minh chứng.</span>@if($permissions['assignment_admin'])<button class="emd9-btn primary" type="button" data-eme11-settings-open><i class="bi bi-plus-lg"></i> Cài đặt hạng mục</button>@endif</div>@endforelse</div>
+
+            <footer class="eme11-foot"><div><i class="bi bi-info-circle"></i>{{ $executionTotal && $executionCompleted === $executionTotal ? 'Tất cả hạng mục đã hoàn thành.' : 'Hạng mục bắt buộc chỉ được hoàn thành khi đủ số file quy định.' }}</div><div>@if($permissions['update'])<button class="emd9-btn light" type="button" data-emx2-stage="incident"><i class="bi bi-exclamation-circle"></i> Ghi nhận phát sinh</button><button class="emd9-btn primary" type="button" data-emx2-stage="complete" @disabled(!$executionTotal || $executionCompleted !== $executionTotal)><i class="bi bi-check2-circle"></i> Hoàn tất đợt</button>@endif</div></footer>
+
+            @if($permissions['assignment_admin'])<div class="eme11-modal" data-eme11-settings-modal hidden><div class="eme11-backdrop" data-eme11-settings-close></div><section class="eme11-dialog" role="dialog" aria-modal="true"><header><div><span class="emp1-kicker">CHỈ ADMIN</span><h2>Cài đặt hồ sơ thực hiện</h2><p>Thêm, sửa hoặc xóa hạng mục và quy định số lượng file cần tải.</p></div><button type="button" data-eme11-settings-close><i class="bi bi-x-lg"></i></button></header><div class="eme11-settings-list"><div class="eme11-settings-heading"><span>Tên hồ sơ</span><span>Bắt buộc</span><span>Tối thiểu</span><span>Tối đa</span><span>Định dạng</span><span></span></div>@foreach($workItems as $workItem)<?php $configuration = str_starts_with((string)$workItem->description,'__ego_checklist__') ? (json_decode(substr((string)$workItem->description,17),true) ?: []) : []; ?><div class="eme11-setting-row"><form method="POST" action="{{ route('projects-unified.maintenance.work-items.update',['schedule'=>$schedule->id,'workItem'=>$workItem->id]) }}">@csrf @method('PUT')<input type="hidden" name="checklist_setting" value="1"><input type="text" name="title" value="{{ $workItem->title }}" required><input type="hidden" name="setting_required" value="0"><input type="checkbox" name="setting_required" value="1" @checked((bool)($configuration['required'] ?? true))><input type="number" name="setting_min_files" min="0" max="100" value="{{ (int)($configuration['min'] ?? 1) }}" required><input type="number" name="setting_max_files" min="1" max="100" value="{{ !empty($configuration['max']) ? (int)$configuration['max'] : '' }}" placeholder="∞"><input type="text" name="setting_extensions" value="{{ $configuration['extensions'] ?? 'jpg,jpeg,png,pdf' }}"><button type="submit" title="Lưu"><i class="bi bi-check-lg"></i></button></form><form method="POST" action="{{ route('projects-unified.maintenance.work-items.destroy',['schedule'=>$schedule->id,'workItem'=>$workItem->id]) }}" onsubmit="return confirm('Xóa hạng mục hồ sơ này?')">@csrf @method('DELETE')<button class="eme11-delete" type="submit" title="Xóa"><i class="bi bi-trash3"></i></button></form></div>@endforeach</div><form class="eme11-setting-new" method="POST" action="{{ route('projects-unified.maintenance.work-items.store',['schedule'=>$schedule->id]) }}">@csrf<input type="hidden" name="checklist_setting" value="1"><input type="hidden" name="status" value="pending"><input type="hidden" name="progress_percent" value="0">@if($leaderId)<input type="hidden" name="assignee_id" value="{{ $leaderId }}">@endif<input name="title" placeholder="Ví dụ: Hình ảnh bảo trì, biên bản công trình..." required><input type="hidden" name="setting_required" value="0"><input type="checkbox" name="setting_required" value="1" checked><input type="number" name="setting_min_files" value="1" min="0" max="100" required><input type="number" name="setting_max_files" min="1" max="100" placeholder="∞"><input name="setting_extensions" value="jpg,jpeg,png,pdf"><button class="emd9-btn primary" type="submit"><i class="bi bi-plus-lg"></i> Thêm</button></form><footer><button class="emd9-btn light" type="button" data-eme11-settings-close>Đóng</button></footer></section></div>@endif
+        </section>
+    </section>
+
+    <section class="emd9-panel" data-emd9-panel="legacy-execution">
+        <section class="emd9-card">
+            <div class="emd9-card-head"><div><h2>Công việc kỹ thuật</h2><p>Quản lý từng đầu việc, người thực hiện, thời gian, tiến độ và minh chứng.</p></div>
+@if($permissions['update'])
+<button class="emd9-btn primary" type="button" data-emd9-toggle="#emd9-add-task"><i class="bi bi-plus-lg"></i> Thêm công việc</button>
+@endif
 </div>
 
-<div class="modal fade om16-preview-modal" id="om16PreviewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl">
-        <div class="modal-content om10-modal">
-            <div class="modal-header"><div><small>XEM TRƯỚC MINH CHỨNG</small><h2 data-om16-preview-title>File minh chứng</h2><p data-om16-preview-note>Đang chuẩn bị nội dung xem trước...</p></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body om16-preview-body">
-                <div class="om16-preview-loading" data-om16-preview-loading><span></span><b>Đang mở file...</b></div>
-                <img data-om16-preview-image alt="Xem trước ảnh" hidden>
-                <iframe data-om16-preview-frame title="Xem trước tài liệu" hidden></iframe>
-                <video data-om16-preview-video controls playsinline hidden></video>
-                <div class="om16-preview-fallback" data-om16-preview-fallback hidden><i class="bi bi-file-earmark-arrow-down"></i><strong>Định dạng này chưa xem trực tiếp trong trình duyệt</strong><span>Hãy tải file xuống để mở bằng ứng dụng phù hợp.</span></div>
-            </div>
-            <div class="modal-footer">@if($canDeleteFiles)<form method="POST" action="#" data-om17-preview-delete data-om11-confirm="Xóa file minh chứng này?" hidden>@csrf @method('DELETE')<button class="om10-btn danger-outline" type="submit"><i class="bi bi-trash3"></i> Xóa file</button></form>@endif<a class="om10-btn light" target="_blank" rel="noopener" data-om16-preview-newtab><i class="bi bi-box-arrow-up-right"></i> Mở tab mới</a><a class="om10-btn primary" data-om16-preview-download><i class="bi bi-download"></i> Tải xuống</a></div>
-        </div>
-    </div>
-</div>
+@if($permissions['update'])
 
-@if($canEditAssignment)
-<div class="modal fade" id="om10TeamModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg"><form class="modal-content om10-modal" method="POST" action="{{ route('ky-thuat.maintenance.team.assign',$schedule) }}">@csrf
-        <div class="modal-header"><div><small>PHÂN CÔNG NHÓM</small><h2>Chọn nhân sự thực hiện</h2><p>{{ $isAdminReviewingPastStep && $adminViewStep===2 ? 'Admin đang chỉnh lại bước đã qua. Lưu xong vẫn giữ nguyên tiến trình hiện tại.' : 'Chọn nhân sự nội bộ và, nếu cần, khai báo nhân công ngoài. Sau khi lưu phải gửi sếp duyệt.' }}</p></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-            <label class="om10-team-search"><i class="bi bi-search"></i><input type="search" placeholder="Tìm kỹ thuật viên..." data-om10-team-search></label>
-            <div class="om10-team-picker" data-om10-team-picker>
-                @foreach($technicalUsers as $user)
-                    @php $selected=in_array((int)$user->id,array_map('intval',$memberIds),true) || (int)$leaderId===(int)$user->id; @endphp
-                    <div class="om10-team-option" data-name="{{ mb_strtolower($user->name) }}">
-                        <label class="member"><input type="checkbox" name="member_user_ids[]" value="{{ $user->id }}" @checked($selected)><span></span><div><strong>{{ $user->name }}</strong><small>{{ $user->position?->name ?: $user->department?->name ?: 'Kỹ thuật' }}</small></div></label>
-                        <label class="leader"><input type="radio" name="leader_user_id" value="{{ $user->id }}" @checked((int)$leaderId===(int)$user->id)><span>Phụ trách chính</span></label>
+            <form id="emd9-add-task" class="emd9-task-form hidden" method="POST" action="{{ route('projects-unified.maintenance.work-items.store', ['schedule'=>$schedule->id]) }}">
+                @csrf
+                <label class="wide"><span>Tên công việc</span><input name="title" required maxlength="255" placeholder="Ví dụ: Kiểm tra inverter, vệ sinh tấm pin..."></label>
+                <label><span>Người thực hiện</span><select name="assignee_id"><option value="">Chưa chọn</option>
+@foreach($technicalUsers as $user)
+<option value="{{ $user->id }}">{{ $user->name }}</option>
+@endforeach
+</select></label>
+                <label><span>Trạng thái</span><select name="status">
+@foreach($workStatuses as $key=>$label)
+<option value="{{ $key }}">{{ $label }}</option>
+@endforeach
+</select></label>
+                <label><span>Tiến độ</span><input type="number" name="progress_percent" min="0" max="100" value="0"></label>
+                <label><span>Dự kiến (phút)</span><input type="number" name="estimated_minutes" min="0"></label>
+                <label class="wide"><span>Mô tả</span><textarea name="description" rows="3"></textarea></label>
+                <div class="wide emd9-form-actions"><button class="emd9-btn light" type="button" data-emd9-toggle="#emd9-add-task">Đóng</button><button class="emd9-btn primary" type="submit">Lưu công việc</button></div>
+            </form>
+            
+@endif
+
+            <div class="emd9-task-table-wrap">
+                <table class="emd9-task-table">
+                    <thead><tr><th>Công việc</th><th>Người thực hiện</th><th>Thời gian</th><th>Tiến độ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                    <tbody>
+                    
+@forelse($workItems as $workItem)
+
+                        <tr>
+                            <td data-label="Công việc"><strong>{{ $workItem->title }}</strong><small>{{ $workItem->description ?: 'Không có mô tả' }}</small>
+@if($workItem->result_note)
+<em>Kết quả: {{ $workItem->result_note }}</em>
+@endif
+</td>
+                            <td data-label="Người thực hiện">{{ $workItem->assignee?->name ?: 'Chưa phân công' }}</td>
+                            <td data-label="Thời gian"><span>{{ optional($workItem->started_at)->format('d/m H:i') ?: '—' }} → {{ optional($workItem->completed_at)->format('d/m H:i') ?: '—' }}</span><small>{{ $workItem->actual_minutes ? $workItem->actual_minutes.' phút' : 'Chưa ghi nhận' }}</small></td>
+                            <td data-label="Tiến độ"><div class="emd9-inline-progress"><i style="width:{{ $workItem->progress_percent }}%"></i></div><b>{{ $workItem->progress_percent }}%</b></td>
+                            <td data-label="Trạng thái"><span class="emd9-status work-{{ $workItem->status }}">{{ $workStatuses[$workItem->status] ?? $workItem->status }}</span></td>
+                            <td data-label="Thao tác"><button class="emd9-icon-btn" type="button" data-emd9-toggle="#task-{{ $workItem->id }}"><i class="bi bi-pencil-square"></i></button></td>
+                        </tr>
+                        <tr id="task-{{ $workItem->id }}" class="emd9-task-editor hidden"><td colspan="6">
+                            
+@if($permissions['update'])
+
+                            <form class="emd9-task-form" method="POST" action="{{ route('projects-unified.maintenance.work-items.update', ['schedule'=>$schedule->id,'workItem'=>$workItem->id]) }}">
+                                @csrf @method('PUT')
+                                <label class="wide"><span>Tên công việc</span><input name="title" value="{{ $workItem->title }}" required></label>
+                                <label><span>Người thực hiện</span><select name="assignee_id"><option value="">Chưa chọn</option>
+@foreach($technicalUsers as $user)
+<option value="{{ $user->id }}" @selected((int)$workItem->assignee_id===(int)$user->id)>{{ $user->name }}</option>
+@endforeach
+</select></label>
+                                <label><span>Trạng thái</span><select name="status">
+@foreach($workStatuses as $key=>$label)
+<option value="{{ $key }}" @selected($workItem->status===$key)>{{ $label }}</option>
+@endforeach
+</select></label>
+                                <label><span>Tiến độ (%)</span><input type="number" name="progress_percent" min="0" max="100" value="{{ $workItem->progress_percent }}"></label>
+                                <label><span>Thực tế (phút)</span><input type="number" name="actual_minutes" min="0" value="{{ $workItem->actual_minutes }}"></label>
+                                <label><span>Bắt đầu</span><input type="datetime-local" name="started_at" value="{{ optional($workItem->started_at)->format('Y-m-d\TH:i') }}"></label>
+                                <label><span>Kết thúc</span><input type="datetime-local" name="completed_at" value="{{ optional($workItem->completed_at)->format('Y-m-d\TH:i') }}"></label>
+                                <label class="wide"><span>Mô tả</span><textarea name="description" rows="2">{{ $workItem->description }}</textarea></label>
+                                <label class="wide"><span>Kết quả</span><textarea name="result_note" rows="3">{{ $workItem->result_note }}</textarea></label>
+                                <div class="wide emd9-form-actions"><button class="emd9-btn light" type="button" data-emd9-toggle="#task-{{ $workItem->id }}">Đóng</button><button class="emd9-btn primary" type="submit">Lưu thay đổi</button></div>
+                            </form>
+                            <form class="emd9-delete-inline" method="POST" action="{{ route('projects-unified.maintenance.work-items.destroy', ['schedule'=>$schedule->id,'workItem'=>$workItem->id]) }}" onsubmit="return confirm('Xóa công việc này?')">@csrf @method('DELETE')<button type="submit"><i class="bi bi-trash3"></i> Xóa công việc</button></form>
+                            
+@endif
+
+@if($permissions['upload'])
+
+                            <form class="emd9-quick-upload" method="POST" action="{{ route('projects-unified.maintenance.schedule-files.store', ['schedule'=>$schedule->id]) }}" enctype="multipart/form-data">@csrf<input type="hidden" name="work_item_id" value="{{ $workItem->id }}"><input type="hidden" name="category" value="during"><input type="file" name="files[]" multiple required><input name="description" placeholder="Ghi chú minh chứng"><button class="emd9-btn light" type="submit"><i class="bi bi-paperclip"></i> Tải minh chứng</button></form>
+                            
+@endif
+
+                        </td></tr>
+                    
+@empty
+
+                        <tr><td colspan="6"><div class="emd9-empty"><i class="bi bi-list-check"></i><b>Chưa có công việc kỹ thuật</b><p>Thêm từng đầu việc để theo dõi đúng người, đúng tiến độ và đúng hồ sơ.</p></div></td></tr>
+                    
+@endforelse
+
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </section>
+
+    <section class="emd9-panel" data-emd9-panel="incident">
+        @php
+            $incidentFiles = $schedule->attachments->where('category', 'fault');
+            $maintenanceProposalItems = $maintenanceProposalItems ?? collect();
+            $maintenanceProposalStatuses = [
+                'SUBMITTED' => 'Chờ Admin duyệt',
+                'PENDING' => 'Chờ Admin duyệt',
+                'NEEDS_REVISION' => 'Cần chỉnh sửa',
+                'ADMIN_APPROVED' => 'Đã duyệt · Chờ Kho',
+                'APPROVED' => 'Đã duyệt · Chờ Kho',
+                'PARTIALLY_ALLOCATED' => 'Kho đang soạn',
+                'WAREHOUSE_ALLOCATED' => 'Kho đã soạn',
+                'READY_FOR_EXPORT' => 'Đã chuyển Kho',
+                'EXPORTED' => 'Đã xuất kho',
+                'REJECTED' => 'Đã từ chối',
+            ];
+            $maintenanceProposalTone = fn ($status) => match (strtoupper((string) $status)) {
+                'SUBMITTED', 'PENDING' => 'warning',
+                'NEEDS_REVISION', 'REJECTED' => 'danger',
+                'EXPORTED' => 'success',
+                default => 'success',
+            };
+            $maintenanceQty = fn ($quantity) => rtrim(rtrim(number_format((float) $quantity, 2, ',', '.'), '0'), ',');
+        @endphp
+        <section class="emd9-card emp1-step-card emi12-card">
+            <div class="emi12-head"><div><span>PHÁT SINH · ĐỢT {{ $roundNo }}/{{ $totalRounds }}</span><h2>Phát sinh &amp; đề xuất vật tư</h2></div><span class="emi12-state" data-emi12-state>{{ $hasIncident ? 'Có phát sinh' : 'Không phát sinh' }}</span></div>
+@if($permissions['update'])
+            <form class="emi12-form" method="POST" action="{{ route('projects-unified.maintenance.update', ['schedule'=>$schedule->id]) }}">@csrf @method('PUT')
+                <div class="emi12-toggle-row"><div><b>Có phát sinh?</b><small>Tắt nếu đợt này không có lỗi hoặc vật tư cần xử lý.</small></div><label class="emi12-switch"><input type="checkbox" value="1" @checked($hasIncident) data-emi12-incident-toggle><span></span></label></div>
+                <input type="hidden" name="incident_kind" value="none" data-emi12-incident-none @disabled($hasIncident)>
+                <div class="emi12-fields" data-emi12-incident-fields @if(! $hasIncident) hidden @endif>
+                    <label><span>Loại xử lý</span><select name="incident_kind" data-emi12-incident-kind @disabled(! $hasIncident)><option value="warranty_free" @selected($schedule->incident_kind==='warranty_free')>Bảo hành miễn phí</option><option value="maintenance_free" @selected($schedule->incident_kind==='maintenance_free')>Bảo trì miễn phí</option><option value="warranty_paid" @selected($schedule->incident_kind==='warranty_paid')>Bảo hành có tính phí</option><option value="maintenance_paid" @selected($schedule->incident_kind==='maintenance_paid')>Bảo trì có tính phí</option></select></label>
+                    @if($canViewCosts)<label><span>Chi phí dự kiến</span><div class="emi12-money"><input type="number" min="0" step="1000" name="incident_estimated_cost" value="{{ $schedule->incident_estimated_cost }}"><i>đ</i></div></label>@endif
+                    <label class="wide"><span>Mô tả hư hỏng / hướng xử lý</span><textarea name="incident_replacement_reason" rows="3" placeholder="Nêu hiện trạng, nguyên nhân và phương án xử lý...">{{ $schedule->incident_replacement_reason }}</textarea></label>
+                    <input type="hidden" name="incident_material_note" value="{{ $schedule->incident_material_note }}">
+                    <div class="wide emi12-tools">
+                        <div><i class="bi bi-paperclip"></i><b>{{ $incidentFiles->count() }} minh chứng</b><small>Ảnh lỗi, PDF</small></div>
+                        @if($permissions['upload'])<label class="emi12-file"><input type="file" name="emi12_unused" data-emi12-upload-picker accept=".jpg,.jpeg,.png,.webp,.pdf">+ Thêm file</label>@endif
+                        <div><i class="bi bi-box-seam"></i><b>{{ $maintenanceProposals->count() }} đề xuất vật tư</b><small>Admin duyệt trước khi chuyển Kho</small></div>
+                        @if($schedule->site_id)<button type="button" class="emd9-btn light" data-emi12-proposal-open><i class="bi bi-plus-lg"></i> Tạo đề xuất</button>@endif
                     </div>
-                @endforeach
+                    <div class="wide emi12-actions"><button class="emd9-btn primary" type="submit"><i class="bi bi-save"></i> Lưu phát sinh</button></div>
+                </div>
+            </form>
+@endif
+@if($permissions['upload'])<form hidden data-emi12-upload-form method="POST" action="{{ route('projects-unified.maintenance.schedule-files.store', ['schedule'=>$schedule->id]) }}" enctype="multipart/form-data">@csrf<input type="hidden" name="category" value="fault"><input type="file" name="files[]" data-emi12-upload-target accept=".jpg,.jpeg,.png,.webp,.pdf"><input type="hidden" name="description" value="Hình ảnh lỗi / phát sinh"></form>@endif
+@if($permissions['update'] && $schedule->site_id)
+<div class="emi12-modal emi13-modal" data-emi12-proposal-modal hidden>
+    <div class="emi12-backdrop" data-emi12-proposal-close></div>
+
+    <section>
+        <header>
+            <div>
+                <span>ĐỀ XUẤT VẬT TƯ</span>
+                <h3>Tạo đề xuất mới</h3>
             </div>
-            <div class="om10-team-summary">Đã chọn <strong data-om10-team-count>0</strong> người</div>
 
-            @if($externalFinanceLocked)
-                <div class="om19-modal-finance-lock">
-                    <i class="bi bi-lock-fill"></i>
-                    <span><strong>Đã có ĐNTT #{{ $schedule->external_labor_payment_request_id }}</strong><small>Chỉ sửa nhân sự nội bộ. Thông tin thuê ngoài được giữ nguyên để không lệch Tài chính.</small></span>
-                </div>
-            @endif
+            <button type="button" data-emi12-proposal-close>×</button>
+        </header>
 
-            <section class="om18-external-form" data-om18-external-wrap>
-                <label class="om18-external-toggle">
-                    <input type="checkbox" name="external_labor_enabled" value="1" data-om18-external-toggle @checked($schedule->external_labor_enabled) @disabled($externalFinanceLocked)>
-                    <span><i class="bi bi-person-workspace"></i></span>
-                    <div><strong>Thuê nhân công ngoài</strong><small>Bật khi cần thuê thêm đội/người ngoài công ty cho đợt này.</small></div>
-                </label>
-                <div class="om18-external-fields" data-om18-external-fields @if(!$schedule->external_labor_enabled) hidden @endif>
-                    <label><span>Đơn vị / người nhận việc</span><input name="external_labor_name" value="{{ old('external_labor_name',$schedule->external_labor_name) }}" placeholder="VD: Đội thi công ABC" @disabled($externalFinanceLocked)></label>
-                    <label><span>Số điện thoại</span><input name="external_labor_phone" value="{{ old('external_labor_phone',$schedule->external_labor_phone) }}" placeholder="SĐT liên hệ" @disabled($externalFinanceLocked)></label>
-                    <label><span>Số lượng nhân công *</span><input type="number" min="1" max="999" name="external_labor_headcount" value="{{ old('external_labor_headcount',$schedule->external_labor_headcount) }}" placeholder="VD: 4" @disabled($externalFinanceLocked)></label>
-                    <label><span>Tổng tiền công *</span><input type="number" min="0" step="1000" name="external_labor_total_cost" value="{{ old('external_labor_total_cost',(int)$schedule->external_labor_total_cost) }}" placeholder="VD: 8000000" @disabled($externalFinanceLocked)></label>
-                    <label><span>Số tiền đề nghị / tạm ứng</span><input type="number" min="0" step="1000" name="external_labor_advance_amount" value="{{ old('external_labor_advance_amount',(int)$schedule->external_labor_advance_amount) }}" placeholder="Để 0 = đề nghị toàn bộ tiền công" @disabled($externalFinanceLocked)></label>
-                    <label><span>Thông tin ngân hàng</span><input name="external_labor_bank_info" value="{{ old('external_labor_bank_info',$schedule->external_labor_bank_info) }}" placeholder="Ngân hàng - STK - Chủ TK" @disabled($externalFinanceLocked)></label>
-                    <label class="wide"><span>Nội dung / phạm vi công việc</span><textarea name="external_labor_note" rows="3" placeholder="Nội dung thuê ngoài, điều kiện thanh toán..." @disabled($externalFinanceLocked)>{{ old('external_labor_note',$schedule->external_labor_note) }}</textarea></label>
-                    <p class="om18-external-hint"><i class="bi bi-info-circle"></i> Khi sếp duyệt phân công, hệ thống tự tạo ĐNTT. Nếu số tiền tạm ứng = 0, ĐNTT lấy toàn bộ tổng tiền công.</p>
+        <form class="emi13-form" method="POST" action="{{ route('projects-unified.materials.proposal.store', ['site' => $schedule->site_id]) }}">
+            @csrf
+
+            <input type="hidden" name="proposal_type" value="REPLACEMENT">
+
+            <input
+                type="hidden"
+                name="warranty_scope"
+                value="{{ in_array($schedule->incident_kind, ['warranty_paid', 'maintenance_paid'], true) ? 'out_of_scope' : 'pending_assessment' }}"
+                data-emi12-warranty-scope
+            >
+
+            <input
+                type="hidden"
+                name="purpose"
+                value="[Bảo trì {{ $schedule->schedule_code }}] Đề xuất vật tư phát sinh"
+            >
+
+            <div class="emi13-import">
+                <div>
+                    <strong>Nhập tay hoặc tải file Excel</strong>
+                    <small>Chỉ cần ba cột: Tên vật tư, Số lượng, Ghi chú.</small>
                 </div>
-            </section>
-        </div>
-        <div class="modal-footer"><button class="om10-btn light" type="button" data-bs-dismiss="modal">Hủy</button><button class="om10-btn primary" type="submit">{{ $isAdminReviewingPastStep && $adminViewStep===2 ? 'Lưu chỉnh sửa của Admin' : 'Lưu phân công' }}</button></div>
-    </form></div>
+
+                <div class="emi13-import-actions">
+                    <button type="button" class="emi13-secondary" data-emi13-template>
+                        ↓ File mẫu
+                    </button>
+
+                    <label class="emi13-secondary">
+                        Nhập Excel
+                        <input
+                            type="file"
+                            accept=".csv,.xlsx,.xls"
+                            data-emi13-import
+                            hidden
+                        >
+                    </label>
+                </div>
+            </div>
+
+            <div class="emi13-table-wrap">
+                <table class="emi13-table">
+                    <thead>
+                        <tr>
+                            <th>Tên vật tư</th>
+                            <th>Số lượng</th>
+                            <th>Ghi chú</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+
+                    <tbody data-emi13-rows></tbody>
+                </table>
+            </div>
+
+            <button type="button" class="emi13-add" data-emi13-add>
+                + Thêm vật tư
+            </button>
+
+            <footer>
+                <small>
+                    <b data-emi13-count>1</b> vật tư · Admin duyệt xong mới chuyển Kho.
+                </small>
+
+                <button class="emd9-btn primary" type="submit">
+                    <i class="bi bi-send"></i>
+                    Gửi Admin duyệt
+                </button>
+            </footer>
+        </form>
+    </section>
 </div>
 @endif
+@if($warrantyClaim)
+            <div class="emd9-info-grid">
+                <div><small>Mã phiếu</small><strong>{{ $warrantyClaim->claim_code }}</strong></div>
+                <div><small>Trạng thái</small><strong>{{ $warrantyStatuses[$warrantyClaim->status] ?? $warrantyClaim->status }}</strong></div>
+                <div><small>Serial lỗi</small><strong>{{ $warrantyClaim->serial_code ?: 'Chưa xác định' }}</strong></div>
+                <div><small>Hình thức</small><strong>{{ $warrantyClaim->is_chargeable ? 'Có tính phí' : 'Miễn phí / bảo hành' }}</strong></div>
+                <div class="wide"><small>Lỗi / hư hỏng phát hiện</small><p>{{ $warrantyClaim->issue_description ?: 'Chưa ghi nhận phát sinh.' }}</p></div>
+                <div class="wide"><small>Phương án xử lý</small><p>{{ $warrantyClaim->proposed_solution ?: 'Chưa cập nhật phương án.' }}</p></div>
+            </div>
+            @if($canViewCosts)<div class="emp1-costs"><span>Dự kiến <b>{{ number_format((float)$warrantyClaim->estimated_cost,0,',','.') }} đ</b></span><span>Thực tế <b>{{ number_format((float)$warrantyClaim->actual_cost,0,',','.') }} đ</b></span><span>Phiếu kho <b>{{ $warrantyClaim->stockMovements->count() }}</b></span></div>@endif
+@if($canUpdateWarranty)
+            <form class="emp1-form emp1-incident-form" method="POST" action="{{ route('projects-unified.maintenance.claims.status', ['claim'=>$warrantyClaim->id]) }}">@csrf
+                <label><span>Trạng thái xử lý</span><select name="status"><?php $allowedClaimStatuses = array_unique(array_merge([$warrantyClaim->status], $warrantyTransitions[$warrantyClaim->status] ?? [])); ?> @foreach($allowedClaimStatuses as $claimStatus)<option value="{{ $claimStatus }}" @selected($claimStatus===$warrantyClaim->status)>{{ $warrantyStatuses[$claimStatus] ?? $claimStatus }}</option>@endforeach</select></label>
+                <label class="wide"><span>Chẩn đoán</span><textarea name="diagnosis" rows="3">{{ $warrantyClaim->diagnosis }}</textarea></label>
+                <label class="wide"><span>Phương án xử lý</span><textarea name="proposed_solution" rows="3">{{ $warrantyClaim->proposed_solution }}</textarea></label>
+                <label class="wide"><span>Kết quả xử lý</span><textarea name="resolution" rows="3">{{ $warrantyClaim->resolution }}</textarea></label>
+@if($canViewCosts)<label><span>Chi phí thực tế</span><input type="number" min="0" step="0.01" name="actual_cost" value="{{ $warrantyClaim->actual_cost }}"></label>@endif
+                <div class="wide emp1-actions"><button class="emd9-btn primary" type="submit"><i class="bi bi-save"></i> Lưu phát sinh</button></div>
+            </form>
+@endif
+@endif
+            <?php if ($maintenanceProposals->isNotEmpty()): ?>
+                <section class="emi14-history">
+                    <header class="emi14-history-head">
+                        <div>
+                            <h3>Đề xuất vật tư đã gửi</h3>
+                            <small>Bấm Xem / Duyệt để mở chi tiết ngay tại trang này.</small>
+                        </div>
+                        <span>{{ $maintenanceProposals->count() }} phiếu</span>
+                    </header>
+
+                    <div class="emi14-table-wrap">
+                        <table class="emi14-table">
+                            <thead>
+                                <tr>
+                                    <th>Phiếu / Người đề xuất</th>
+                                    <th>Vật tư</th>
+                                    <th>Ghi chú bảo hành / bảo trì</th>
+                                    <th>Trạng thái</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($maintenanceProposals as $proposal): ?>
+                                    <?php
+                                        $proposalStatus = strtoupper((string) $proposal->status);
+                                        $proposalItems = $maintenanceProposalItems[$proposal->id] ?? collect();
+                                        $proposalNote = $proposal->note ?: $schedule->incident_replacement_reason;
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <strong>DX-{{ str_pad((string) $proposal->id, 5, '0', STR_PAD_LEFT) }}</strong>
+                                            <small>{{ $proposal->creator_name ?: 'Người lập' }} · {{ \Illuminate\Support\Carbon::parse($proposal->created_at)->format('d/m/Y H:i') }}</small>
+                                        </td>
+                                        <td>
+                                            <strong>{{ $proposalItems->count() }} dòng</strong>
+                                            <small>{{ $maintenanceQty($proposalItems->sum('requested_qty')) }} tổng số lượng</small>
+                                        </td>
+                                        <td>{{ \Illuminate\Support\Str::limit($proposalNote ?: '—', 65) }}</td>
+                                        <td><span class="emi14-status {{ $maintenanceProposalTone($proposalStatus) }}">{{ $maintenanceProposalStatuses[$proposalStatus] ?? $proposalStatus }}</span></td>
+                                        <td class="emi14-actions"><button type="button" class="emi14-view" data-emi14-open="proposal-{{ $proposal->id }}">Xem / Duyệt <i class="bi bi-chevron-right"></i></button></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <?php foreach ($maintenanceProposals as $proposal): ?>
+                    <?php
+                        $proposalStatus = strtoupper((string) $proposal->status);
+                        $proposalItems = $maintenanceProposalItems[$proposal->id] ?? collect();
+                        $linkedMaterialRequestId = $proposalItems->pluck('material_request_id')->filter()->first();
+                        $proposalNote = $proposal->note ?: $schedule->incident_replacement_reason;
+                        $incidentKindLabels = [
+                            'warranty_free' => 'Bảo hành miễn phí',
+                            'maintenance_free' => 'Bảo trì miễn phí',
+                            'warranty_paid' => 'Bảo hành có tính phí',
+                            'maintenance_paid' => 'Bảo trì có tính phí',
+                        ];
+                    ?>
+                    <div class="emi14-detail-modal" data-emi14-modal="proposal-{{ $proposal->id }}" hidden>
+                        <div class="emi14-backdrop" data-emi14-close></div>
+                        <section class="emi14-detail-card" role="dialog" aria-modal="true" aria-labelledby="emi14-title-{{ $proposal->id }}">
+                            <header>
+                                <div><small>CHI TIẾT ĐỀ XUẤT</small><h3 id="emi14-title-{{ $proposal->id }}">DX-{{ str_pad((string) $proposal->id, 5, '0', STR_PAD_LEFT) }}</h3></div>
+                                <button type="button" class="emi14-close" data-emi14-close aria-label="Đóng">×</button>
+                            </header>
+
+                            <div class="emi14-detail-meta">
+                                <div><small>Người đề xuất</small><strong>{{ $proposal->creator_name ?: 'Người lập' }}</strong></div>
+                                <div><small>Loại xử lý</small><strong>{{ $incidentKindLabels[$schedule->incident_kind] ?? 'Bảo trì / Bảo hành' }}</strong></div>
+                                <div><small>Trạng thái</small><strong>{{ $maintenanceProposalStatuses[$proposalStatus] ?? $proposalStatus }}</strong></div>
+                            </div>
+
+                            <div class="emi14-detail-body">
+                                <table class="emi14-detail-table">
+                                    <thead><tr><th>Tên vật tư đề xuất</th><th>Số lượng</th><th>Ghi chú</th><th>Sản phẩm Kho đã chọn</th></tr></thead>
+                                    <tbody>
+                                        <?php if ($proposalItems->isNotEmpty()): ?>
+                                        <?php foreach ($proposalItems as $item): ?>
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ $item->requested_name }}</strong>
+                                                    <?php if ($item->requested_spec): ?>
+                                                        <small>{{ $item->requested_spec }}</small>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>{{ $maintenanceQty($item->requested_qty) }} {{ $item->requested_unit ?: '' }}</td>
+                                                <td>{{ $item->request_note ?: '—' }}</td>
+                                                <td>
+                                                    <?php if (data_get($item, 'selected_product_name')): ?>
+                                                        <strong>{{ data_get($item, 'selected_product_name') }}</strong>
+                                                        <small>{{ data_get($item, 'selected_warehouse_name') ?: 'Kho đã ghép' }}</small>
+                                                    <?php elseif ($linkedMaterialRequestId): ?>
+                                                        <span>Kho chưa ghép sản phẩm</span>
+                                                    <?php else: ?>
+                                                        <span>Chưa chuyển Kho</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <tr><td colspan="4">Phiếu chưa có dòng vật tư.</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+
+                                <div class="emi14-warranty-note"><b>Ghi chú bảo hành / bảo trì</b><p>{{ $proposalNote ?: 'Chưa có ghi chú.' }}</p></div>
+                                <?php if ($proposalStatus === 'NEEDS_REVISION' && $proposal->approval_note): ?>
+                                    <div class="emi14-review-note"><i class="bi bi-exclamation-circle"></i> {{ $proposal->approval_note }}</div>
+                                <?php endif; ?>
+                            </div>
+
+                            <?php if (($permissions['assignment_admin'] ?? false) && in_array($proposalStatus, ['SUBMITTED', 'PENDING', 'NEEDS_REVISION'], true)): ?>
+                                <footer class="emi14-review">
+                                    <form class="emi14-return-form" method="POST" action="{{ route('projects-unified.materials.proposal.return', ['site' => $schedule->site_id, 'proposal' => $proposal->id]) }}">
+                                        @csrf
+                                        <input type="hidden" name="return_to" value="maintenance">
+                                        <input name="revision_note" required maxlength="2000" placeholder="Lý do trả chỉnh sửa...">
+                                        <button class="emi14-return" type="submit">Trả chỉnh sửa</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('projects-unified.materials.proposal.approve', ['site' => $schedule->site_id, 'proposal' => $proposal->id]) }}">
+                                        @csrf
+                                        <input type="hidden" name="return_to" value="maintenance">
+                                        <input type="hidden" name="approval_note" value="Duyệt từ hồ sơ {{ $schedule->schedule_code }}">
+                                        <button class="emi14-approve" type="submit"><i class="bi bi-check2-circle"></i> Duyệt &amp; chuyển Kho</button>
+                                    </form>
+                                </footer>
+                            <?php elseif ($linkedMaterialRequestId && Route::has('material-requests.show')): ?>
+                                <footer class="emi14-review simple"><a class="emi14-neutral" href="{{ route('material-requests.show', $linkedMaterialRequestId) }}"><i class="bi bi-box-seam"></i> Xem phiếu Kho #{{ $linkedMaterialRequestId }}</a></footer>
+                            <?php else: ?>
+                                <footer class="emi14-review simple"><button type="button" class="emi14-neutral" data-emi14-close>Đóng</button></footer>
+                            <?php endif; ?>
+                        </section>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </section>
+    </section>
+
+    <section class="emd9-panel" data-emd9-panel="complete">
+        <section class="emd9-card emp1-step-card">
+            <div class="emd9-card-head"><div><span class="emp1-kicker">HOÀN TẤT - ĐỢT {{ $roundNo }}/{{ $totalRounds }}</span><h2>{{ $roundCompleted ? 'Đợt đã hoàn thành' : 'Hoàn tất đợt bảo trì' }}</h2><p>{{ $roundCompleted ? 'Checklist và minh chứng đã được lưu vào hồ sơ công trình.' : 'Chốt kết quả và gửi duyệt ngay tại bước hoàn tất.' }}</p></div><span class="emd9-badge {{ $statusTone }}">{{ $statusLabel }}</span></div>
+            <div class="emd9-info-grid">
+                <div><small>Trạng thái đợt</small><strong>{{ $statusLabel }}</strong></div>
+                <div><small>Trạng thái duyệt</small><strong>{{ $approvalLabel }}</strong></div>
+                <div><small>Tiến độ xử lý</small><strong>{{ $displayProgress }}%</strong></div>
+                <div><small>Hồ sơ đính kèm</small><strong>{{ $schedule->attachments->count() }} file</strong></div>
+                <div class="wide"><small>Kết quả cuối cùng</small><p>{{ $schedule->result_note ?: 'Chưa cập nhật kết quả cuối cùng.' }}</p></div>
+                <div class="wide"><small>Phản hồi duyệt</small><p>{{ $schedule->approval_note ?: 'Chưa có phản hồi.' }}</p></div>
+            </div>
+@if($permissions['update'])
+            <form class="emp1-form emp1-result-form" method="POST" action="{{ route('projects-unified.maintenance.update', ['schedule'=>$schedule->id]) }}">@csrf @method('PUT')
+                <label class="wide"><span>Kết quả cuối cùng</span><textarea name="result_note" rows="5">{{ $schedule->result_note }}</textarea></label>
+                @if($canViewCosts)<label><span>Chi phí thực tế (VNĐ)</span><input type="number" min="0" step="1000" name="completion_actual_cost" value="{{ $schedule->completion_actual_cost }}"></label>@endif
+                <fieldset class="wide emp1-radio-group"><legend>XÁC NHẬN</legend><label><input type="radio" name="completion_state" value="completed" @checked($schedule->completion_state==='completed')> Hoàn thành đợt</label><label><input type="radio" name="completion_state" value="needs_followup" @checked($schedule->completion_state==='needs_followup')> Chưa hoàn thành / cần xử lý tiếp</label></fieldset>
+                <div class="wide emp1-actions"><button class="emd9-btn light" type="submit"><i class="bi bi-save"></i> Lưu kết quả</button></div>
+            </form>
+@endif
+@if($permissions['upload'])
+            <form class="emp1-upload" method="POST" action="{{ route('projects-unified.maintenance.schedule-files.store', ['schedule'=>$schedule->id]) }}" enctype="multipart/form-data">@csrf<input type="hidden" name="category" value="report"><input type="file" name="files[]" multiple required accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.mp4"><input name="description" placeholder="Ghi chú hồ sơ hoàn thành"><button class="emd9-btn light" type="submit"><i class="bi bi-cloud-arrow-up"></i> Tải hồ sơ</button></form>
+@endif
+            <div class="emp1-complete-actions" id="emp1-complete-actions">
+@if($permissions['submit'] && in_array($schedule->status,['in_progress','waiting_material','waiting_submission','revision_requested'],true))<form method="POST" action="{{ route('projects-unified.maintenance.approval.submit', ['schedule'=>$schedule->id]) }}">@csrf<textarea name="comment" rows="2" placeholder="Ghi chú khi gửi duyệt"></textarea><button class="emd9-btn primary" type="submit"><i class="bi bi-send-check"></i> Gửi duyệt</button></form>@endif
+@if($permissions['approve'] && $schedule->status==='pending_approval')<form method="POST" action="{{ route('projects-unified.maintenance.approval.approve', ['schedule'=>$schedule->id]) }}">@csrf<textarea name="comment" rows="2" placeholder="Nhận xét phê duyệt"></textarea><button class="emd9-btn success" type="submit"><i class="bi bi-patch-check"></i> Phê duyệt</button></form>@endif
+@if($permissions['approve'] && $schedule->status==='approved')<form method="POST" action="{{ route('projects-unified.maintenance.approval.complete', ['schedule'=>$schedule->id]) }}">@csrf<textarea name="comment" rows="2" placeholder="Ghi chú đóng hồ sơ"></textarea><button class="emd9-btn success" type="submit"><i class="bi bi-check2-circle"></i> Xác nhận hoàn thành đợt</button></form>@endif
+            </div>
+        </section>
+    </section>
+
+    <section class="emd9-panel" data-emd9-panel="documents">
+        <div class="emd9-doc-grid">
+            <main>
+                <section class="emd9-card">
+                    <div class="emd9-card-head"><div><h2>Tài liệu đính kèm</h2><p>Ảnh trước, trong, sau xử lý; serial; biên bản; PDF; Excel và video.</p></div><strong>{{ $schedule->attachments->count() }} file</strong></div>
+                    
+@if($permissions['upload'])
+
+                    <form class="emd9-upload" method="POST" action="{{ route('projects-unified.maintenance.schedule-files.store', ['schedule'=>$schedule->id]) }}" enctype="multipart/form-data">
+                        @csrf
+                        <select name="category" required><option value="before">Trước xử lý</option><option value="during">Trong xử lý</option><option value="after">Sau xử lý</option><option value="fault">Thiết bị lỗi</option><option value="serial">Ảnh serial</option><option value="report">Biên bản</option><option value="video">Video</option><option value="other">Khác</option></select>
+                        <select name="work_item_id"><option value="">Hồ sơ chung của đợt</option>
+@foreach($workItems as $item)
+<option value="{{ $item->id }}">{{ $item->title }}</option>
+@endforeach
+</select>
+                        <input type="file" name="files[]" multiple required accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.mp4">
+                        <input name="description" placeholder="Ghi chú nhóm file">
+                        <button class="emd9-btn primary" type="submit"><i class="bi bi-cloud-arrow-up"></i> Tải lên</button>
+                    </form>
+                    
+@endif
+
+                    <div class="emd9-files">
+                        
+@forelse($schedule->attachments as $attachment)
+
+                        <article>
+                            <span class="emd9-file-icon"><i class="bi bi-file-earmark"></i></span>
+                            <div><b>{{ mb_strimwidth($attachment->original_name, 0, 60, '…') }}</b><small>{{ strtoupper($attachment->category) }} · {{ number_format($attachment->file_size/1024,1) }} KB · {{ $attachment->uploader?->name ?: 'Hệ thống' }} · {{ optional($attachment->created_at)->format('d/m/Y H:i') }}</small>
+@if($attachment->workItem)
+<em>Công việc: {{ $attachment->workItem->title }}</em>
+@endif
+</div>
+                            <a href="{{ route('projects-unified.maintenance.schedule-files.preview', ['attachment'=>$attachment->id]) }}" target="_blank" title="Xem trước"><i class="bi bi-eye"></i></a>
+                            <a href="{{ route('projects-unified.maintenance.schedule-files.download', ['attachment'=>$attachment->id]) }}" title="Tải xuống"><i class="bi bi-download"></i></a>
+                            
+@if($permissions['upload'])
+<form method="POST" action="{{ route('projects-unified.maintenance.schedule-files.destroy', ['attachment'=>$attachment->id]) }}" onsubmit="return confirm('Xóa file này?')">@csrf @method('DELETE')<button type="submit" title="Xóa"><i class="bi bi-trash3"></i></button></form>
+@endif
+
+                        </article>
+                        
+@empty
+<div class="emd9-empty"><i class="bi bi-folder2-open"></i><b>Chưa có tài liệu</b></div>
+@endforelse
+
+                    </div>
+                </section>
+
+                <section class="emd9-card">
+                    <div class="emd9-card-head"><div><h2>Bình luận nội bộ</h2><p>Trao đổi giữa Giám đốc, Trưởng phòng, Kỹ thuật, Kho và Kế toán.</p></div></div>
+                    
+@if($permissions['comment'])
+
+                    <form class="emd9-comment-form" method="POST" action="{{ route('projects-unified.maintenance.comments.store', ['schedule'=>$schedule->id]) }}">@csrf<textarea name="body" rows="3" required maxlength="5000" placeholder="Nhập bình luận, có thể ghi @Tên người cần lưu ý..."></textarea><button class="emd9-btn primary" type="submit"><i class="bi bi-send"></i> Gửi bình luận</button></form>
+                    
+@endif
+
+                    <div class="emd9-comments">
+                        
+@forelse($comments as $comment)
+
+                        <article><span>{{ mb_substr($comment->user?->name ?: '?',0,1) }}</span><div><b>{{ $comment->user?->name ?: 'Người dùng đã xóa' }}</b><small>{{ optional($comment->created_at)->format('d/m/Y H:i') }}</small><p>{{ $comment->body }}</p></div>
+@if((int)$comment->user_id===(int)auth()->id() || $permissions['manager'])
+<form method="POST" action="{{ route('projects-unified.maintenance.comments.destroy', ['schedule'=>$schedule->id,'comment'=>$comment->id]) }}" onsubmit="return confirm('Xóa bình luận này?')">@csrf @method('DELETE')<button><i class="bi bi-trash3"></i></button></form>
+@endif
+</article>
+                        
+@empty
+<div class="emd9-empty compact">Chưa có bình luận nội bộ.</div>
+@endforelse
+
+                    </div>
+                </section>
+            </main>
+
+            <aside>
+                <section class="emd9-card" id="emd9-approval-actions">
+                    <div class="emd9-card-head"><div><h2>Ghi chú &amp; phê duyệt</h2><p>{{ $approvalLabel }}</p></div></div>
+                    <div class="emd9-note"><b>Ghi chú kỹ thuật</b><p>{{ $schedule->technical_note ?: 'Chưa có ghi chú.' }}</p></div>
+                    <div class="emd9-note"><b>Kết quả xử lý</b><p>{{ $schedule->result_note ?: 'Chưa cập nhật kết quả.' }}</p></div>
+                    <div class="emd9-note"><b>Phản hồi duyệt</b><p>{{ $schedule->approval_note ?: 'Chưa có phản hồi.' }}</p></div>
+                    <div class="emd9-approval-actions">
+                        
+@if($permissions['submit'] && in_array($schedule->status,['in_progress','waiting_material','waiting_submission','revision_requested'],true))
+<form method="POST" action="{{ route('projects-unified.maintenance.approval.submit', ['schedule'=>$schedule->id]) }}">@csrf<textarea name="comment" rows="2" placeholder="Ghi chú khi gửi duyệt"></textarea><button class="emd9-btn primary" type="submit"><i class="bi bi-send-check"></i> Gửi duyệt</button></form>
+@endif
+
+@if($permissions['approve'] && $schedule->status==='pending_approval')
+<form method="POST" action="{{ route('projects-unified.maintenance.approval.approve', ['schedule'=>$schedule->id]) }}">@csrf<textarea name="comment" rows="2" placeholder="Nhận xét phê duyệt"></textarea><button class="emd9-btn success" type="submit"><i class="bi bi-patch-check"></i> Phê duyệt</button></form>
+@endif
+
+@if($permissions['revision'] && $schedule->status==='pending_approval')
+<form method="POST" action="{{ route('projects-unified.maintenance.approval.revision', ['schedule'=>$schedule->id]) }}">@csrf<textarea name="comment" rows="2" required placeholder="Nội dung cần chỉnh sửa"></textarea><button class="emd9-btn warning" type="submit"><i class="bi bi-arrow-return-left"></i> Yêu cầu chỉnh sửa</button></form>
+@endif
+
+@if($permissions['reject'] && $schedule->status==='pending_approval')
+<form method="POST" action="{{ route('projects-unified.maintenance.approval.reject', ['schedule'=>$schedule->id]) }}" onsubmit="return confirm('Từ chối kết quả này?')">@csrf<textarea name="comment" rows="2" required placeholder="Lý do từ chối"></textarea><button class="emd9-btn danger" type="submit"><i class="bi bi-x-octagon"></i> Từ chối</button></form>
+@endif
+
+@if($permissions['approve'] && $schedule->status==='approved')
+<form method="POST" action="{{ route('projects-unified.maintenance.approval.complete', ['schedule'=>$schedule->id]) }}" onsubmit="return confirm('Hoàn thành và đóng hồ sơ?')">@csrf<textarea name="comment" rows="2" placeholder="Ghi chú đóng hồ sơ"></textarea><button class="emd9-btn success" type="submit"><i class="bi bi-check2-circle"></i> Hoàn thành &amp; đóng hồ sơ</button></form>
+@endif
+
+@if($permissions['reopen'] && in_array($schedule->status,['approved','completed','pending_approval','revision_requested'],true))
+<form method="POST" action="{{ route('projects-unified.maintenance.approval.reopen', ['schedule'=>$schedule->id]) }}">@csrf<textarea name="comment" rows="2" required placeholder="Lý do mở lại"></textarea><button class="emd9-btn light" type="submit"><i class="bi bi-arrow-clockwise"></i> Mở lại công việc</button></form>
+@endif
+
+                    </div>
+                </section>
+
+@if($warrantyClaim && $canUpdateWarranty)
+
+                <section class="emd9-card">
+                    <div class="emd9-card-head"><div><h2>Cập nhật phiếu bảo hành</h2><p>{{ $warrantyClaim->claim_code }}</p></div></div>
+                    <form class="emd9-stack-form" method="POST" action="{{ route('projects-unified.maintenance.claims.status', ['claim'=>$warrantyClaim->id]) }}">@csrf
+                        <label><span>Trạng thái tiếp theo</span><select name="status">
+<?php $allowedClaimStatuses = array_unique(array_merge([$warrantyClaim->status], $warrantyTransitions[$warrantyClaim->status] ?? [])); ?>
+ 
+@foreach($allowedClaimStatuses as $claimStatus)
+<option value="{{ $claimStatus }}" @selected($claimStatus===$warrantyClaim->status)>{{ $warrantyStatuses[$claimStatus] ?? $claimStatus }}</option>
+@endforeach
+</select></label>
+                        <label><span>Chẩn đoán</span><textarea name="diagnosis" rows="3">{{ $warrantyClaim->diagnosis }}</textarea></label>
+                        <label><span>Phương án đề xuất</span><textarea name="proposed_solution" rows="3">{{ $warrantyClaim->proposed_solution }}</textarea></label>
+                        <label><span>Kết quả xử lý</span><textarea name="resolution" rows="3">{{ $warrantyClaim->resolution }}</textarea></label>
+                        
+@if($canViewCosts)
+<label><span>Chi phí thực tế</span><input type="number" min="0" step="0.01" name="actual_cost" value="{{ $warrantyClaim->actual_cost }}"></label>
+@endif
+
+                        <button class="emd9-btn primary" type="submit">Cập nhật phiếu</button>
+                    </form>
+                </section>
+                
+@endif
+
+                
+@if($warrantyClaim)
+
+                <section class="emd9-card">
+                    <div class="emd9-card-head"><div><h2>Kho &amp; đổi thiết bị</h2><p>Serial lỗi: {{ $warrantyClaim->serial_code ?: '—' }}</p></div></div>
+                    <div class="emd9-stock-list">
+                        
+@forelse($warrantyClaim->stockMovements as $movement)
+
+                        <article><div><b>{{ $movement->movement_code ?: '#'.$movement->id }}</b><small>{{ $stockTypes[$movement->movement_type] ?? $movement->movement_type }} · {{ $movement->warehouse?->name ?: 'Chưa chọn kho' }}</small><em>{{ $movement->serial_code }}</em></div><span class="emd9-status">{{ $stockStatuses[$movement->status] ?? $movement->status }}</span></article>
+                        
+@empty
+<div class="emd9-empty compact">Chưa phát sinh phiếu kho.</div>
+@endforelse
+
+                    </div>
+                    
+@if($permissions['stock'])
+
+                    <details class="emd9-stock-create"><summary>+ Tạo yêu cầu kho</summary><form class="emd9-stack-form" method="POST" action="{{ route('projects-unified.maintenance.stock.store') }}">@csrf<input type="hidden" name="warranty_claim_id" value="{{ $warrantyClaim->id }}"><label><span>Nghiệp vụ</span><select name="movement_type">
+@foreach($stockTypes as $key=>$label)
+<option value="{{ $key }}">{{ $label }}</option>
+@endforeach
+</select></label><label><span>Kho</span><select name="warehouse_id" required><option value="">Chọn kho</option>
+@foreach($warehouses as $warehouse)
+<option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+@endforeach
+</select></label><label><span>Serial</span><input name="serial_code" required placeholder="Nhập chính xác serial"></label><label><span>Serial liên quan</span><input name="related_serial_code" placeholder="Không bắt buộc"></label><label><span>Ghi chú</span><textarea name="note" rows="2"></textarea></label><button class="emd9-btn primary" type="submit">Tạo yêu cầu</button></form></details>
+                    
+@endif
+
+@if($canViewCosts)
+
+                    <div class="emd9-cost-box"><div><small>Dự kiến</small><b>{{ number_format((float)$warrantyClaim->estimated_cost,0,',','.') }} đ</b></div><div><small>Thực tế</small><b>{{ number_format((float)$warrantyClaim->actual_cost,0,',','.') }} đ</b></div><div><small>Hình thức</small><b>{{ $warrantyClaim->is_chargeable ? 'Tính phí' : 'Bảo hành miễn phí' }}</b></div></div>
+                    
+@endif
+
+                </section>
+                
+@endif
+
+            </aside>
+        </div>
+    </section>
+
+    <section class="emd9-panel" data-emd9-panel="history">
+        <section class="emd9-card">
+            <div class="emd9-card-head"><div><h2>Lịch sử xử lý</h2><p>Trạng thái, phê duyệt, công việc và thay đổi quan trọng.</p></div></div>
+            <div class="emd9-history">
+                
+@foreach($schedule->approvals as $approval)
+<article><span></span><div><b>{{ strtoupper(str_replace('_',' ',$approval->action)) }}</b><p>{{ $approval->comment ?: ($approvalStatuses[$approval->status] ?? $approval->status) }}</p><small>{{ $approval->approver?->name ?: $approval->submitter?->name ?: 'Hệ thống' }} · {{ optional($approval->reviewed_at ?: $approval->submitted_at ?: $approval->created_at)->format('d/m/Y H:i') }}</small></div></article>
+@endforeach
+
+@foreach($schedule->statusHistories as $history)
+<article><span></span><div><b>{{ $statuses[$history->to_status] ?? $history->to_status }}</b><p>{{ $history->reason ?: $history->note ?: 'Cập nhật trạng thái' }}</p><small>{{ $history->user?->name ?: 'Hệ thống' }} · {{ optional($history->changed_at ?: $history->created_at)->format('d/m/Y H:i') }}</small></div></article>
+@endforeach
+
+@foreach($workItems->sortByDesc('updated_at') as $workItem)
+<article><span></span><div><b>Công việc: {{ $workItem->title }}</b><p>{{ $workStatuses[$workItem->status] ?? $workItem->status }} · {{ $workItem->progress_percent }}%</p><small>{{ $workItem->assignee?->name ?: $workItem->creator?->name ?: 'Hệ thống' }} · {{ optional($workItem->updated_at)->format('d/m/Y H:i') }}</small></div></article>
+@endforeach
+
+@if($schedule->approvals->isEmpty() && $schedule->statusHistories->isEmpty() && $workItems->isEmpty())
+<div class="emd9-empty">Chưa có lịch sử.</div>
+@endif
+
+            </div>
+        </section>
+    </section>
+
+        </div>
+
+        <aside class="emx2-side" aria-label="Hồ sơ tại chỗ và nhóm thực hiện">
+            <section class="emx2-side-card"><header><h3>Hồ sơ tại chỗ</h3><span class="emd9-badge {{ $checklistPercent >= 100 ? 'success' : 'warning' }}">{{ $checklistPercent >= 100 ? 'Sẵn sàng' : 'Đang bổ sung' }}</span></header><div class="emx2-donut" style="--emx2-progress:{{ $checklistPercent }}"><div><strong>{{ $checklistPercent }}%</strong><small>checklist bắt buộc</small></div></div><dl><div><dt>Hoàn thành</dt><dd>{{ $completedChecklist }}/{{ $requiredChecklist }}</dd></div><div><dt>Thiếu minh chứng</dt><dd>{{ max(0, $requiredChecklist - $completedChecklist) }} bước</dd></div><div><dt>Tổng file</dt><dd>{{ $attachmentCount }}</dd></div></dl>@foreach($schedule->attachments->take(3) as $attachment)<a class="emx2-side-file" href="{{ route('projects-unified.maintenance.schedule-files.preview', ['attachment'=>$attachment->id]) }}" target="_blank"><i class="bi bi-eye"></i> {{ \Illuminate\Support\Str::limit($attachment->original_name, 34) }}</a>@endforeach @if($attachmentCount > 3)<button type="button" class="emx2-more-files" data-emx2-open-tab="documents">Xem thêm {{ $attachmentCount - 3 }} file</button>@endif</section>
+            <section class="emx2-side-card"><header><h3>Nhóm thực hiện</h3>@if($permissions['assignment_manage'])<button type="button" data-emx2-open-assignment>Chỉnh sửa</button>@endif</header>@forelse($schedule->assignees as $assignee)<div class="emx2-member"><span>{{ mb_strtoupper(mb_substr($assignee->user?->name ?: '?', 0, 1)) }}</span><div><strong>{{ $assignee->user?->name ?: 'Nhân sự' }}</strong><small>{{ (int) $assignee->user_id === (int) $leaderId ? 'Phụ trách chính' : 'Thành viên' }} · {{ $assignee->accepted_at ? 'Đã nhận việc' : 'Chưa nhận việc' }}</small></div></div>@empty<div class="emx2-no-members"><i class="bi bi-people"></i><span>Chưa có nhân sự thực hiện</span></div>@endforelse</section>
+            @if($schedule->issue_note || $schedule->technical_note)<section class="emx2-side-card"><header><h3>Thông tin công việc</h3></header><p class="emx2-note">{{ $schedule->issue_note ?: $schedule->technical_note }}</p></section>@endif
+        </aside>
+    </div>
+
+    @if($permissions['update'])
+    <div class="emx2-modal" data-emx2-assignment-modal hidden><div class="emx2-modal-backdrop" data-emx2-close-assignment></div><section class="emx2-modal-dialog ema10-modal" role="dialog" aria-modal="true" aria-labelledby="emx2AssignmentTitle"><header><div><span>NHÂN SỰ NỘI BỘ</span><h2 id="emx2AssignmentTitle">Chọn người thực hiện</h2><p>Chọn nhiều kỹ thuật viên và chỉ định đúng một người phụ trách chính.</p></div><button type="button" data-emx2-close-assignment><i class="bi bi-x-lg"></i></button></header><form method="POST" action="{{ route('projects-unified.maintenance.update', ['schedule'=>$schedule->id]) }}" data-emx2-assignment-form>@csrf @method('PUT')<div class="emx2-search"><i class="bi bi-search"></i><input type="search" placeholder="Tìm theo tên hoặc phòng ban..." data-emx2-user-search></div><div class="emx2-user-list">@foreach($technicalUsers as $user)<?php $userSelected = (int)$leaderId === (int)$user->id || in_array((int)$user->id,$memberIds,true); ?><label class="emx2-user" data-emx2-user-row data-emx2-name="{{ mb_strtolower($user->name.' '.($user->department?->name ?: 'Kỹ thuật')) }}"><input type="checkbox" value="{{ $user->id }}" data-emx2-user-check @checked($userSelected)><span class="ema10-user-avatar">{{ mb_strtoupper(mb_substr($user->name,0,1)) }}</span><span><strong>{{ $user->name }}</strong><small>{{ $user->department?->name ?: 'Kỹ thuật' }}</small></span><span class="emx2-lead"><input type="radio" name="leader_user_id" value="{{ $user->id }}" @checked((int)$leaderId === (int)$user->id)> Phụ trách chính</span></label>@endforeach</div><div class="emx2-selection-count"><span>Đã chọn <b data-emx2-user-count>{{ $assignedCount }}</b> người</span><small>Sau khi lưu, phân công sẽ chuyển sang chờ Admin duyệt.</small></div><footer><button class="emd9-btn light" type="button" data-emx2-close-assignment>Hủy</button><button class="emd9-btn primary" type="submit"><i class="bi bi-check2-circle"></i> Lưu &amp; gửi duyệt</button></footer></form></section></div>
+    @endif
+
+    <footer class="emd9-sticky">
+        <a class="emd9-btn light" href="{{ route('projects-unified.maintenance.index') }}"><i class="bi bi-arrow-left"></i> Quay lại</a>
+        <div>
+            <button class="emd9-btn light" type="button" onclick="window.print()"><i class="bi bi-printer"></i> In phiếu</button>
+            
+@if($permissions['submit'] && in_array($schedule->status,['in_progress','waiting_material','waiting_submission','revision_requested'],true))
+<button class="emd9-btn primary" type="button" data-emp1-open="complete"><i class="bi bi-send-check"></i> Gửi duyệt</button>
+@endif
+
+@if($permissions['approve'] && $schedule->status==='pending_approval')
+<button class="emd9-btn success" type="button" data-emp1-open="complete"><i class="bi bi-patch-check"></i> Phê duyệt</button>
+@endif
+
+        </div>
+    </footer>
+</div>
 @endsection
 
 @section('scripts')
-<script src="{{ asset('js/technical-maintenance-v10.js') }}?v={{ file_exists(public_path('js/technical-maintenance-v10.js')) ? filemtime(public_path('js/technical-maintenance-v10.js')) : time() }}"></script>
-@endsection
-
-@if(($permissions['assign'] ?? false) || ($permissions['admin'] ?? false))
-<div
-    class="modal fade"
-    id="omRoundsModal"
-    tabindex="-1"
->
-    <div
-        class="modal-dialog modal-dialog-centered"
-    >
-        <form
-            method="POST"
-            class="modal-content"
-            action="{{ route('ky-thuat.maintenance.rounds.update', $schedule) }}"
-        >
-            @csrf
-
-            <div class="modal-header">
-                <div>
-                    <div class="small text-muted">
-                        CHU KỲ BẢO TRÌ / BẢO HÀNH
-                    </div>
-
-                    <h5 class="modal-title">
-                        Sửa số đợt
-                    </h5>
-                </div>
-
-                <button
-                    type="button"
-                    class="btn-close"
-                    data-bs-dismiss="modal"
-                ></button>
-            </div>
-
-            <div class="modal-body">
-
-                <label class="form-label">
-                    Tổng số đợt
-                </label>
-
-                <input
-                    class="form-control"
-                    type="number"
-                    name="total_rounds" data-om-total-rounds
-                    min="1"
-                    max="36"
-                    value="{{ $schedule->total_rounds ?: $cycleOptions->count() }}"
-                    required
-                >
-
-                <label class="form-label mt-3">
-                    Khoảng cách đợt mới
-                </label>
-
-                <select
-                    class="form-select"
-                    name="interval_months" data-om-interval-months
-                >
-                    @for($month = 1; $month <= 12; $month++)
-                        <option value="{{ $month }}" @selected($month === 3)>
-                            {{ $month }} tháng
-                        </option>
-                    @endfor
-                </select>
-
-                
-                {{-- EGO_ROUND_DATE_EDITOR_FINAL --}}
-                <div class="mt-4">
-                    <div class="mb-2">
-                        <label class="form-label fw-semibold mb-1">
-                            Ngày từng đợt
-                        </label>
-
-                        <div class="small text-muted">
-                            Chỉnh trực tiếp ngày của từng đợt bảo hành/bảo trì.
-                        </div>
-                    </div>
-
-                    <div
-                        data-om-round-dates
-                        style="
-                            max-height:280px;
-                            overflow-y:auto;
-                            border:1px solid #e5e7eb;
-                            border-radius:10px;
-                            padding:8px 12px;
-                            background:#f8fafc;
-                        "
-                    >
-                        @foreach($cycleOptions as $roundOption)
-                            @php
-                                $roundDateValue = $roundOption->scheduled_date
-                                    ? \Illuminate\Support\Carbon::parse(
-                                        $roundOption->scheduled_date
-                                    )->format('Y-m-d')
-                                    : '';
-
-                                $roundDateLocked = false;
-                            @endphp
-
-                            <div
-                                class="d-flex align-items-center gap-3 py-2"
-                                data-om-round-row
-                                data-round-no="{{ $roundOption->round_no ?: $loop->iteration }}"
-                                data-round-id="{{ $roundOption->id }}"
-                                data-locked="0"
-                                @if(!$loop->last)
-                                    style="border-bottom:1px solid #e5e7eb;"
-                                @endif
-                            >
-                                <div style="width:75px;flex:0 0 75px;">
-                                    <strong>
-                                        Đợt {{ $roundOption->round_no ?: $loop->iteration }}
-                                    </strong>
-
-                                    
-                                </div>
-
-                                <div class="flex-grow-1">
-                                    <input
-                                        type="date"
-                                        class="form-control form-control-sm"
-                                        name="round_dates[{{ $roundOption->id }}]"
-                                        value="{{ $roundDateValue }}"
-                                        
-                                    >
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-<div
-                    class="alert alert-light border mt-3 mb-0"
-                >
-                    Giảm số đợt chỉ xóa các đợt
-                    chưa phát sinh thực hiện.
-                    Các đợt đã làm sẽ được giữ lại.
-                </div>
-
-            </div>
-
-            <div class="modal-footer">
-
-                <button
-                    type="button"
-                    class="btn btn-light"
-                    data-bs-dismiss="modal"
-                >
-                    Hủy
-                </button>
-
-                <button
-                    type="submit"
-                    class="btn btn-primary"
-                >
-                    Cập nhật
-                </button>
-
-            </div>
-        </form>
-    </div>
-</div>
-@endif
-
-{{-- EGO_DYNAMIC_ROUNDS_UI_V1 --}}
+<script src="{{ asset('js/technical-maintenance-detail-v9.js') }}?v={{ file_exists(public_path('js/technical-maintenance-detail-v9.js')) ? filemtime(public_path('js/technical-maintenance-detail-v9.js')) : time() }}"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
+    const root = document.querySelector('[data-emd9-root]');
+    if (!root) return;
+    const steps = [...root.querySelectorAll('[data-emp1-target]')];
+    const stageTitles = { summary:'Tổng quan', plan:'Kế hoạch', assignment:'Phân công', perform:'Thực hiện', incident:'Phát sinh', complete:'Hoàn tất', documents:'Hồ sơ đính kèm', history:'Lịch sử xử lý' };
+    const openStage = (name, updateHash = false) => {
+        root.querySelectorAll('[data-emd9-panel]').forEach(panel => panel.classList.toggle('active', panel.dataset.emd9Panel === name));
+        root.querySelectorAll('.emx2-tabs [data-emd9-tab]').forEach(tab => tab.classList.toggle('active', !['documents', 'history'].includes(name) ? tab === root.querySelector('.emx2-tabs [data-emd9-tab]') : tab.dataset.emd9Tab === name));
+        steps.forEach(step => step.classList.toggle('active', step.dataset.emp1Target === name));
+        const title = root.querySelector('[data-emr9-current-title]');
+        if (title) title.textContent = stageTitles[name] || 'Tổng quan';
+        if (updateHash && stageTitles[name]) history.replaceState(null, '', '#round-' + name);
+        if (updateHash) root.querySelector('.emp1-content')?.scrollIntoView({ behavior:'smooth', block:'start' });
+    };
+    const requestedStage = location.hash.startsWith('#round-') ? location.hash.slice(7) : (root.dataset.emx2InitialStage || 'summary');
+    openStage(stageTitles[requestedStage] ? requestedStage : 'summary');
+    steps.forEach(step => step.addEventListener('click', () => {
+        openStage(step.dataset.emp1Tab, true);
+    }));
+    root.querySelectorAll('.emx2-tabs [data-emd9-tab]').forEach(tab => tab.addEventListener('click', () => openStage(tab.dataset.emd9Tab, true)));
+    root.querySelectorAll('[data-emp1-open]').forEach(button => button.addEventListener('click', () => {
+        openStage(button.dataset.emp1Open);
+    }));
+    root.querySelectorAll('[data-emx2-stage]').forEach(button => button.addEventListener('click', () => openStage(button.dataset.emx2Stage, true)));
+    root.querySelectorAll('[data-emx2-open-tab]').forEach(button => button.addEventListener('click', () => root.querySelector('[data-emd9-tab="' + button.dataset.emx2OpenTab + '"]')?.click()));
 
-    const modal = document.getElementById('omRoundsModal');
-    if (!modal) return;
-
-    const totalInput =
-        modal.querySelector('[data-om-total-rounds]');
-
-    const intervalSelect =
-        modal.querySelector('[data-om-interval-months]');
-
-    const list =
-        modal.querySelector('[data-om-round-dates]');
-
-    if (!totalInput || !intervalSelect || !list) {
-        return;
+    const checklistSettings = root.querySelector('[data-eme11-settings-modal]');
+    if (checklistSettings) {
+        const closeChecklistSettings = () => { checklistSettings.hidden = true; document.body.classList.remove('eme11-modal-open'); };
+        root.querySelectorAll('[data-eme11-settings-open]').forEach(button => button.addEventListener('click', () => { checklistSettings.hidden = false; document.body.classList.add('eme11-modal-open'); }));
+        checklistSettings.querySelectorAll('[data-eme11-settings-close]').forEach(button => button.addEventListener('click', closeChecklistSettings));
+        document.addEventListener('keydown', event => { if (event.key === 'Escape' && !checklistSettings.hidden) closeChecklistSettings(); });
     }
 
-    function parseDate(value) {
-        if (!value) return null;
+    const incidentToggle = root.querySelector('[data-emi12-incident-toggle]');
+    const syncIncident = () => {
+        const present = !!incidentToggle?.checked;
+        root.querySelectorAll('[data-emi12-incident-fields]').forEach(field => { field.hidden = !present; });
+        const none = root.querySelector('[data-emi12-incident-none]');
+        if (none) none.disabled = present;
+        const kind = root.querySelector('[data-emi12-incident-kind]');
+        if (kind) kind.disabled = !present;
+        const selected = kind?.value;
+        const scope = root.querySelector('[data-emi12-warranty-scope]');
+        if (scope) scope.value = ['warranty_paid', 'maintenance_paid'].includes(selected) ? 'out_of_scope' : (present ? 'in_scope' : 'pending_assessment');
+        const state = root.querySelector('[data-emi12-state]');
+        if (state) { state.textContent = present ? 'Có phát sinh' : 'Không phát sinh'; state.classList.toggle('active', present); }
+    };
+    incidentToggle?.addEventListener('change', syncIncident);
+    root.querySelector('[data-emi12-incident-kind]')?.addEventListener('change', syncIncident);
+    syncIncident();
 
-        const d = new Date(value + 'T00:00:00');
+    const proposalModal = root.querySelector('[data-emi12-proposal-modal]');
+    const closeProposal = () => { if (!proposalModal) return; proposalModal.hidden = true; document.body.classList.remove('emi12-modal-open'); };
+    root.querySelector('[data-emi12-proposal-open]')?.addEventListener('click', () => { if (!proposalModal) return; proposalModal.hidden = false; document.body.classList.add('emi12-modal-open'); proposalModal.querySelector('input[name="items[0][name]"]')?.focus(); });
+    proposalModal?.querySelectorAll('[data-emi12-proposal-close]').forEach(button => button.addEventListener('click', closeProposal));
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && proposalModal && !proposalModal.hidden) closeProposal(); });
 
-        return Number.isNaN(d.getTime())
-            ? null
-            : d;
-    }
+    const closeProposalDetail = modal => {
+        if (!modal) return;
+        modal.hidden = true;
+        document.body.classList.remove('emi14-modal-open');
+    };
+    root.querySelectorAll('[data-emi14-open]').forEach(button => button.addEventListener('click', () => {
+        const modal = root.querySelector('[data-emi14-modal="' + button.dataset.emi14Open + '"]');
+        if (!modal) return;
+        modal.hidden = false;
+        document.body.classList.add('emi14-modal-open');
+    }));
+    root.querySelectorAll('[data-emi14-modal]').forEach(modal => {
+        modal.querySelectorAll('[data-emi14-close]').forEach(button => button.addEventListener('click', () => closeProposalDetail(modal)));
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        root.querySelectorAll('[data-emi14-modal]:not([hidden])').forEach(closeProposalDetail);
+    });
 
-    function formatDate(date) {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
+    /* EMI13: popup đề xuất vật tư nhiều dòng */
 
-        return `${y}-${m}-${d}`;
-    }
+    if (proposalModal) {
+        const rowsContainer = proposalModal.querySelector('[data-emi13-rows]');
+        const countElement = proposalModal.querySelector('[data-emi13-count]');
 
-    function addMonthsSafe(date, months) {
-        const originalDay = date.getDate();
+        const refreshRows = () => {
+            const rows = [...rowsContainer.querySelectorAll('tr')];
 
-        const result = new Date(date);
-        result.setDate(1);
-        result.setMonth(result.getMonth() + months);
+            rows.forEach((row, index) => {
+                row.querySelector('[data-emi13-name]').name = `items[${index}][name]`;
+                row.querySelector('[data-emi13-qty]').name = `items[${index}][qty]`;
+                row.querySelector('[data-emi13-note]').name = `items[${index}][note]`;
+                row.querySelector('[data-emi13-unit]').name = `items[${index}][unit]`;
 
-        const lastDay = new Date(
-            result.getFullYear(),
-            result.getMonth() + 1,
-            0
-        ).getDate();
+                const removeButton = row.querySelector('[data-emi13-remove]');
 
-        result.setDate(
-            Math.min(originalDay, lastDay)
-        );
+                removeButton.disabled = rows.length === 1;
+            });
 
-        return result;
-    }
-
-    function existingRows() {
-        return Array.from(
-            list.querySelectorAll('[data-om-round-row]')
-        );
-    }
-
-    function makeRow(roundNo, dateValue) {
-
-        const row = document.createElement('div');
-
-        row.className =
-            'd-flex align-items-center gap-3 py-2';
-
-        row.setAttribute('data-om-round-row', '');
-        row.dataset.roundNo = String(roundNo);
-        row.dataset.roundId = '';
-        row.dataset.locked = '0';
-
-        row.style.borderBottom = '1px solid #e5e7eb';
-
-        row.innerHTML = `
-            <div style="width:75px;flex:0 0 75px;">
-                <strong>Đợt ${roundNo}</strong>
-                <div class="small text-muted">
-                    Mới
-                </div>
-            </div>
-
-            <div class="flex-grow-1">
-                <input
-                    type="date"
-                    class="form-control form-control-sm"
-                    name="new_round_dates[${roundNo}]"
-                    value="${dateValue || ''}"
-                >
-            </div>
-        `;
-
-        return row;
-    }
-
-    function getLastKnownDate(rows) {
-
-        for (let i = rows.length - 1; i >= 0; i--) {
-
-            const input = rows[i].querySelector(
-                'input[type="date"]'
-            );
-
-            if (input && input.value) {
-                return parseDate(input.value);
+            if (countElement) {
+                countElement.textContent = String(rows.length);
             }
-        }
+        };
 
-        return null;
-    }
+        const addRow = (name = '', quantity = 1, note = '') => {
+            const row = document.createElement('tr');
 
-    function syncRows() {
+            row.innerHTML = `
+                <td>
+                    <input
+                        type="text"
+                        data-emi13-name
+                        placeholder="Nhập tên vật tư"
+                        required
+                    >
+                    <input
+                        type="hidden"
+                        data-emi13-unit
+                        value="Cái"
+                    >
+                </td>
+                <td>
+                    <input
+                        type="number"
+                        data-emi13-qty
+                        min="1"
+                        required
+                    >
+                </td>
+                <td>
+                    <input
+                        type="text"
+                        data-emi13-note
+                        placeholder="Ghi chú nếu có"
+                    >
+                </td>
+                <td>
+                    <button
+                        type="button"
+                        class="emi13-remove"
+                        data-emi13-remove
+                        title="Xóa dòng"
+                    >×</button>
+                </td>
+            `;
 
-        const target =
-            Math.max(
-                1,
-                parseInt(totalInput.value || '1', 10)
-            );
+            row.querySelector('[data-emi13-name]').value = name;
+            row.querySelector('[data-emi13-qty]').value = Math.max(1, Number(quantity) || 1);
+            row.querySelector('[data-emi13-note]').value = note;
 
-        const interval =
-            Math.max(
-                1,
-                parseInt(intervalSelect.value || '3', 10)
-            );
-
-        let rows = existingRows();
-
-        /*
-         * Thu bớt dòng mới nếu giảm tổng số đợt.
-         * Dòng DB cũ đã khóa thì không xóa UI.
-         */
-        while (rows.length > target) {
-
-            const last = rows[rows.length - 1];
-
-            /*
-             * Tổng số đợt trên form là nguồn chuẩn.
-             * Nhập 5 thì danh sách chỉ hiển thị đúng 5 dòng.
-             */
-            last.remove();
-
-            rows = existingRows();
-        }
-
-        /*
-         * Sinh thêm dòng mới nếu tăng tổng số đợt.
-         */
-        rows = existingRows();
-
-        if (rows.length < target) {
-
-            let lastDate =
-                getLastKnownDate(rows);
-
-            for (
-                let roundNo = rows.length + 1;
-                roundNo <= target;
-                roundNo++
-            ) {
-
-                if (lastDate) {
-                    lastDate =
-                        addMonthsSafe(
-                            lastDate,
-                            interval
-                        );
+            row.querySelector('[data-emi13-remove]').addEventListener('click', () => {
+                if (rowsContainer.querySelectorAll('tr').length > 1) {
+                    row.remove();
+                    refreshRows();
                 }
+            });
 
-                const row =
-                    makeRow(
-                        roundNo,
-                        lastDate
-                            ? formatDate(lastDate)
-                            : ''
-                    );
+            rowsContainer.appendChild(row);
 
-                list.appendChild(row);
+            refreshRows();
+
+            return row;
+        };
+
+        addRow();
+
+        proposalModal.querySelector('[data-emi13-add]')?.addEventListener('click', () => {
+            addRow().querySelector('[data-emi13-name]')?.focus();
+        });
+
+        proposalModal.querySelector('[data-emi13-template]')?.addEventListener('click', () => {
+            const content = '\uFEFFTên vật tư,Số lượng,Ghi chú\nTấm pin năng lượng,2,Thay thế thiết bị hỏng\n';
+
+            const url = URL.createObjectURL(
+                new Blob([content], {
+                    type: 'text/csv;charset=utf-8;'
+                })
+            );
+
+            const link = document.createElement('a');
+
+            link.href = url;
+            link.download = 'mau-de-xuat-vat-tu.csv';
+            link.click();
+
+            URL.revokeObjectURL(url);
+        });
+
+        const importRows = (data) => {
+            const normalized = data
+                .slice(1)
+                .filter(row => row && String(row[0] || '').trim() !== '');
+
+            if (!normalized.length) {
+                alert('File chưa có dữ liệu vật tư.');
+                return;
             }
-        }
 
-        /*
-         * Bỏ border dòng cuối
-         */
-        rows = existingRows();
+            rowsContainer.innerHTML = '';
 
-        rows.forEach(function (row, index) {
-            row.style.borderBottom =
-                index === rows.length - 1
-                    ? '0'
-                    : '1px solid #e5e7eb';
+            normalized.forEach(row => {
+                addRow(
+                    String(row[0] || '').trim(),
+                    Number(row[1]) || 1,
+                    String(row[2] || '').trim()
+                );
+            });
+        };
+
+        const parseCsv = text => {
+            const result = [];
+            let row = [];
+            let value = '';
+            let quoted = false;
+
+            text.replace(/^\uFEFF/, '').split('').forEach((character, index, characters) => {
+                if (character === '"') {
+                    if (quoted && characters[index + 1] === '"') {
+                        value += '"';
+                    } else if (!(quoted && characters[index - 1] === '"')) {
+                        quoted = !quoted;
+                    }
+                } else if (character === ',' && !quoted) {
+                    row.push(value);
+                    value = '';
+                } else if ((character === '\n' || character === '\r') && !quoted) {
+                    if (value.length || row.length) {
+                        row.push(value);
+                        result.push(row);
+                        row = [];
+                        value = '';
+                    }
+                } else {
+                    value += character;
+                }
+            });
+
+            if (value.length || row.length) {
+                row.push(value);
+                result.push(row);
+            }
+
+            return result;
+        };
+
+        proposalModal.querySelector('[data-emi13-import]')?.addEventListener('change', async event => {
+            const file = event.target.files?.[0];
+
+            if (!file) {
+                return;
+            }
+
+            if (file.name.toLowerCase().endsWith('.csv')) {
+                importRows(parseCsv(await file.text()));
+                event.target.value = '';
+                return;
+            }
+
+            const readExcel = async () => {
+                const workbook = XLSX.read(await file.arrayBuffer(), {
+                    type: 'array'
+                });
+
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+                importRows(
+                    XLSX.utils.sheet_to_json(sheet, {
+                        header: 1,
+                        defval: ''
+                    })
+                );
+
+                event.target.value = '';
+            };
+
+            if (window.XLSX) {
+                await readExcel();
+                return;
+            }
+
+            const script = document.createElement('script');
+
+            script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+
+            script.onload = readExcel;
+
+            script.onerror = () => {
+                alert('Không tải được bộ đọc Excel. Vui lòng lưu file thành CSV rồi nhập lại.');
+            };
+
+            document.head.appendChild(script);
         });
     }
 
-    totalInput.addEventListener(
-        'input',
-        syncRows
-    );
+    const uploadPicker = root.querySelector('[data-emi12-upload-picker]');
+    const uploadTarget = root.querySelector('[data-emi12-upload-target]');
+    uploadPicker?.addEventListener('change', () => { if (!uploadPicker.files?.length || !uploadTarget) return; const transfer = new DataTransfer(); [...uploadPicker.files].forEach(file => transfer.items.add(file)); uploadTarget.files = transfer.files; root.querySelector('[data-emi12-upload-form]')?.submit(); });
 
-    intervalSelect.addEventListener(
-        'change',
-        function () {
-
-            /*
-             * Khi đổi khoảng cách, chỉ tính lại các dòng MỚI.
-             * Không đè ngày các đợt DB hiện có.
-             */
-            const rows = existingRows();
-
-            const interval =
-                Math.max(
-                    1,
-                    parseInt(
-                        intervalSelect.value || '3',
-                        10
-                    )
-                );
-
-            let lastDate = null;
-
-            rows.forEach(function (row) {
-
-                const input =
-                    row.querySelector('input[type="date"]');
-
-                if (!input) return;
-
-                if (row.dataset.roundId) {
-
-                    if (input.value) {
-                        lastDate =
-                            parseDate(input.value);
-                    }
-
-                    return;
-                }
-
-                if (lastDate) {
-
-                    lastDate =
-                        addMonthsSafe(
-                            lastDate,
-                            interval
-                        );
-
-                    input.value =
-                        formatDate(lastDate);
-                }
-            });
-        }
-    );
-
-    modal.addEventListener(
-        'shown.bs.modal',
-        syncRows
-    );
+    const modal = root.querySelector('[data-emx2-assignment-modal]');
+    if (!modal) return;
+    const closeModal = () => { modal.hidden = true; document.body.classList.remove('emx2-modal-open'); };
+    root.querySelectorAll('[data-emx2-open-assignment]').forEach(button => button.addEventListener('click', () => { modal.hidden = false; document.body.classList.add('emx2-modal-open'); modal.querySelector('[data-emx2-user-search]')?.focus(); }));
+    modal.querySelectorAll('[data-emx2-close-assignment]').forEach(button => button.addEventListener('click', closeModal));
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !modal.hidden) closeModal(); });
+    const rows = [...modal.querySelectorAll('[data-emx2-user-row]')];
+    const count = modal.querySelector('[data-emx2-user-count]');
+    const syncSelection = () => { const selected = rows.filter(row => row.querySelector('[data-emx2-user-check]').checked); if (count) count.textContent = String(selected.length); rows.forEach(row => { const check = row.querySelector('[data-emx2-user-check]'); const lead = row.querySelector('[name="leader_user_id"]'); if (!check.checked && lead.checked) lead.checked = false; row.classList.toggle('selected', check.checked); }); };
+    rows.forEach(row => { const check = row.querySelector('[data-emx2-user-check]'); const lead = row.querySelector('[name="leader_user_id"]'); check.addEventListener('change', syncSelection); lead.addEventListener('change', () => { check.checked = true; syncSelection(); }); });
+    modal.querySelector('[data-emx2-user-search]')?.addEventListener('input', event => { const q = event.target.value.toLocaleLowerCase('vi').trim(); rows.forEach(row => { row.hidden = q !== '' && !row.dataset.emx2Name.includes(q); }); });
+    const externalToggle = modal.querySelector('[data-emx2-external-toggle]');
+    externalToggle?.addEventListener('change', () => { modal.querySelector('[data-emx2-external-fields]').hidden = !externalToggle.checked; });
+    modal.querySelector('[data-emx2-assignment-form]')?.addEventListener('submit', event => { const selected = rows.filter(row => row.querySelector('[data-emx2-user-check]').checked); let leader = modal.querySelector('[name="leader_user_id"]:checked'); if (selected.length > 0 && !leader) { leader = selected[0].querySelector('[name="leader_user_id"]'); leader.checked = true; } modal.querySelectorAll('[data-emx2-generated-member]').forEach(input => input.remove()); selected.forEach(row => { const value = row.querySelector('[data-emx2-user-check]').value; if (leader && value === leader.value) return; const input = document.createElement('input'); input.type = 'hidden'; input.name = 'member_user_ids[]'; input.value = value; input.dataset.emx2GeneratedMember = '1'; event.target.appendChild(input); }); });
+    syncSelection();
 });
 </script>
+@endsection

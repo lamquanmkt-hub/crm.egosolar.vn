@@ -170,12 +170,10 @@
                             <div style="display:flex;align-items:center;gap:8px">
                                 <div class="ego-cat-money">{{ number_format($cat['total'], 0, ',', '.') }} đ</div>
 
-                                @php
-                                    $catId = null;
-                                    if (\Illuminate\Support\Facades\Schema::hasTable('hr_office_expense_categories')) {
-                                        $catId = \Illuminate\Support\Facades\DB::table('hr_office_expense_categories')->where('slug', $cat['key'])->value('id');
-                                    }
-                                @endphp
+                                {{-- Id hạng mục do controller đưa sẵn vào $categoryStats.
+                                     Trước đây chỗ này tra lại theo slug cho TỪNG hạng mục
+                                     ngay trong vòng lặp — 7 câu truy vấn cho 7 hạng mục. --}}
+                                @php($catId = $cat['id'] ?? null)
 
                                 @if(($cat['count'] ?? 0) == 0 && $catId)
                                     <form method="POST" action="{{ route('hr.office-expenses.categories.destroy', $catId) }}" onsubmit="return confirm('Xóa hạng mục này?')">

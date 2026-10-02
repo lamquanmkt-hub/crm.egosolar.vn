@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Models\Concerns\LockedToEgoInternational;
+use App\Models\Projects\Site;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class SolarSiteDocument extends Model
 {
-    use LockedToEgoInternational;
     use SoftDeletes;
 
     protected $fillable = [

@@ -2,14 +2,16 @@
 
 namespace App\Services\Technical;
 
-use App\Models\Site;
+use App\Models\Projects\Site;
 use App\Models\SolarMaintenanceSchedule;
 use App\Models\User;
 use App\Support\EgoCompanyScope;
+use App\Support\SchemaCache;
 use App\Support\SolarMaintenanceAccess;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Collection;
 
 /**
  * Service truy vấn dữ liệu lịch bảo trì điện mặt trời (danh sách, thống kê, tìm công trình, nhân sự kỹ thuật).
@@ -25,7 +27,6 @@ class SolarMaintenanceQueryService
             ->with([
                 'site:id,name,contact_name,contact_phone,address,system_kwp,system_kw_ac,battery_kwh,system_type,phase,installed_at,warranty_to,monitoring_link,monitoring_account,company_id',
                 'assignees.user:id,name,email,phone_number,department_id,position_id',
-                'maintenanceProfile',
             ])
             ->withCount('attachments');
 
@@ -40,7 +41,7 @@ class SolarMaintenanceQueryService
             END")
             ->orderBy('scheduled_date')
             ->orderByDesc('id')
-            ->paginate(100)
+            ->paginate(30)
             ->withQueryString();
     }
 
@@ -61,7 +62,12 @@ class SolarMaintenanceQueryService
             ->selectRaw("SUM(CASE WHEN status = 'unassigned' THEN 1 ELSE 0 END) AS unassigned")
             ->selectRaw("SUM(CASE WHEN status = 'pending_approval' OR approval_status = 'pending' THEN 1 ELSE 0 END) AS pending_approval")
             ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed")
-            ->selectRaw("SUM(CASE WHEN status = 'unassigned' OR status IN ('pending_approval','revision_requested') OR approval_status = 'pending' OR (status NOT IN ('completed','cancelled') AND scheduled_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)) THEN 1 ELSE 0 END) AS needs_action")
+            ->selectRaw("SUM(CASE WHEN status IN ('draft','scheduled','unassigned','assigned','customer_confirmed','postponed') THEN 1 ELSE 0 END) AS scheduled_bucket")
+            ->selectRaw("SUM(CASE WHEN status IN ('travelling','in_progress','waiting_material','waiting_submission','revision_requested','approved','waiting_customer') THEN 1 ELSE 0 END) AS processing_bucket")
+            ->selectRaw("SUM(CASE WHEN status = 'pending_approval' THEN 1 ELSE 0 END) AS approval_bucket")
+            ->selectRaw("SUM(CASE WHEN status IN ('cancelled') THEN 1 ELSE 0 END) AS cancelled_bucket")
+            ->selectRaw("SUM(CASE WHEN status = 'completed' AND YEAR(COALESCE(completed_date, DATE(completed_at), scheduled_date)) = YEAR(CURDATE()) AND MONTH(COALESCE(completed_date, DATE(completed_at), scheduled_date)) = MONTH(CURDATE()) THEN 1 ELSE 0 END) AS completed_this_month")
+            ->selectRaw("SUM(CASE WHEN status = 'completed' AND YEAR(COALESCE(completed_date, DATE(completed_at), scheduled_date)) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND MONTH(COALESCE(completed_date, DATE(completed_at), scheduled_date)) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) THEN 1 ELSE 0 END) AS completed_last_month")
             ->first();
 
         return [
@@ -74,93 +80,136 @@ class SolarMaintenanceQueryService
             'unassigned' => (int) ($row->unassigned ?? 0),
             'pending_approval' => (int) ($row->pending_approval ?? 0),
             'completed' => (int) ($row->completed ?? 0),
-            'needs_action' => (int) ($row->needs_action ?? 0),
+            'scheduled_bucket' => (int) ($row->scheduled_bucket ?? 0),
+            'processing_bucket' => (int) ($row->processing_bucket ?? 0),
+            'approval_bucket' => (int) ($row->approval_bucket ?? 0),
+            'cancelled_bucket' => (int) ($row->cancelled_bucket ?? 0),
+            'completed_this_month' => (int) ($row->completed_this_month ?? 0),
+            'completed_last_month' => (int) ($row->completed_last_month ?? 0),
+            'completion_rate' => (int) (($row->total ?? 0) > 0 ? round(((int) ($row->completed ?? 0) / (int) $row->total) * 100) : 0),
         ];
     }
 
     /**
-     * Danh sách hồ sơ theo từng đợt dành cho hàng đợi phê duyệt.
+     * Danh sách lịch quan trọng dành cho trang điều hành Ban Giám đốc.
+     * Không phụ thuộc bộ lọc tháng của trang danh sách; ưu tiên quá hạn, hôm nay và 7 ngày tới.
      */
-    public function approvalQueue(Request $request, User $user)
+    public function overviewSchedules(User $user, int $limit = 8): Collection
     {
         $query = SolarMaintenanceSchedule::query()
             ->with([
-                'site:id,name,contact_name,address,company_id',
-                'assignees.user:id,name',
-                'submitter:id,name',
-                'approver:id,name',
-            ])
-            ->withCount([
-                'checklistItems as checklist_total',
-                'checklistItems as checklist_done' => fn (Builder $checklist) => $checklist->where('is_done', 1),
-                'attachments as evidence_count' => fn (Builder $attachments) => $attachments
-                    ->whereIn('category', ['before', 'during', 'after', 'report', 'fault', 'serial', 'checklist']),
-            ])
-            ->whereNotNull('submitted_at');
+                'site:id,name,address,system_kwp,system_kw_ac,system_type,company_id',
+                'assignees.user:id,name,email,phone_number,department_id,position_id',
+            ]);
 
         $this->scopeVisibleTo($query, $user);
-        $this->applyApprovalFilters($query, $request);
 
-        $view = (string) $request->input('approval_view', 'pending');
-        if ($view === 'approved') {
-            $query->orderByDesc('approved_at')->orderByDesc('id');
-        } else {
-            $query->orderByRaw('CASE WHEN submitted_at < ? THEN 0 ELSE 1 END', [now()->subHours(24)])
-                ->orderBy('submitted_at')
-                ->orderBy('id');
+        return $query
+            ->whereNotIn('status', ['cancelled'])
+            ->orderByRaw("CASE
+                WHEN status NOT IN ('completed','cancelled') AND scheduled_date < CURDATE() THEN 0
+                WHEN status NOT IN ('completed','cancelled') AND scheduled_date = CURDATE() THEN 1
+                WHEN status NOT IN ('completed','cancelled') AND scheduled_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 2
+                WHEN status NOT IN ('completed','cancelled') THEN 3
+                ELSE 4
+            END")
+            ->orderByRaw("CASE WHEN priority='urgent' THEN 0 WHEN priority='high' THEN 1 WHEN priority='normal' THEN 2 ELSE 3 END")
+            ->orderBy('scheduled_date')
+            ->orderByDesc('id')
+            ->limit(max(1, min($limit, 20)))
+            ->get();
+    }
+
+    /**
+     * Tổng hợp tải công việc của kỹ thuật viên để Giám đốc nhìn thấy ngay ai đang phụ trách,
+     * ai có lịch quá hạn và tỷ lệ hoàn thành của từng người.
+     */
+    public function technicianWorkload(User $viewer, int $limit = 6): Collection
+    {
+        $technicians = $this->technicalUsers();
+
+        return $technicians->map(function (User $technician) use ($viewer) {
+            $base = SolarMaintenanceSchedule::query();
+            $this->scopeVisibleTo($base, $viewer);
+            $base->where(function (Builder $assigned) use ($technician) {
+                $assigned->where('assigned_to', $technician->id)
+                    ->orWhereHas('assignees', fn (Builder $assignee) => $assignee->where('user_id', $technician->id));
+            })->whereNotIn('status', ['cancelled']);
+
+            $total = (clone $base)->count();
+            $active = (clone $base)->whereNotIn('status', ['completed', 'cancelled'])->count();
+            $activeSites = (clone $base)
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->whereNotNull('site_id')
+                ->distinct('site_id')
+                ->count('site_id');
+            $overdue = (clone $base)
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->whereDate('scheduled_date', '<', today())
+                ->count();
+            $todayCount = (clone $base)
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->whereDate('scheduled_date', today())
+                ->count();
+            $completed = (clone $base)->where('status', 'completed')->count();
+
+            return [
+                'user' => $technician,
+                'total' => $total,
+                'active' => $active,
+                'active_sites' => $activeSites,
+                'overdue' => $overdue,
+                'today' => $todayCount,
+                'completion_rate' => $total > 0 ? (int) round(($completed / $total) * 100) : 0,
+            ];
+        })
+            ->sortByDesc(fn (array $row) => ($row['active'] * 1000) + ($row['overdue'] * 100) + $row['total'])
+            ->take(max(1, min($limit, 20)))
+            ->values();
+    }
+
+    /**
+     * Thống kê các đợt bảo trì theo round_no để hiển thị tiến độ từng đợt.
+     */
+    public function roundOverview(User $user, int $limit = 4): Collection
+    {
+        $maxQuery = SolarMaintenanceSchedule::query();
+        $this->scopeVisibleTo($maxQuery, $user);
+        $maxRounds = (int) ($maxQuery->max('total_rounds') ?: 1);
+        $roundCount = max(1, min($limit, $maxRounds));
+        $rows = collect();
+
+        for ($round = 1; $round <= $roundCount; $round++) {
+            $query = SolarMaintenanceSchedule::query();
+            $this->scopeVisibleTo($query, $user);
+            $query->whereRaw('COALESCE(NULLIF(round_no, 0), 1) = ?', [$round])
+                ->whereNotIn('status', ['cancelled']);
+
+            $stats = $query->selectRaw('COUNT(*) AS total')
+                ->selectRaw('MIN(scheduled_date) AS start_date')
+                ->selectRaw('MAX(scheduled_date) AS end_date')
+                ->selectRaw("SUM(CASE WHEN status NOT IN ('draft','unassigned') THEN 1 ELSE 0 END) AS scheduled_count")
+                ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count")
+                ->first();
+
+            $startDate = ! empty($stats->start_date) ? Carbon::parse($stats->start_date)->startOfDay() : null;
+            $endDate = ! empty($stats->end_date) ? Carbon::parse($stats->end_date)->startOfDay() : null;
+            $total = (int) ($stats->total ?? 0);
+            $scheduledCount = (int) ($stats->scheduled_count ?? 0);
+
+            $rows->push([
+                'round' => $round,
+                'total' => $total,
+                'scheduled_count' => $scheduledCount,
+                'completed_count' => (int) ($stats->completed_count ?? 0),
+                'progress' => $total > 0 ? (int) round(($scheduledCount / $total) * 100) : 0,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'days_to_start' => $startDate ? today()->diffInDays($startDate, false) : null,
+            ]);
         }
 
-        return $query->paginate(50)->withQueryString();
-    }
-
-    /**
-     * Số liệu tóm tắt của hàng đợi phê duyệt theo phạm vi người dùng.
-     */
-    public function approvalSummary(User $user): array
-    {
-        $query = SolarMaintenanceSchedule::query();
-        $this->scopeVisibleTo($query, $user);
-
-        $pending = (clone $query)
-            ->where('status', 'pending_approval')
-            ->where('approval_status', 'pending');
-
-        return [
-            'pending' => (clone $pending)->count(),
-            'overdue' => (clone $pending)->where('submitted_at', '<', now()->subHours(24))->count(),
-            'revision' => (clone $query)->where(function (Builder $revision) {
-                $revision->where('status', 'revision_requested')
-                    ->orWhereIn('approval_status', ['revision_requested', 'rejected']);
-            })->count(),
-            'approved_month' => (clone $query)
-                ->where('approval_status', 'approved')
-                ->where('approved_at', '>=', now()->startOfMonth())
-                ->count(),
-        ];
-    }
-
-    /**
-     * Hồ sơ chi tiết đang được chọn trong hàng đợi duyệt.
-     */
-    public function approvalItem(int $id, User $user): ?SolarMaintenanceSchedule
-    {
-        $query = SolarMaintenanceSchedule::query()
-            ->with([
-                'site',
-                'assignees.user:id,name,email,phone_number',
-                'submitter:id,name',
-                'approver:id,name',
-                'attachments.uploader:id,name',
-                'checklistItems.completer:id,name',
-                'checklistItems.attachments.uploader:id,name',
-                'approvals.approver:id,name',
-                'approvals.submitter:id,name',
-            ])
-            ->whereNotNull('submitted_at');
-
-        $this->scopeVisibleTo($query, $user);
-
-        return $query->find($id);
+        return $rows;
     }
 
     /**
@@ -170,7 +219,7 @@ class SolarMaintenanceQueryService
     {
         $companyId = EgoCompanyScope::currentId();
 
-        return Site::withoutGlobalScopes()
+        return Site::query()
             ->select($this->siteColumns())
             ->when($companyId > 0 && ! SolarMaintenanceAccess::isAdmin($user), fn ($q) => $q->where('company_id', $companyId))
             ->orderByDesc('id')
@@ -185,7 +234,7 @@ class SolarMaintenanceQueryService
     {
         $companyId = EgoCompanyScope::currentId();
 
-        return Site::withoutGlobalScopes()
+        return Site::query()
             ->select($this->siteColumns())
             ->when($companyId > 0 && ! SolarMaintenanceAccess::isAdmin($user), fn ($q) => $q->where('company_id', $companyId))
             ->when($keyword !== '', function ($q) use ($keyword) {
@@ -208,7 +257,7 @@ class SolarMaintenanceQueryService
     public function technicalUsers()
     {
         $technicalRoles = [
-            'ky_thuat', 'technical', 'technician', 'technical_staff', 'technical_leader',
+            'technical', 'technician', 'technical_staff', 'technical_leader',
             'technical_manager', 'maintenance_manager', 'ky_thuat_manager',
             'quan_ly_ky_thuat', 'bao_hanh', 'maintenance',
         ];
@@ -220,7 +269,7 @@ class SolarMaintenanceQueryService
                 'position:id,name,code',
                 'roles:id,name',
             ])
-            ->when(Schema::hasColumn('users', 'is_active'), function ($q) {
+            ->when(SchemaCache::hasColumn('users', 'is_active'), function ($q) {
                 $q->where(function ($active) {
                     $active->where('is_active', 1)->orWhereNull('is_active');
                 });
@@ -228,7 +277,7 @@ class SolarMaintenanceQueryService
             ->where(function ($q) use ($technicalRoles) {
                 $q->whereHas('roles', fn ($roles) => $roles->whereIn('name', $technicalRoles));
 
-                if (Schema::hasTable('departments')) {
+                if (SchemaCache::hasTable('departments')) {
                     $q->orWhereHas('department', function ($department) {
                         $department->where(function ($name) {
                             $name->where('name', 'like', '%kỹ thuật%')
@@ -242,7 +291,7 @@ class SolarMaintenanceQueryService
                     });
                 }
 
-                if (Schema::hasTable('positions')) {
+                if (SchemaCache::hasTable('positions')) {
                     $q->orWhereHas('position', function ($position) {
                         $position->where(function ($name) {
                             $name->where('name', 'like', '%kỹ thuật%')
@@ -257,7 +306,7 @@ class SolarMaintenanceQueryService
                 }
             });
 
-        if (Schema::hasColumn('users', 'company_id') && EgoCompanyScope::currentId() > 0) {
+        if (SchemaCache::hasColumn('users', 'company_id') && EgoCompanyScope::currentId() > 0) {
             $query->where(function ($company) {
                 $company->where('company_id', EgoCompanyScope::currentId())
                     ->orWhereNull('company_id');
@@ -274,17 +323,6 @@ class SolarMaintenanceQueryService
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        // Kỹ thuật xem toàn bộ lịch O&M; quyền sửa/duyệt vẫn do Policy kiểm soát.
-        if (SolarMaintenanceAccess::isTechnician($user)) {
-            return $query;
-        }
-
-        // EGO_TECHNICAL_SEE_ALL_MAINTENANCE_V2
-        // Quyền XEM không phụ thuộc phân công hay company.
-        if (\App\Support\SolarMaintenanceAccess::isTechnician($user)) {
-            return $query;
-        }
-
         $companyId = EgoCompanyScope::currentId();
 
         if ($companyId > 0 && ! SolarMaintenanceAccess::isAdmin($user)) {
@@ -337,35 +375,9 @@ class SolarMaintenanceQueryService
     private function applyFilters(Builder $query, Request $request): void
     {
         $search = trim((string) $request->input('q', ''));
-        $month = $request->has('month')
-            ? trim((string) $request->input('month', ''))
-            : '';
-        $view = (string) $request->input('view', 'needs_action');
+        $month = trim((string) $request->input('month', now()->format('Y-m')));
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
-
-
-
-        if ($view === 'needs_action') {
-            $query->where(function (Builder $needsAction) {
-                $needsAction->where('status', 'unassigned')
-                    ->orWhereIn('status', ['pending_approval', 'revision_requested'])
-                    ->orWhere('approval_status', 'pending')
-                    ->orWhere(function (Builder $dueSoon) {
-                        $dueSoon->whereNotIn('status', ['completed', 'cancelled'])
-                            ->whereDate('scheduled_date', '<=', today()->addDays(7));
-                    });
-            });
-        } elseif ($view === 'upcoming') {
-            $query->whereNotIn('status', ['completed', 'cancelled'])
-                ->whereBetween('scheduled_date', [today(), today()->addDays(7)]);
-        } elseif ($view === 'overdue') {
-            $query->whereNotIn('status', ['completed', 'cancelled'])
-                ->whereDate('scheduled_date', '<', today());
-        } elseif ($view === 'completed') {
-            // V3: hoàn thành được xác định bằng status=completed; không còn bắt buộc duyệt cuối.
-            $query->where('status', 'completed');
-        }
 
         if ($search !== '') {
             $query->where(function (Builder $q) use ($search) {
@@ -411,48 +423,6 @@ class SolarMaintenanceQueryService
         } elseif ($month !== '') {
             $query->whereYear('scheduled_date', substr($month, 0, 4))
                 ->whereMonth('scheduled_date', substr($month, 5, 2));
-        }
-    }
-
-    /**
-     * Bộ lọc riêng cho hàng đợi duyệt; luôn lọc theo hồ sơ đợt thay vì nhóm công trình.
-     */
-    private function applyApprovalFilters(Builder $query, Request $request): void
-    {
-        $view = (string) $request->input('approval_view', 'pending');
-
-        if ($view === 'revision') {
-            $query->where(function (Builder $revision) {
-                $revision->where('status', 'revision_requested')
-                    ->orWhereIn('approval_status', ['revision_requested', 'rejected']);
-            });
-        } elseif ($view === 'approved') {
-            $query->where('approval_status', 'approved');
-        } else {
-            $query->where('status', 'pending_approval')
-                ->where('approval_status', 'pending');
-        }
-
-        $search = trim((string) $request->input('q', ''));
-        if ($search !== '') {
-            $query->where(function (Builder $keyword) use ($search) {
-                $like = '%'.$search.'%';
-                $keyword->where('schedule_code', 'like', $like)
-                    ->orWhere('site_name', 'like', $like)
-                    ->orWhere('customer_name', 'like', $like)
-                    ->orWhereHas('site', function (Builder $site) use ($like) {
-                        $site->where('name', 'like', $like)
-                            ->orWhere('contact_name', 'like', $like);
-                    });
-            });
-        }
-
-        if ($request->filled('priority')) {
-            $query->where('priority', $request->input('priority'));
-        }
-
-        if ($request->input('sla') === 'overdue') {
-            $query->where('submitted_at', '<', now()->subHours(24));
         }
     }
 }

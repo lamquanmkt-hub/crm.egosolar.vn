@@ -9,20 +9,26 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-   public function up(): void
-{
-    Schema::table('weekly_tasks', function (Blueprint $table) {
-        $table->string('owner')->nullable()->after('category');
-    });
-}
+    public function up(): void
+    {
+        if (Schema::hasTable('weekly_tasks')) {
+            Schema::table('weekly_tasks', function (Blueprint $table) {
+                if (! Schema::hasColumn('weekly_tasks', 'owner')) {
+                    $table->string('owner')->nullable()->after('category');
+                }
+            });
+        }
+    }
 
     /**
      * Reverse the migrations.
      */
-public function down(): void
-{
-    Schema::table('weekly_tasks', function (Blueprint $table) {
-        $table->dropColumn('owner');
-    });
-}
+    public function down(): void
+    {
+        if (Schema::hasTable('weekly_tasks')) {
+            Schema::table('weekly_tasks', function (Blueprint $table) {
+                $table->dropColumn('owner');
+            });
+        }
+    }
 };

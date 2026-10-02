@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('customer_profiles')) {
+        if (! Schema::hasTable('customer_profiles')) {
             Schema::create('customer_profiles', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('customer_id')->nullable()->index();
@@ -37,7 +37,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('customer_profile_documents')) {
+        if (! Schema::hasTable('customer_profile_documents')) {
             Schema::create('customer_profile_documents', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('customer_profile_id')->index();

@@ -23,15 +23,15 @@
 @section('content')
 <div class="container-fluid tw:py-6 acr-page">
     @if(session('success'))
-        <div class="alert alert-success border-0 rounded-4" role="alert"><i class="bi bi-check-circle me-2"></i>{{ session('success') }}</div>
+        <x-ui.alert variant="success" class="tw:border-0 tw:rounded-[1rem]"><i class="bi bi-check-circle tw:mr-2"></i>{{ session('success') }}</x-ui.alert>
     @endif
     @if(session('error'))
-        <div class="alert alert-danger border-0 rounded-4" role="alert"><i class="bi bi-exclamation-circle me-2"></i>{{ session('error') }}</div>
+        <x-ui.alert variant="danger" class="tw:border-0 tw:rounded-[1rem]"><i class="bi bi-exclamation-circle tw:mr-2"></i>{{ session('error') }}</x-ui.alert>
     @endif
     @if($errors->any())
-        <div class="alert alert-danger border-0 rounded-4" role="alert">
-            @foreach($errors->all() as $error)<div><i class="bi bi-exclamation-circle me-2"></i>{{ $error }}</div>@endforeach
-        </div>
+        <x-ui.alert variant="danger" class="tw:border-0 tw:rounded-[1rem]">
+            @foreach($errors->all() as $error)<div><i class="bi bi-exclamation-circle tw:mr-2"></i>{{ $error }}</div>@endforeach
+        </x-ui.alert>
     @endif
 
     <header class="acr-hero">

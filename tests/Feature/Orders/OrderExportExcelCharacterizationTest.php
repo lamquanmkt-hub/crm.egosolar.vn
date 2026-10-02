@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 /**
  * Characterization test cho export Excel danh sách đơn hàng
- * (GET /orders/export/excel) — chốt hành vi trước khi tách ra exporter.
+ * (GET /orders/exports/excel) — chốt hành vi trước khi tách ra exporter.
  */
 final class OrderExportExcelCharacterizationTest extends TestCase
 {
@@ -40,7 +40,7 @@ final class OrderExportExcelCharacterizationTest extends TestCase
         $this->seedShippableOrder();
 
         $response = $this->actingAs($this->adminUser)
-            ->get('/orders/export/excel')
+            ->get('/orders/exports/excel')
             ->assertOk()
             ->assertHeader(
                 'content-type',
@@ -61,7 +61,7 @@ final class OrderExportExcelCharacterizationTest extends TestCase
     /** Sales chỉ export được đơn của chính mình. */
     public function test_sales_export_only_includes_own_orders(): void
     {
-        $sales = $this->userWithRole('sales');
+        $sales = $this->userWithRole('sales', permissions: ['page.orders']);
         $otherUser = User::factory()->create();
 
         $this->seedShippableOrder(orderOverrides: [
@@ -70,7 +70,7 @@ final class OrderExportExcelCharacterizationTest extends TestCase
         ]);
 
         $response = $this->actingAs($sales)
-            ->get('/orders/export/excel')
+            ->get('/orders/exports/excel')
             ->assertOk();
 
         $this->assertNotContains('TEST-OTHER-999', $this->allCellValues($response));

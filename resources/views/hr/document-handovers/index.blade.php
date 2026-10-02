@@ -5,7 +5,7 @@
 
 <div class="hs-page">
     @if(session('success'))
-        <div class="alert alert-success" style="border-radius:16px;font-weight:800">{{ session('success') }}</div>
+        <x-ui.alert variant="success" style="border-radius:16px;font-weight:800">{{ session('success') }}</x-ui.alert>
     @endif
 
     <div class="hs-hero">

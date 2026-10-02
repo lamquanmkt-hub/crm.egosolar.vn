@@ -9,7 +9,7 @@
         <i class="bi bi-exclamation-triangle-fill"></i>
         <div>
             <strong>Vui lòng kiểm tra dữ liệu:</strong>
-            <ul class="mb-0 mt-1">
+            <ul class="tw:mb-0 tw:mt-1">
                 @foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach
             </ul>
         </div>

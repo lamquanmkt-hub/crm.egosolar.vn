@@ -9,7 +9,7 @@ use App\Models\CRM\Customers\Customer;
 use App\Models\Hr\Gift;
 use App\Models\Hr\GiftRequest as GiftRequestModel;
 use App\Services\Hr\GiftStockService;
-use App\Support\EgoCompanyLock;
+use App\Support\EgoCompanyScope;
 use App\Support\GiftAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -21,13 +21,11 @@ use Throwable;
 
 final class GiftRequestController extends Controller
 {
-    public function __construct(private readonly GiftStockService $stockService)
-    {
-    }
+    public function __construct(private readonly GiftStockService $stockService) {}
 
     public function index(Request $request): View
     {
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
         $query = GiftRequestModel::query()
             ->where('company_id', $companyId)
             ->with(['creator', 'items.gift'])
@@ -63,7 +61,7 @@ final class GiftRequestController extends Controller
 
         return view('hr.gifts.requests.create', [
             'gifts' => Gift::query()
-                ->where('company_id', EgoCompanyLock::id())
+                ->where('company_id', EgoCompanyScope::currentId())
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(),
@@ -73,7 +71,7 @@ final class GiftRequestController extends Controller
     public function store(Request $request): RedirectResponse
     {
         abort_unless(GiftAccess::canRequest($request->user()), 403);
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
 
         $data = $request->validate([
             'customer_id' => ['required', 'integer'],
@@ -310,7 +308,7 @@ final class GiftRequestController extends Controller
 
     private function guardCompany(GiftRequestModel $giftRequest): void
     {
-        abort_unless((int) $giftRequest->company_id === EgoCompanyLock::id(), 404);
+        abort_unless((int) $giftRequest->company_id === EgoCompanyScope::currentId(), 404);
     }
 
     private function authorizeView(Request $request, GiftRequestModel $giftRequest): void

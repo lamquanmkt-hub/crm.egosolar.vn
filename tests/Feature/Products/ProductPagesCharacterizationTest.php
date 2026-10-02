@@ -94,7 +94,7 @@ final class ProductPagesCharacterizationTest extends TestCase
         $this->seedShippableOrder();
 
         $response = $this->actingAs($this->user)
-            ->get('/products/input/export/excel')
+            ->get('/products/input/exports/excel')
             ->assertOk();
 
         $cells = $this->allCellValues($response);

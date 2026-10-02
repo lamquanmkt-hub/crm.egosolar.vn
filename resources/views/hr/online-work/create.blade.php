@@ -1,19 +1,24 @@
+{{--
+    EGO_VIEW_CHET — VIEW CHẾT, KHÔNG AI RENDER (rà soát 2026-09-06)
+
+    Route `hr.online-work.create` (routes/hr.php) là closure chỉ redirect sang
+    `hr.leave.create?request_type=wfh`; không controller/@include nào gọi view này.
+
+    CHƯA XOÁ theo yêu cầu: chỉ đánh dấu để lần sau khỏi rà lại.
+    Nếu bạn đấu view này vào một route/@include, hãy XOÁ dấu này —
+    tests/Feature/View/DeadViewsMarkedTest.php sẽ báo đỏ để nhắc.
+--}}
 @extends('layouts.app')
 
 @section('content')
-<style>
-    .online-page{
+<style> .online-page{
         min-height:100vh;
         background:#f4f7fb;
         padding-bottom:48px;
         font-size:13px;
-    }
-
-    .online-shell{
+    }.online-shell{
         padding:22px;
-    }
-
-    .online-hero{
+    }.online-hero{
         border-radius:24px;
         padding:24px;
         color:#fff;
@@ -26,100 +31,65 @@
         justify-content:space-between;
         align-items:center;
         gap:12px;
-    }
-
-    .online-hero h3{
+    }.online-hero h3{
         font-size:25px;
         font-weight:950;
         margin:0;
         letter-spacing:-.03em;
-    }
-
-    .online-hero p{
+    }.online-hero p{
         margin:5px 0 0;
         opacity:.84;
         font-size:13px;
-    }
-
-    .online-card{
+    }.online-card{
         background:#fff;
         border:1px solid #e5eaf1;
         border-radius:22px;
         box-shadow:0 12px 32px rgba(15,23,42,.065);
         overflow:hidden;
-    }
-
-    .online-card-head{
+    }.online-card-head{
         padding:15px 18px;
         border-bottom:1px solid #e5eaf1;
         font-weight:950;
         color:#0f172a;
-    }
-
-    .online-card-body{
+    }.online-card-body{
         padding:18px;
-    }
-
-    .form-label{
+    }.ow-label{
         font-size:12px;
         font-weight:850;
         color:#334155;
-    }
-
-    .form-control,
-    .form-select{
+    }.ow-input{
         border-radius:13px;
         border-color:#dbe3ee;
         font-size:13px;
-    }
-
-    .btn-pill{
+    }.btn-pill{
         border-radius:999px;
         font-size:13px;
         font-weight:850;
         padding:8px 16px;
-    }
-
-    .online-layout{
+    }.online-layout{
         display:grid;
         grid-template-columns:1fr 340px;
         gap:16px;
         align-items:start;
-    }
-
-    .tip-box{
+    }.tip-box{
         padding:14px;
         border-bottom:1px solid #e5eaf1;
-    }
-
-    .tip-box:last-child{
+    }.tip-box:last-child{
         border-bottom:0;
-    }
-
-    .tip-title{
+    }.tip-title{
         font-weight:950;
         color:#0f172a;
-    }
-
-    .tip-desc{
+    }.tip-desc{
         color:#64748b;
         font-size:12px;
         margin-top:4px;
         line-height:1.5;
-    }
-
-    @media(max-width:1100px){
-        .online-layout{
+    }@media(max-width:1100px){.online-layout{
             grid-template-columns:1fr;
         }
-    }
-
-    @media(max-width:768px){
-        .online-shell{
+    }@media(max-width:768px){.online-shell{
             padding:14px;
-        }
-
-        .online-hero{
+        }.online-hero{
             flex-direction:column;
             align-items:flex-start;
         }
@@ -141,20 +111,20 @@
         </div>
 
         @if(session('success'))
-            <div class="alert alert-success border-0 shadow-sm rounded-4">
+            <x-ui.alert variant="success" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[1rem]">
                 {{ session('success') }}
-            </div>
+            </x-ui.alert>
         @endif
 
         @if($errors->any())
-            <div class="alert alert-danger border-0 shadow-sm rounded-4">
+            <x-ui.alert variant="danger" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[1rem]">
                 <b>Chưa gửi được đơn.</b>
-                <ul class="mb-0 mt-1">
+                <ul class="tw:mb-0 tw:mt-1">
                     @foreach($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
                 </ul>
-            </div>
+            </x-ui.alert>
         @endif
 
         <div class="online-layout">
@@ -167,51 +137,51 @@
                     <form method="POST" action="#">
                         @csrf
 
-                        <div class="row g-3">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Ngày bắt đầu</label>
-                                <input type="date" name="start_date" class="form-control" required>
+                        <div class="tw:row tw:g-3">
+                            <div class="tw:md:col12-6 tw:mb-4">
+                                <x-ui.label class="ow-label">Ngày bắt đầu</x-ui.label>
+                                <x-ui.input type="date" name="start_date" class="ow-input" required />
                             </div>
 
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Ngày kết thúc</label>
-                                <input type="date" name="end_date" class="form-control" required>
+                            <div class="tw:md:col12-6 tw:mb-4">
+                                <x-ui.label class="ow-label">Ngày kết thúc</x-ui.label>
+                                <x-ui.input type="date" name="end_date" class="ow-input" required />
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Hình thức</label>
-                            <select name="online_type" class="form-select">
+                        <div class="tw:mb-4">
+                            <x-ui.label class="ow-label">Hình thức</x-ui.label>
+                            <x-ui.select name="online_type" class="ow-input">
                                 <option value="full_day">Làm online cả ngày</option>
                                 <option value="morning">Làm online buổi sáng</option>
                                 <option value="afternoon">Làm online buổi chiều</option>
                                 <option value="custom">Khung giờ tùy chỉnh</option>
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Lý do xin làm online</label>
-                            <textarea name="reason"
+                        <div class="tw:mb-4">
+                            <x-ui.label class="ow-label">Lý do xin làm online</x-ui.label>
+                            <x-ui.input as="textarea" name="reason"
                                       rows="5"
-                                      class="form-control"
+                                      class="ow-input"
                                       placeholder="Ví dụ: cần xử lý công việc từ xa, đi công tác, việc cá nhân nhưng vẫn đảm bảo tiến độ..."
-                                      required></textarea>
+                                      required></x-ui.input>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Kế hoạch công việc trong thời gian online</label>
-                            <textarea name="work_plan"
+                        <div class="tw:mb-4">
+                            <x-ui.label class="ow-label">Kế hoạch công việc trong thời gian online</x-ui.label>
+                            <x-ui.input as="textarea" name="work_plan"
                                       rows="5"
-                                      class="form-control"
-                                      placeholder="Liệt kê các đầu việc sẽ thực hiện, deadline, cách báo cáo kết quả..."></textarea>
+                                      class="ow-input"
+                                      placeholder="Liệt kê các đầu việc sẽ thực hiện, deadline, cách báo cáo kết quả..."></x-ui.input>
                         </div>
 
-                        <div class="alert alert-warning rounded-4 small">
+                        <x-ui.alert variant="warning" class="tw:rounded-[1rem] tw:text-[0.875em]">
                             Trang này hiện là giao diện sẵn. Nếu hệ thống của bạn đã có controller lưu đơn làm online,
                             chỉ cần đổi `action="#"` thành route lưu đơn thật.
-                        </div>
+                        </x-ui.alert>
 
-                        <div class="d-flex justify-content-end gap-2 flex-wrap">
+                        <div class="tw:flex tw:justify-end tw:gap-2 flex-wrap">
                             <a href="{{ route('hr.attendance.my') }}" class="btn btn-outline-secondary btn-pill">
                                 Hủy
                             </a>

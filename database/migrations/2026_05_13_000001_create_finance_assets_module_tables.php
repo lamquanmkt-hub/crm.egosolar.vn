@@ -9,7 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('finance_asset_categories')) {
+        if (! Schema::hasTable('finance_asset_categories')) {
             Schema::create('finance_asset_categories', function (Blueprint $table) {
                 $table->id();
                 $table->string('code', 50)->nullable()->unique();
@@ -21,7 +21,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('finance_assets')) {
+        if (! Schema::hasTable('finance_assets')) {
             Schema::create('finance_assets', function (Blueprint $table) {
                 $table->id();
                 $table->string('code', 80)->unique();
@@ -51,7 +51,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('finance_asset_events')) {
+        if (! Schema::hasTable('finance_asset_events')) {
             Schema::create('finance_asset_events', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('asset_id')->index();
@@ -68,7 +68,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('finance_asset_files')) {
+        if (! Schema::hasTable('finance_asset_files')) {
             Schema::create('finance_asset_files', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('asset_id')->index();
@@ -81,7 +81,7 @@ return new class extends Migration
             });
         }
 
-        if (Schema::hasTable('finance_asset_categories') && !DB::table('finance_asset_categories')->exists()) {
+        if (Schema::hasTable('finance_asset_categories') && ! DB::table('finance_asset_categories')->exists()) {
             $now = now();
             DB::table('finance_asset_categories')->insert([
                 ['code' => 'MAY_MOC', 'name' => 'Máy móc / Thiết bị', 'useful_life_months' => 60, 'color' => '#2563eb', 'created_at' => $now, 'updated_at' => $now],

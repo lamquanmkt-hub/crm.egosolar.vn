@@ -6,10 +6,10 @@ namespace App\Http\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
 use App\Models\CRM\Orders\Order;
+use App\Support\SchemaCache;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller xử lý xóa mềm đơn hàng kèm lý do.
@@ -52,7 +52,7 @@ class OrderDeleteController extends Controller
             $updates = [];
 
             if (
-                Schema::hasColumn(
+                SchemaCache::hasColumn(
                     $lockedOrder->getTable(),
                     'deleted_by'
                 )
@@ -61,7 +61,7 @@ class OrderDeleteController extends Controller
             }
 
             if (
-                Schema::hasColumn(
+                SchemaCache::hasColumn(
                     $lockedOrder->getTable(),
                     'delete_reason'
                 )

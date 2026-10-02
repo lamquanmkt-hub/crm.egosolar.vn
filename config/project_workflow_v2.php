@@ -31,7 +31,7 @@ return [
             'ky_thuat_truong', 'manager_technical',
         ],
         'technical' => [
-            'ky_thuat', 'technical', 'technician', 'technical_staff',
+            'technical', 'technician', 'technical_staff',
             'engineer', 'engineering',
         ],
         'sales' => [

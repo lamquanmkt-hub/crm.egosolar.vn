@@ -2,13 +2,11 @@
 
 namespace App\Models\Payments;
 
-use App\Models\Concerns\LockedToEgoInternational;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
 class PaymentRequest extends Model
 {
-    use LockedToEgoInternational;
     protected $fillable = [
         'payment_content',
         'doc_type',          // ✅ thêm dòng này
@@ -20,6 +18,9 @@ class PaymentRequest extends Model
         'reason',
         'amount',
         'bank_info',
+        'bank_name',
+        'bank_account',
+        'bank_account_name',
         'status',
         'admin_approved_by',
         'admin_approved_at',
@@ -31,15 +32,17 @@ class PaymentRequest extends Model
         'company_id',
         'site_id',
         'cost_type',
-        'maintenance_schedule_id',
     ];
 
     // Công ty
+    public const COMPANY_EGO = 'Công ty TNHH Ego Viet Nam';
+
     public const COMPANY_EGP = 'Công ty TNHH Thương Mại Kỹ Thuật Quốc Tế EGO';
 
     public static function companyOptions(): array
     {
         return [
+            self::COMPANY_EGO => self::COMPANY_EGO,
             self::COMPANY_EGP => self::COMPANY_EGP,
         ];
     }
@@ -77,24 +80,18 @@ class PaymentRequest extends Model
         return $this->belongsTo(User::class, 'accounting_approved_by');
     }
 
+    /**
+     * Chứng từ đính kèm, sắp theo id tăng dần.
+     *
+     * Thứ tự ghim ở đây vì trước kia hai view tự truy vấn lại bảng
+     * `payment_attachments` kèm `orderBy('id')` thay vì dùng quan hệ đã eager
+     * load — bỏ truy vấn đó đi mà quan hệ không có thứ tự thì danh sách chứng từ
+     * đổi thứ tự tuỳ CSDL trả về.
+     */
     public function attachments()
     {
-        return $this->hasMany(\App\Models\Payments\PaymentAttachment::class);
-    }
-
-    /**
-     * Nhật ký thao tác (sửa/duyệt/hủy/xóa) — chỉ đọc, không xóa theo phiếu.
-     */
-    public function editLogs()
-    {
-        return $this->hasMany(\App\Models\Payments\PaymentRequestEditLog::class, 'payment_request_id')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
-    }
-
-    public function maintenanceSchedule()
-    {
-        return $this->belongsTo(\App\Models\SolarMaintenanceSchedule::class, 'maintenance_schedule_id');
+        return $this->hasMany(\App\Models\Payments\PaymentAttachment::class)
+            ->orderBy('id');
     }
 
     protected $casts = [

@@ -5,4 +5,5 @@ return [
     App\Providers\ContractServiceProvider::class,
     App\Providers\HelperServiceProvider::class,
     App\Providers\RepositoryServiceProvider::class,
+    App\Providers\ViewComposerServiceProvider::class,
 ];

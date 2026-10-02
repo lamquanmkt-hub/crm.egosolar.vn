@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('material_request_items', function (Blueprint $table) {
-    $table->id();
-    $table->unsignedBigInteger('material_request_id');
-    $table->unsignedBigInteger('product_id'); // sản phẩm
-    $table->decimal('qty', 12, 2)->default(0);
-    $table->text('note')->nullable();
-    $table->timestamps();
-});
+        if (! Schema::hasTable('material_request_items')) {
+            Schema::create('material_request_items', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('material_request_id');
+                $table->unsignedBigInteger('product_id'); // sản phẩm
+                $table->decimal('qty', 12, 2)->default(0);
+                $table->text('note')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**

@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Solar;
 use App\Http\Controllers\Controller;
 use App\Models\SolarProvince;
 use App\Models\SolarSetting;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller tính toán cấu hình và báo giá nhanh hệ thống điện mặt trời.
@@ -560,28 +560,28 @@ class SolarCalculatorController extends Controller
      */
     private function getSolarProductOptions(): array
     {
-        if (! Schema::hasTable('crm_product_catalog')) {
+        if (! SchemaCache::hasTable('crm_product_catalog')) {
             return ['panels' => [], 'inverters' => [], 'batteries' => []];
         }
 
-        $productColumns = Schema::getColumnListing('crm_product_catalog');
+        $productColumns = SchemaCache::columns('crm_product_catalog');
         $has = fn (string $col): bool => in_array($col, $productColumns, true);
 
         $query = DB::table('crm_product_catalog as p');
 
-        $hasBrands = Schema::hasTable('crm_brands') && $has('brand_id');
+        $hasBrands = SchemaCache::hasTable('crm_brands') && $has('brand_id');
         if ($hasBrands) {
             $query->leftJoin('crm_brands as b', 'b.id', '=', 'p.brand_id');
         }
 
-        $hasCategories = Schema::hasTable('crm_product_categories') && $has('category_id');
+        $hasCategories = SchemaCache::hasTable('crm_product_categories') && $has('category_id');
         if ($hasCategories) {
             $query->leftJoin('crm_product_categories as c', 'c.id', '=', 'p.category_id');
         }
 
         $hasStockJoin = false;
-        if (Schema::hasTable('crm_product_stock')) {
-            $stockColumns = Schema::getColumnListing('crm_product_stock');
+        if (SchemaCache::hasTable('crm_product_stock')) {
+            $stockColumns = SchemaCache::columns('crm_product_stock');
             if (in_array('product_id', $stockColumns, true) && in_array('qty', $stockColumns, true)) {
                 $stockQuery = DB::table('crm_product_stock')
                     ->select('product_id', DB::raw('SUM(qty) as stock_qty'))
@@ -708,11 +708,11 @@ class SolarCalculatorController extends Controller
      */
     private function getRetailTierPrices(array $productIds): array
     {
-        if (empty($productIds) || ! Schema::hasTable('crm_product_prices')) {
+        if (empty($productIds) || ! SchemaCache::hasTable('crm_product_prices')) {
             return [];
         }
 
-        $priceColumns = Schema::getColumnListing('crm_product_prices');
+        $priceColumns = SchemaCache::columns('crm_product_prices');
         foreach (['product_id', 'price_tier_id', 'price'] as $required) {
             if (! in_array($required, $priceColumns, true)) {
                 return [];
@@ -720,8 +720,8 @@ class SolarCalculatorController extends Controller
         }
 
         $tierIds = [5];
-        if (Schema::hasTable('crm_price_tiers')) {
-            $tierColumns = Schema::getColumnListing('crm_price_tiers');
+        if (SchemaCache::hasTable('crm_price_tiers')) {
+            $tierColumns = SchemaCache::columns('crm_price_tiers');
             $tiers = DB::table('crm_price_tiers')->get();
             foreach ($tiers as $tier) {
                 $text = '';

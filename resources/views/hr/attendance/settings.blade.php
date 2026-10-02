@@ -1,28 +1,28 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid py-4 attendance-settings-page">
+<div class="container-fluid tw:py-6 attendance-settings-page">
 
     {{-- HERO --}}
-    <div class="setting-hero mb-4">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+    <div class="setting-hero tw:mb-6">
+        <div class="tw:flex tw:justify-between tw:items-start flex-wrap tw:gap-4">
             <div>
-                <div class="setting-kicker mb-2">Admin Attendance Settings</div>
-                <h1 class="setting-title mb-2">Cài đặt chấm công</h1>
+                <div class="setting-kicker tw:mb-2">Admin Attendance Settings</div>
+                <h1 class="setting-title tw:mb-2">Cài đặt chấm công</h1>
                 <div class="setting-subtitle">
                     Quản lý giờ làm việc, cấu hình đi muộn, điều kiện đủ công và chính sách GPS cho toàn hệ thống.
                 </div>
             </div>
 
-            <div class="d-flex gap-2 flex-wrap">
-                <a href="{{ route('hr.attendance.index') }}" class="btn setting-btn setting-btn-light">
+            <div class="tw:flex tw:gap-2 flex-wrap">
+                <x-ui.button variant="none" size="none" class="setting-btn setting-btn-light" href="{{ route('hr.attendance.index') }}">
                     <i class="bi bi-arrow-left me-1"></i> Quay lại thống kê
-                </a>
+                </x-ui.button>
             </div>
         </div>
 
-        <div class="row g-3 mt-2">
-            <div class="col-12 col-md-3">
+        <div class="tw:row tw:g-3 tw:mt-2">
+            <div class="tw:col12-12 tw:md:col12-3">
                 <div class="setting-hero-card">
                     <div class="setting-hero-label">Giờ bắt đầu hiện tại</div>
                     <div class="setting-hero-value">
@@ -31,7 +31,7 @@
                 </div>
             </div>
 
-            <div class="col-12 col-md-3">
+            <div class="tw:col12-12 tw:md:col12-3">
                 <div class="setting-hero-card">
                     <div class="setting-hero-label">Giờ kết thúc hiện tại</div>
                     <div class="setting-hero-value">
@@ -40,7 +40,7 @@
                 </div>
             </div>
 
-            <div class="col-12 col-md-3">
+            <div class="tw:col12-12 tw:md:col12-3">
                 <div class="setting-hero-card">
                     <div class="setting-hero-label">Chính sách GPS</div>
                     <div class="setting-hero-value">
@@ -49,7 +49,7 @@
                 </div>
             </div>
 
-            <div class="col-12 col-md-3">
+            <div class="tw:col12-12 tw:md:col12-3">
                 <div class="setting-hero-card">
                     <div class="setting-hero-label">Phạt đi muộn</div>
                     <div class="setting-hero-value">
@@ -61,101 +61,101 @@
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success setting-alert-success border-0 shadow-sm rounded-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i>{{ session('success') }}
-        </div>
+        <x-ui.alert variant="success" class="setting-alert-success tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[1rem] tw:mb-6">
+            <i class="bi bi-check-circle-fill tw:mr-2"></i>{{ session('success') }}
+        </x-ui.alert>
     @endif
 
     @if ($errors->any())
-        <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
-            <div class="fw-bold mb-2">Có lỗi xảy ra:</div>
-            <ul class="mb-0 ps-3">
+        <x-ui.alert variant="danger" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[1rem] tw:mb-6">
+            <div class="tw:font-bold tw:mb-2">Có lỗi xảy ra:</div>
+            <ul class="tw:mb-0 ps-3">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
-        </div>
+        </x-ui.alert>
     @endif
 
     <form method="POST" action="{{ route('hr.attendance.settings.update') }}">
         @csrf
 
-        <div class="row g-4">
+        <div class="tw:row tw:g-4">
 
             {{-- CỘT TRÁI --}}
-            <div class="col-12 col-xl-8">
-                <div class="card setting-glass-card h-100">
-                    <div class="card-header bg-transparent border-0 px-4 pt-4 pb-2">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="tw:col12-12 tw:min-[75rem]:col12-8">
+                <x-ui.card class="setting-glass-card tw:h-full">
+                    <x-ui.card-header class="bg-transparent border-0 tw:px-6 pt-4 pb-2">
+                        <div class="tw:flex tw:items-center tw:justify-between flex-wrap tw:gap-2">
                             <div>
-                                <h5 class="fw-bold mb-1">Thiết lập ca làm việc</h5>
-                                <div class="text-muted small">Cấu hình thời gian chuẩn để hệ thống tính đi muộn, về sớm và đủ công.</div>
+                                <h5 class="tw:font-bold tw:mb-1">Thiết lập ca làm việc</h5>
+                                <div class="tw:text-[rgba(33,37,41,0.75)]! small">Cấu hình thời gian chuẩn để hệ thống tính đi muộn, về sớm và đủ công.</div>
                             </div>
                             <span class="setting-chip">Core Config</span>
                         </div>
-                    </div>
+                    </x-ui.card-header>
 
-                    <div class="card-body px-4 pb-4 pt-2">
-                        <div class="row g-4">
-                            <div class="col-md-6">
-                                <label class="form-label setting-label">Giờ bắt đầu làm</label>
+                    <x-ui.card-body class="tw:px-6 pb-4 pt-2">
+                        <div class="tw:row tw:g-4">
+                            <div class="tw:md:col12-6">
+                                <x-ui.label class="setting-label">Giờ bắt đầu làm</x-ui.label>
                                 <div class="setting-input-wrap">
                                     <span class="setting-input-icon"><i class="bi bi-sunrise"></i></span>
-                                    <input type="time"
+                                    <x-ui.input type="time"
                                            name="work_start_time"
-                                           class="form-control setting-input"
-                                           value="{{ old('work_start_time', \Carbon\Carbon::parse($setting->work_start_time)->format('H:i')) }}">
+                                           class="setting-input"
+                                           value="{{ old('work_start_time', \Carbon\Carbon::parse($setting->work_start_time)->format('H:i')) }}" />
                                 </div>
                                 <div class="setting-help">Nhân viên check-in sau mốc này sẽ bắt đầu bị tính đi muộn.</div>
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label setting-label">Giờ kết thúc làm</label>
+                            <div class="tw:md:col12-6">
+                                <x-ui.label class="setting-label">Giờ kết thúc làm</x-ui.label>
                                 <div class="setting-input-wrap">
                                     <span class="setting-input-icon"><i class="bi bi-sunset"></i></span>
-                                    <input type="time"
+                                    <x-ui.input type="time"
                                            name="work_end_time"
-                                           class="form-control setting-input"
-                                           value="{{ old('work_end_time', \Carbon\Carbon::parse($setting->work_end_time)->format('H:i')) }}">
+                                           class="setting-input"
+                                           value="{{ old('work_end_time', \Carbon\Carbon::parse($setting->work_end_time)->format('H:i')) }}" />
                                 </div>
                                 <div class="setting-help">Nhân viên check-out trước mốc này sẽ bị tính về sớm.</div>
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label setting-label">Số phút cho phép đi muộn</label>
+                            <div class="tw:md:col12-6">
+                                <x-ui.label class="setting-label">Số phút cho phép đi muộn</x-ui.label>
                                 <div class="setting-input-wrap">
                                     <span class="setting-input-icon"><i class="bi bi-clock-history"></i></span>
-                                    <input type="number"
+                                    <x-ui.input type="number"
                                            name="late_grace_minutes"
                                            min="0"
-                                           class="form-control setting-input"
-                                           value="{{ old('late_grace_minutes', $setting->late_grace_minutes) }}">
+                                           class="setting-input"
+                                           value="{{ old('late_grace_minutes', $setting->late_grace_minutes) }}" />
                                 </div>
                                 <div class="setting-help">Ví dụ 5 phút nghĩa là 08:05 mới bắt đầu tính đi muộn.</div>
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label setting-label">Mức phạt mỗi lần đi muộn</label>
+                            <div class="tw:md:col12-6">
+                                <x-ui.label class="setting-label">Mức phạt mỗi lần đi muộn</x-ui.label>
                                 <div class="setting-input-wrap">
                                     <span class="setting-input-icon"><i class="bi bi-cash-stack"></i></span>
-                                    <input type="number"
+                                    <x-ui.input type="number"
                                            name="late_penalty_per_time"
                                            min="0"
-                                           class="form-control setting-input"
-                                           value="{{ old('late_penalty_per_time', $setting->late_penalty_per_time ?? 0) }}">
+                                           class="setting-input"
+                                           value="{{ old('late_penalty_per_time', $setting->late_penalty_per_time ?? 0) }}" />
                                 </div>
                                 <div class="setting-help">Ví dụ 50000 nghĩa là mỗi lần đi muộn sẽ bị trừ 50.000đ.</div>
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label setting-label">Số phút tối thiểu tính đủ công</label>
+                            <div class="tw:md:col12-6">
+                                <x-ui.label class="setting-label">Số phút tối thiểu tính đủ công</x-ui.label>
                                 <div class="setting-input-wrap">
                                     <span class="setting-input-icon"><i class="bi bi-hourglass-split"></i></span>
-                                    <input type="number"
+                                    <x-ui.input type="number"
                                            name="min_work_minutes"
                                            min="1"
-                                           class="form-control setting-input"
-                                           value="{{ old('min_work_minutes', $setting->min_work_minutes) }}">
+                                           class="setting-input"
+                                           value="{{ old('min_work_minutes', $setting->min_work_minutes) }}" />
                                 </div>
                                 <div class="setting-help">Ví dụ 480 phút tương đương 8 tiếng làm việc hợp lệ.</div>
                             </div>
@@ -165,20 +165,20 @@
                         {{-- LỊCH CÔNG CHUẨN --}}
                         <div class="setting-divider my-4"></div>
 
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                        <div class="tw:flex tw:items-center tw:justify-between flex-wrap tw:gap-2 tw:mb-4">
                             <div>
-                                <h5 class="fw-bold mb-1">Lịch công chuẩn</h5>
-                                <div class="text-muted small">
+                                <h5 class="tw:font-bold tw:mb-1">Lịch công chuẩn</h5>
+                                <div class="tw:text-[rgba(33,37,41,0.75)]! small">
                                     Cấu hình ngày nào phải đi làm để hệ thống tính công chuẩn, thiếu công và ngày nghỉ.
                                 </div>
                             </div>
                             <span class="setting-chip">Work Calendar</span>
                         </div>
 
-                        <div class="calendar-config-box mb-4">
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <div class="fw-bold mb-2">Ngày làm việc trong tuần</div>
+                        <div class="calendar-config-box tw:mb-6">
+                            <div class="tw:row tw:g-3">
+                                <div class="tw:col12-12">
+                                    <div class="tw:font-bold tw:mb-2">Ngày làm việc trong tuần</div>
                                     <div class="calendar-weekday-grid">
                                         @foreach([
                                             'workday_monday' => 'Thứ 2',
@@ -206,9 +206,9 @@
                                     </div>
                                 </div>
 
-                                <div class="col-md-6">
-                                    <label class="form-label setting-label">Chính sách làm việc thứ 7</label>
-                                    <select name="saturday_mode" class="form-select setting-input calendar-select" id="saturday-mode">
+                                <div class="tw:md:col12-6">
+                                    <x-ui.label class="setting-label">Chính sách làm việc thứ 7</x-ui.label>
+                                    <x-ui.select name="saturday_mode" class="setting-input calendar-select" id="saturday-mode">
                                         @foreach([
                                             'off' => 'Nghỉ tất cả thứ 7',
                                             'all' => 'Làm tất cả thứ 7',
@@ -220,19 +220,19 @@
                                                 {{ $label }}
                                             </option>
                                         @endforeach
-                                    </select>
+                                    </x-ui.select>
                                     <div class="setting-help">
                                         Gợi ý: nếu công ty làm thứ 7 so le, chọn tuần lẻ hoặc tuần chẵn.
                                     </div>
                                 </div>
 
-                                <div class="col-md-6" id="saturday-custom-wrap">
-                                    <label class="form-label setting-label">Ngày thứ 7 làm cụ thể</label>
-                                    <input type="text"
+                                <div class="tw:md:col12-6" id="saturday-custom-wrap">
+                                    <x-ui.label class="setting-label">Ngày thứ 7 làm cụ thể</x-ui.label>
+                                    <x-ui.input type="text"
                                            name="saturday_custom_dates"
-                                           class="form-control setting-input calendar-plain-input"
+                                           class="setting-input calendar-plain-input"
                                            placeholder="Ví dụ: 2026-04-04, 2026-04-18"
-                                           value="{{ old('saturday_custom_dates', is_array($setting->saturday_custom_dates ?? null) ? implode(', ', $setting->saturday_custom_dates) : ($setting->saturday_custom_dates ?? '')) }}">
+                                           value="{{ old('saturday_custom_dates', is_array($setting->saturday_custom_dates ?? null) ? implode(', ', $setting->saturday_custom_dates) : ($setting->saturday_custom_dates ?? '')) }}" />
                                     <div class="setting-help">
                                         Chỉ dùng khi chọn “Chọn ngày thứ 7 cụ thể”. Nhập dạng YYYY-MM-DD, cách nhau bằng dấu phẩy.
                                     </div>
@@ -241,10 +241,10 @@
                         </div>
 
                         {{-- NGÀY NGHỈ / NGÀY LỄ --}}
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                        <div class="tw:flex tw:items-center tw:justify-between flex-wrap tw:gap-2 tw:mb-4">
                             <div>
-                                <h5 class="fw-bold mb-1">Ngày nghỉ / ngày lễ trong tháng</h5>
-                                <div class="text-muted small">
+                                <h5 class="tw:font-bold tw:mb-1">Ngày nghỉ / ngày lễ trong tháng</h5>
+                                <div class="tw:text-[rgba(33,37,41,0.75)]! small">
                                     Các ngày này sẽ không tính là ngày phải chấm công.
                                 </div>
                             </div>
@@ -254,15 +254,15 @@
                         </div>
 
                         <div class="holiday-panel">
-                            <div class="row g-3 align-items-end mb-3">
-                                <div class="col-md-4">
-                                    <label class="form-label setting-label">Tháng cấu hình ngày nghỉ</label>
-                                    <input type="month"
+                            <div class="tw:row tw:g-3 tw:items-end tw:mb-4">
+                                <div class="tw:md:col12-4">
+                                    <x-ui.label class="setting-label">Tháng cấu hình ngày nghỉ</x-ui.label>
+                                    <x-ui.input type="month"
                                            name="holiday_month"
-                                           class="form-control setting-input calendar-plain-input"
-                                           value="{{ old('holiday_month', $holidayMonth ?? now()->format('Y-m')) }}">
+                                           class="setting-input calendar-plain-input"
+                                           value="{{ old('holiday_month', $holidayMonth ?? now()->format('Y-m')) }}" />
                                 </div>
-                                <div class="col-md-8">
+                                <div class="tw:md:col12-8">
                                     <div class="holiday-note-box">
                                         Ví dụ tháng có 30/04, 01/05 hoặc ngày nghỉ nội bộ thì thêm ở đây. Dashboard và Excel sẽ bỏ các ngày này khỏi công chuẩn.
                                     </div>
@@ -377,7 +377,7 @@
                                 };
                             @endphp
 
-                            <div class="workday-summary-grid mb-3">
+                            <div class="workday-summary-grid tw:mb-4">
                                 <div class="workday-summary-card primary">
                                     <div class="workday-summary-label">Công chuẩn tháng</div>
                                     <div class="workday-summary-value">{{ $standardWorkdaysForStats }}</div>
@@ -409,7 +409,7 @@
                                 </div>
                             </div>
 
-<div class="holiday-calendar-widget mb-3">
+<div class="holiday-calendar-widget tw:mb-4">
                                 <div class="holiday-calendar-head">
                                     <div>
                                         <div class="holiday-calendar-title">
@@ -505,8 +505,8 @@
                                 <div id="holiday-hidden-inputs"></div>
                             </div>
 
-                            <div class="table-responsive holiday-table-wrap legacy-holiday-table mb-3">
-                                <table class="table align-middle mb-0 holiday-table">
+                            <div class="table-responsive holiday-table-wrap legacy-holiday-table tw:mb-4">
+                                <table class="table align-middle tw:mb-0 holiday-table">
                                     <thead>
                                         <tr>
                                             <th style="width:150px;">Ngày</th>
@@ -521,7 +521,7 @@
                                         @forelse($holidays as $holiday)
                                             <tr>
                                                 <td>{{ optional($holiday->holiday_date)->format('d/m/Y') }}</td>
-                                                <td class="fw-semibold">{{ $holiday->name }}</td>
+                                                <td class="tw:font-semibold">{{ $holiday->name }}</td>
                                                 <td>
                                                     @php
                                                         $holidayTypeLabel = match($holiday->type) {
@@ -534,7 +534,7 @@
                                                     <span class="holiday-badge">{{ $holidayTypeLabel }}</span>
                                                 </td>
                                                 <td>{{ $holiday->is_paid ? 'Có' : 'Không' }}</td>
-                                                <td class="text-muted small">{{ $holiday->note ?: '-' }}</td>
+                                                <td class="tw:text-[rgba(33,37,41,0.75)]! small">{{ $holiday->note ?: '-' }}</td>
                                                 <td>
                                                     <label class="holiday-delete-check">
                                                         <input type="checkbox" name="delete_holiday_ids[]" value="{{ $holiday->id }}">
@@ -544,7 +544,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="6" class="text-center text-muted py-4">
+                                                <td colspan="6" class="text-center tw:text-[rgba(33,37,41,0.75)]! tw:py-6">
                                                     Chưa có ngày nghỉ/lễ trong tháng này.
                                                 </td>
                                             </tr>
@@ -554,24 +554,24 @@
                                     <tbody id="new-holiday-rows">
                                         <tr class="new-holiday-row">
                                             <td>
-                                                <input type="date" name="new_holiday_date[]" class="form-control form-control-sm">
+                                                <x-ui.input size="sm" type="date" name="new_holiday_date[]" />
                                             </td>
                                             <td>
-                                                <input type="text" name="new_holiday_name[]" class="form-control form-control-sm" placeholder="VD: Giỗ tổ Hùng Vương">
+                                                <x-ui.input size="sm" type="text" name="new_holiday_name[]" placeholder="VD: Giỗ tổ Hùng Vương" />
                                             </td>
                                             <td>
-                                                <select name="new_holiday_type[]" class="form-select form-select-sm">
+                                                <x-ui.select size="sm" name="new_holiday_type[]">
                                                     <option value="holiday">Nghỉ lễ</option>
                                                     <option value="compensatory">Nghỉ bù</option>
                                                     <option value="company">Nghỉ công ty</option>
                                                     <option value="other">Khác</option>
-                                                </select>
+                                                </x-ui.select>
                                             </td>
                                             <td class="text-center">
                                                 <input type="checkbox" name="new_holiday_is_paid[0]" value="1" checked>
                                             </td>
                                             <td>
-                                                <input type="text" name="new_holiday_note[]" class="form-control form-control-sm" placeholder="Ghi chú">
+                                                <x-ui.input size="sm" type="text" name="new_holiday_note[]" placeholder="Ghi chú" />
                                             </td>
                                             <td></td>
                                         </tr>
@@ -579,24 +579,24 @@
                                 </table>
                             </div>
 
-                            <button type="button" class="btn setting-btn setting-btn-light" id="add-holiday-row">
+                            <x-ui.button variant="none" size="none" class="setting-btn setting-btn-light" type="button" id="add-holiday-row">
                                 <i class="bi bi-plus-circle me-1"></i> Thêm dòng ngày nghỉ
-                            </button>
+                            </x-ui.button>
                         </div>
 
                         <div class="setting-divider my-4"></div>
 
-                        <div class="row g-4">
-                            <div class="col-12">
+                        <div class="tw:row tw:g-4">
+                            <div class="tw:col12-12">
                                 <div class="setting-switch-card">
-                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-                                        <div class="d-flex gap-3 align-items-start">
+                                    <div class="tw:flex tw:justify-between tw:items-center flex-wrap tw:gap-4">
+                                        <div class="tw:flex tw:gap-4 tw:items-start">
                                             <div class="setting-switch-icon">
                                                 <i class="bi bi-geo-alt"></i>
                                             </div>
                                             <div>
-                                                <div class="fw-bold fs-6 mb-1">Bắt buộc lấy GPS khi chấm công</div>
-                                                <div class="text-muted small">
+                                                <div class="tw:font-bold fs-6 tw:mb-1">Bắt buộc lấy GPS khi chấm công</div>
+                                                <div class="tw:text-[rgba(33,37,41,0.75)]! small">
                                                     Khi bật, hệ thống sẽ yêu cầu có vị trí GPS chính xác lúc check-in/check-out. Nếu nhân viên từ chối quyền vị trí hoặc GPS chưa đủ chính xác thì sẽ không thể chấm công.
                                                 </div>
                                             </div>
@@ -616,22 +616,22 @@
                             </div>
                         </div>
 
-                    </div>
-                </div>
+                    </x-ui.card-body>
+                </x-ui.card>
             </div>
 
             {{-- CỘT PHẢI --}}
-            <div class="col-12 col-xl-4">
-                <div class="card setting-glass-card mb-4">
-                    <div class="card-header bg-transparent border-0 px-4 pt-4 pb-2">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <h5 class="fw-bold mb-0">Tóm tắt nhanh</h5>
+            <div class="tw:col12-12 tw:min-[75rem]:col12-4">
+                <x-ui.card class="setting-glass-card tw:mb-6">
+                    <x-ui.card-header class="bg-transparent border-0 tw:px-6 pt-4 pb-2">
+                        <div class="tw:flex tw:items-center tw:justify-between">
+                            <h5 class="tw:font-bold tw:mb-0">Tóm tắt nhanh</h5>
                             <span class="setting-chip">Preview</span>
                         </div>
-                    </div>
+                    </x-ui.card-header>
 
-                    <div class="card-body px-4 pb-4 pt-2">
-                        <div class="setting-summary-box mb-3">
+                    <x-ui.card-body class="tw:px-6 pb-4 pt-2">
+                        <div class="setting-summary-box tw:mb-4">
                             <div class="setting-summary-label">Ca làm việc</div>
                             <div class="setting-summary-value" id="preview-working-time">
                                 {{ \Carbon\Carbon::parse($setting->work_start_time)->format('H:i') }}
@@ -640,21 +640,21 @@
                             </div>
                         </div>
 
-                        <div class="setting-summary-box mb-3">
+                        <div class="setting-summary-box tw:mb-4">
                             <div class="setting-summary-label">Đi muộn sau</div>
                             <div class="setting-summary-value" id="preview-grace">
                                 {{ (int) $setting->late_grace_minutes }} phút
                             </div>
                         </div>
 
-                        <div class="setting-summary-box mb-3">
+                        <div class="setting-summary-box tw:mb-4">
                             <div class="setting-summary-label">Phạt đi muộn</div>
                             <div class="setting-summary-value" id="preview-late-penalty">
                                 {{ number_format((int) ($setting->late_penalty_per_time ?? 0), 0, ',', '.') }} đ / lần
                             </div>
                         </div>
 
-                        <div class="setting-summary-box mb-3">
+                        <div class="setting-summary-box tw:mb-4">
                             <div class="setting-summary-label">Đủ công từ</div>
                             <div class="setting-summary-value" id="preview-work-minutes">
                                 {{ (int) $setting->min_work_minutes }} phút
@@ -667,72 +667,72 @@
                                 {{ $setting->require_gps ? 'Bắt buộc' : 'Không bắt buộc' }}
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </x-ui.card-body>
+                </x-ui.card>
 
-                <div class="card setting-glass-card">
-                    <div class="card-header bg-transparent border-0 px-4 pt-4 pb-2">
-                        <h5 class="fw-bold mb-0">Gợi ý cấu hình</h5>
-                    </div>
+                <x-ui.card class="setting-glass-card">
+                    <x-ui.card-header class="bg-transparent border-0 tw:px-6 pt-4 pb-2">
+                        <h5 class="tw:font-bold tw:mb-0">Gợi ý cấu hình</h5>
+                    </x-ui.card-header>
 
-                    <div class="card-body px-4 pb-4 pt-2">
+                    <x-ui.card-body class="tw:px-6 pb-4 pt-2">
                         <div class="setting-tip-item">
                             <div class="setting-tip-dot tip-cyan"></div>
                             <div>
-                                <div class="fw-semibold">Giờ chuẩn phổ biến</div>
-                                <div class="small text-muted">08:00 - 17:30 hoặc 08:30 - 18:00</div>
+                                <div class="tw:font-semibold">Giờ chuẩn phổ biến</div>
+                                <div class="small tw:text-[rgba(33,37,41,0.75)]!">08:00 - 17:30 hoặc 08:30 - 18:00</div>
                             </div>
                         </div>
 
                         <div class="setting-tip-item">
                             <div class="setting-tip-dot tip-green"></div>
                             <div>
-                                <div class="fw-semibold">Grace period</div>
-                                <div class="small text-muted">Nên để 5 phút để tránh sai lệch nhỏ.</div>
+                                <div class="tw:font-semibold">Grace period</div>
+                                <div class="small tw:text-[rgba(33,37,41,0.75)]!">Nên để 5 phút để tránh sai lệch nhỏ.</div>
                             </div>
                         </div>
 
                         <div class="setting-tip-item">
                             <div class="setting-tip-dot tip-orange"></div>
                             <div>
-                                <div class="fw-semibold">Đủ công</div>
-                                <div class="small text-muted">480 phút tương đương 8 tiếng làm việc.</div>
+                                <div class="tw:font-semibold">Đủ công</div>
+                                <div class="small tw:text-[rgba(33,37,41,0.75)]!">480 phút tương đương 8 tiếng làm việc.</div>
                             </div>
                         </div>
 
                         <div class="setting-tip-item">
                             <div class="setting-tip-dot tip-red"></div>
                             <div>
-                                <div class="fw-semibold">Phạt đi muộn</div>
-                                <div class="small text-muted">Có thể dùng để tự động trừ lương theo số lần đi muộn trong tháng.</div>
+                                <div class="tw:font-semibold">Phạt đi muộn</div>
+                                <div class="small tw:text-[rgba(33,37,41,0.75)]!">Có thể dùng để tự động trừ lương theo số lần đi muộn trong tháng.</div>
                             </div>
                         </div>
 
-                        <div class="setting-tip-item mb-0">
+                        <div class="setting-tip-item tw:mb-0">
                             <div class="setting-tip-dot tip-purple"></div>
                             <div>
-                                <div class="fw-semibold">GPS</div>
-                                <div class="small text-muted">Nên bật khi cần kiểm soát chấm công ngoài văn phòng.</div>
+                                <div class="tw:font-semibold">GPS</div>
+                                <div class="small tw:text-[rgba(33,37,41,0.75)]!">Nên bật khi cần kiểm soát chấm công ngoài văn phòng.</div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </x-ui.card-body>
+                </x-ui.card>
             </div>
 
             {{-- ACTION BAR --}}
-            <div class="col-12">
+            <div class="tw:col12-12">
                 <div class="setting-action-bar">
-                    <div class="text-muted small">
+                    <div class="tw:text-[rgba(33,37,41,0.75)]! small">
                         Sau khi lưu, cấu hình mới sẽ áp dụng cho các lần chấm công tiếp theo.
                     </div>
 
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a href="{{ route('hr.attendance.index') }}" class="btn setting-btn setting-btn-light">
+                    <div class="tw:flex tw:gap-2 flex-wrap">
+                        <x-ui.button variant="none" size="none" class="setting-btn setting-btn-light" href="{{ route('hr.attendance.index') }}">
                             Huỷ
-                        </a>
-                        <button class="btn setting-btn setting-btn-primary">
+                        </x-ui.button>
+                        <x-ui.button variant="none" size="none" type="submit" class="setting-btn setting-btn-primary">
                             <i class="bi bi-save me-1"></i> Lưu cài đặt
-                        </button>
+                        </x-ui.button>
                     </div>
                 </div>
             </div>
@@ -1522,7 +1522,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <input type="text" name="new_holiday_note[]" class="form-control form-control-sm" placeholder="Ghi chú">
                 </td>
                 <td>
-                    <button type="button" class="btn btn-sm btn-light remove-holiday-row">Xoá</button>
+                    <x-ui.button type="button" variant="light" size="sm" class="remove-holiday-row">Xoá</x-ui.button>
                 </td>
             `;
             newHolidayRows.appendChild(tr);

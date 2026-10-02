@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Core\Warehouse;
+use App\Models\Projects\Site;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -47,7 +48,7 @@ class SolarWarrantyStockMovement extends Model
 
     public function site(): BelongsTo
     {
-        return $this->belongsTo(Site::class, 'site_id')->withoutGlobalScopes();
+        return $this->belongsTo(Site::class, 'site_id');
     }
 
     public function warehouse(): BelongsTo

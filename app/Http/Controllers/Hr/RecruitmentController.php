@@ -3,16 +3,20 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Database\Schema\Blueprint;
+use App\Support\SchemaCache;
+use App\View\Presenters\Hr\RecruitmentPagePresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller quản lý toàn bộ quy trình tuyển dụng: yêu cầu, sàng lọc, phỏng vấn, thư mời và tiếp nhận.
  */
 class RecruitmentController extends Controller
 {
+    public function __construct(
+        private readonly RecruitmentPagePresenter $pagePresenter,
+    ) {}
+
     /**
      * Trang mặc định của module tuyển dụng (tab báo cáo).
      */
@@ -100,7 +104,6 @@ class RecruitmentController extends Controller
      */
     private function page($active)
     {
-        $this->ensureTablesReady();
 
         $requests = DB::table('hr_recruitment_requests')
             ->orderByDesc('id')
@@ -160,7 +163,7 @@ class RecruitmentController extends Controller
             'rejected' => DB::table('hr_recruitment_candidates')->whereIn('status', ['rejected', 'not_fit', 'interview_failed'])->count(),
         ];
 
-        return view('hr.recruitment.index', compact(
+        return view('hr.recruitment.index', array_merge(compact(
             'active',
             'requests',
             'candidates',
@@ -178,7 +181,7 @@ class RecruitmentController extends Controller
             'statusStats',
             'sourceStats',
             'stats'
-        ));
+        ), $this->pagePresenter->viewData($offers, $candidates)));
     }
 
     /**
@@ -690,62 +693,14 @@ class RecruitmentController extends Controller
      */
     private function onlyExistingColumns(string $table, array $data): array
     {
-        if (! Schema::hasTable($table)) {
+        if (! SchemaCache::hasTable($table)) {
             return $data;
         }
 
-        $columns = Schema::getColumnListing($table);
+        $columns = SchemaCache::columns($table);
 
         return collect($data)
             ->filter(fn ($value, $key) => in_array($key, $columns, true))
             ->all();
-    }
-
-    /**
-     * Bổ sung các cột còn thiếu cho các bảng tuyển dụng nếu bảng đã tồn tại.
-     */
-    private function ensureTablesReady(): void
-    {
-        foreach ([
-            'hr_recruitment_requests',
-            'hr_recruitment_candidates',
-            'hr_recruitment_interviews',
-            'hr_recruitment_offers',
-        ] as $table) {
-            if (! Schema::hasTable($table)) {
-                return;
-            }
-        }
-
-        $this->addColumnIfMissing('hr_recruitment_candidates', 'cv_link', fn (Blueprint $table) => $table->string('cv_link', 1000)->nullable()->after('source'));
-        $this->addColumnIfMissing('hr_recruitment_candidates', 'zalo', fn (Blueprint $table) => $table->string('zalo')->nullable()->after('email'));
-        $this->addColumnIfMissing('hr_recruitment_candidates', 'contact_channel', fn (Blueprint $table) => $table->string('contact_channel')->nullable()->after('cv_link'));
-        $this->addColumnIfMissing('hr_recruitment_candidates', 'contacted_at', fn (Blueprint $table) => $table->dateTime('contacted_at')->nullable()->after('contact_channel'));
-        $this->addColumnIfMissing('hr_recruitment_candidates', 'suitability', fn (Blueprint $table) => $table->string('suitability')->nullable()->after('contacted_at'));
-        $this->addColumnIfMissing('hr_recruitment_candidates', 'reject_reason', fn (Blueprint $table) => $table->text('reject_reason')->nullable()->after('status'));
-        $this->addColumnIfMissing('hr_recruitment_candidates', 'archive_note', fn (Blueprint $table) => $table->text('archive_note')->nullable()->after('reject_reason'));
-        $this->addColumnIfMissing('hr_recruitment_candidates', 'archive_until', fn (Blueprint $table) => $table->date('archive_until')->nullable()->after('archive_note'));
-
-        $this->addColumnIfMissing('hr_recruitment_interviews', 'status', fn (Blueprint $table) => $table->string('status')->default('scheduled')->after('interviewer'));
-        $this->addColumnIfMissing('hr_recruitment_interviews', 'cancel_reason', fn (Blueprint $table) => $table->text('cancel_reason')->nullable()->after('result'));
-        $this->addColumnIfMissing('hr_recruitment_interviews', 'evaluation', fn (Blueprint $table) => $table->text('evaluation')->nullable()->after('cancel_reason'));
-        $this->addColumnIfMissing('hr_recruitment_interviews', 'evaluation_result', fn (Blueprint $table) => $table->string('evaluation_result')->nullable()->after('evaluation'));
-        $this->addColumnIfMissing('hr_recruitment_interviews', 'expected_start_date', fn (Blueprint $table) => $table->date('expected_start_date')->nullable()->after('evaluation_result'));
-
-        $this->addColumnIfMissing('hr_recruitment_offers', 'response_note', fn (Blueprint $table) => $table->text('response_note')->nullable()->after('status'));
-        $this->addColumnIfMissing('hr_recruitment_offers', 'onboarding_status', fn (Blueprint $table) => $table->string('onboarding_status')->nullable()->after('response_note'));
-        $this->addColumnIfMissing('hr_recruitment_offers', 'onboarding_date', fn (Blueprint $table) => $table->date('onboarding_date')->nullable()->after('onboarding_status'));
-    }
-
-    /**
-     * Thêm cột vào bảng nếu bảng tồn tại và cột chưa có.
-     */
-    private function addColumnIfMissing(string $table, string $column, callable $definition): void
-    {
-        if (Schema::hasTable($table) && ! Schema::hasColumn($table, $column)) {
-            Schema::table($table, function (Blueprint $blueprint) use ($definition) {
-                $definition($blueprint);
-            });
-        }
     }
 }

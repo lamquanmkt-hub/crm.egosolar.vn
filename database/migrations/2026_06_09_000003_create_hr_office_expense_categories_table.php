@@ -2,14 +2,14 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('hr_office_expense_categories')) {
+        if (! Schema::hasTable('hr_office_expense_categories')) {
             Schema::create('hr_office_expense_categories', function (Blueprint $table) {
                 $table->id();
                 $table->string('name');

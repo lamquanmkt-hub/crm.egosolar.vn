@@ -8,13 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('positions', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('code')->nullable();
-            $table->text('description')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('positions')) {
+            Schema::create('positions', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->string('code')->nullable();
+                $table->text('description')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void

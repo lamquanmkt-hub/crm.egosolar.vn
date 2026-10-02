@@ -1,13 +1,12 @@
-@extends('layouts.app')
+ @extends('layouts.app')
 
-@section('title', 'Công trình · EGO Solar')
+@section('title', 'Dự án · EGO Solar')
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/projects-unified-v1.css') }}?v={{ file_exists(public_path('css/projects-unified-v1.css')) ? filemtime(public_path('css/projects-unified-v1.css')) : time() }}">
 <link rel="stylesheet" href="{{ asset('css/projects-workflow-v2.css') }}?v={{ file_exists(public_path('css/projects-workflow-v2.css')) ? filemtime(public_path('css/projects-workflow-v2.css')) : time() }}">
 <link rel="stylesheet" href="{{ asset('css/ego-project-list-clean.css') }}?v={{ file_exists(public_path('css/ego-project-list-clean.css')) ? filemtime(public_path('css/ego-project-list-clean.css')) : '1' }}">
 <link rel="stylesheet" href="{{ asset('css/ego-project-dashboard-compact.css') }}?v={{ file_exists(public_path('css/ego-project-dashboard-compact.css')) ? filemtime(public_path('css/ego-project-dashboard-compact.css')) : '1' }}">
-<link rel="stylesheet" href="{{ asset('css/project-unification-20260906.css') }}?v=1">
 @endpush
 
 @section('content')
@@ -69,15 +68,13 @@
 
 <div class="pu-page">
     <div class="pu-shell">
-        @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
-        @if(session('warning'))<div class="alert alert-warning">{{ session('warning') }}</div>@endif
         <header class="pu-panel pu-compact-hero">
             <div class="pu-compact-title">
-                <div class="pu-eyebrow">Hồ sơ chung Sales · Kỹ thuật</div>
-                <h1 class="pu-title">Công trình</h1>
+                <div class="pu-eyebrow">Không gian quản trị dự án</div>
+                <h1 class="pu-title">Dự án điện mặt trời</h1>
                 <p class="pu-subtitle"><strong>{{ number_format($workflowKpis['total'] ?? $kpis['total']) }}</strong> công trình đang quản lý · {{ $scopeLabel }}</p>
             </div>
-            @if($canSeeRevenue && $financeSummary)
+            @if($canSeeFinance && $financeSummary)
                 <div class="pu-compact-finance">
                     <div><small>Giá trị hợp đồng</small><strong>{{ $money($financeSummary['contract']) }}</strong></div>
                     <div class="received"><small>Đã thu</small><strong>{{ $money($financeSummary['received']) }}</strong></div>
@@ -87,7 +84,7 @@
             <div class="pu-header-actions">
                 <a class="pu-btn pu-btn-soft" href="{{ route('projects-unified.maintenance.index') }}"><i class="bi bi-shield-check"></i>Bảo trì &amp; Bảo hành</a>
                 @if($canCreate)
-                    <a class="pu-btn pu-btn-primary" href="{{ route('projects-unified.create') }}"><i class="bi bi-plus-lg"></i>Tạo công trình</a>
+                    <a class="pu-btn pu-btn-primary" href="{{ route('projects-unified.create') }}"><i class="bi bi-plus-lg"></i>Tạo dự án</a>
                 @endif
             </div>
         </header>
@@ -133,7 +130,7 @@
             <div class="pu-table-head pu-simple-head">
                 <div>Mã</div><div>Tên công trình</div><div>Khách hàng</div><div>Công suất</div>
                 <div class="pu-status-heading"><select name="workflow_step" form="projectListFilterForm" onchange="document.getElementById('projectListFilterForm').requestSubmit()" aria-label="Lọc trạng thái"><option value="">Trạng thái</option>@foreach($workflowDefinitions as $key => $workflowDefinition)<option value="{{ $key }}" @selected(request('workflow_step') === $key)>{{ $workflowDefinition['short'] ?? $workflowDefinition['label'] }}</option>@endforeach</select></div>
-                <div>Phụ trách</div><div>{{ $canSeeRevenue ? 'Giá trị / Công nợ' : 'Ghi chú' }}</div>
+                <div>Phụ trách</div><div>Ghi chú</div>
             </div>
 
             @forelse($projects as $site)
@@ -153,18 +150,9 @@
                     <div class="pu-cell" data-label="Tên công trình"><a class="pu-simple-name" href="{{ route('projects-unified.show', ['site' => $site->id, 'step' => $statusCode ?: null]) }}" title="{{ $project['name'] }}">{{ $project['name'] }}</a></div>
                     <div class="pu-cell pu-simple-customer" data-label="Khách hàng" title="{{ $project['customer'] ?: 'Chưa cập nhật khách hàng' }}">{{ $project['customer'] ?: '—' }}</div>
                     <div class="pu-cell pu-simple-capacity" data-label="Công suất">{{ $capacityLabel }}</div>
-                    <div class="pu-cell" data-label="Trạng thái"><a class="pu-badge pu-status-filter {{ $workflowToneClass[$workflowTone] ?? 'blue' }}" href="{{ route('projects-unified.index', array_merge(request()->except(['page', 'workflow_step']), $statusCode !== '' ? ['workflow_step' => $statusCode] : [])) }}" title="Bấm để lọc trạng thái {{ $statusLabel }}"><i class="bi {{ $workflowRow['icon'] ?? 'bi-diagram-3' }}"></i>{{ $statusLabel }}</a><small class="pu-canonical-progress">Tiến độ {{ (int) ($workflowRow['progress'] ?? $project['progress'] ?? 0) }}%</small></div>
+                    <div class="pu-cell" data-label="Trạng thái"><a class="pu-badge pu-status-filter {{ $workflowToneClass[$workflowTone] ?? 'blue' }}" href="{{ route('projects-unified.index', array_merge(request()->except(['page', 'workflow_step']), $statusCode !== '' ? ['workflow_step' => $statusCode] : [])) }}" title="Bấm để lọc trạng thái {{ $statusLabel }}"><i class="bi {{ $workflowRow['icon'] ?? 'bi-diagram-3' }}"></i>{{ $statusLabel }}</a></div>
                     <div class="pu-cell pu-simple-engineer" data-label="Phụ trách">{{ $project['lead_engineer'] }}</div>
-                    @if($canSeeRevenue)
-                        @php($revenue = $revenueMap[(int) $site->id] ?? ['contract'=>0,'received'=>0,'debt'=>0])
-                        <div class="pu-cell pu-canonical-revenue" data-label="Giá trị / Công nợ">
-                            <strong>{{ $money($revenue['contract']) }}</strong>
-                            <small>Đã thu <b>{{ $money($revenue['received']) }}</b></small>
-                            <small class="debt">Còn phải thu <b>{{ $money($revenue['debt']) }}</b></small>
-                        </div>
-                    @else
                     <div class="pu-cell pu-simple-note {{ !empty($workflowRow['is_overdue']) ? 'is-overdue' : '' }}" data-label="Ghi chú" title="{{ $projectNote }}">{{ \Illuminate\Support\Str::limit($projectNote, 78) }}</div>
-                    @endif
                 </article>
             @empty
                 <div class="pu-empty"><i class="bi bi-folder2-open"></i><strong>Chưa có dự án phù hợp</strong><div>Hãy thay đổi bộ lọc hoặc tạo dự án mới.</div></div>

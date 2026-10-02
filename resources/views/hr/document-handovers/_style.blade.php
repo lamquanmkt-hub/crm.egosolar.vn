@@ -22,4 +22,129 @@
     .hs-preview-modal{position:fixed;inset:0;z-index:100000;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.62);backdrop-filter:blur(7px);padding:24px}.hs-preview-modal.show{display:flex}.hs-preview-box{width:min(1020px,94vw);height:min(760px,88vh);border-radius:20px;overflow:hidden;background:#fff;box-shadow:0 30px 90px rgba(15,23,42,.38);display:flex;flex-direction:column}.hs-preview-head{height:52px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:linear-gradient(90deg,#0f3b78,#0891b2);color:#fff}.hs-preview-title{font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hs-preview-close{border:1px solid rgba(255,255,255,.35);border-radius:10px;background:rgba(255,255,255,.13);color:#fff;font-weight:950;padding:7px 11px}.hs-preview-frame{flex:1;width:100%;border:0;background:#f8fafc}
     @media(max-width:1100px){.hs-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hs-detail-grid{grid-template-columns:1fr}.hs-flow{grid-template-columns:repeat(4,minmax(0,1fr))}}
     @media(max-width:768px){.hs-hero{border-radius:22px;padding:22px}.hs-title{font-size:24px}.hs-stat-grid,.hs-info-grid,.hs-form-grid{grid-template-columns:1fr}.hs-flow{grid-template-columns:repeat(2,minmax(0,1fr))}.hs-toolbar .hs-input,.hs-toolbar .hs-select{width:100%}.hs-table-card{overflow:auto}.hs-table{min-width:920px}.hs-file{grid-template-columns:38px 1fr}.hs-file-actions{grid-column:1 / -1;justify-content:flex-start}.hs-preview-modal{padding:10px}.hs-preview-box{width:96vw;height:90vh;border-radius:16px}}
+
+
+/* =========================================================
+   POPUP XEM FILE CHÍNH GIỮA
+   ========================================================= */
+.hs-preview-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.72);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.hs-preview-modal.show {
+    display: flex;
+}
+
+.hs-preview-dialog {
+    width: min(1380px, 94vw);
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 18px;
+    box-shadow: 0 30px 90px rgba(15, 23, 42, 0.45);
+}
+
+.hs-preview-head {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 12px 9px 20px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.hs-preview-title {
+    min-width: 0;
+    overflow: hidden;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 850;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hs-preview-close {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: #334155;
+    font-family: Arial, sans-serif;
+    font-size: 28px;
+    font-weight: 400;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.hs-preview-close:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.hs-preview-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: #e2e8f0;
+}
+
+.hs-preview-body iframe {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: 0;
+    background: #ffffff;
+}
+
+@media (max-width: 768px) {
+    .hs-preview-modal {
+        padding: 0;
+    }
+
+    .hs-preview-dialog {
+        width: 100vw;
+        height: 100dvh;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .hs-preview-head {
+        min-height: 54px;
+        padding: 7px 9px 7px 14px;
+    }
+
+    .hs-preview-title {
+        font-size: 14px;
+    }
+
+    .hs-preview-close {
+        width: 40px;
+        height: 40px;
+        flex-basis: 40px;
+    }
+}
+
 </style>

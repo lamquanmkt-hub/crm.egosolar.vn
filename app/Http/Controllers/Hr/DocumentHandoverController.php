@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -45,7 +45,6 @@ class DocumentHandoverController extends Controller
      */
     public function index(Request $request)
     {
-        $this->ensureTables();
 
         $query = DB::table('hr_document_handovers as h')
             ->leftJoin('users as creator', 'creator.id', '=', 'h.created_by')
@@ -101,7 +100,6 @@ class DocumentHandoverController extends Controller
      */
     public function show($id)
     {
-        $this->ensureTables();
 
         $item = DB::table('hr_document_handovers as h')
             ->leftJoin('users as creator', 'creator.id', '=', 'h.created_by')
@@ -142,7 +140,6 @@ class DocumentHandoverController extends Controller
      */
     public function store(Request $request)
     {
-        $this->ensureTables();
 
         $data = $this->validateMain($request);
 
@@ -188,7 +185,6 @@ class DocumentHandoverController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $this->ensureTables();
 
         $row = DB::table('hr_document_handovers')->where('id', (int) $id)->first();
         abort_unless($row, 404);
@@ -232,7 +228,6 @@ class DocumentHandoverController extends Controller
      */
     public function uploadFiles(Request $request, $id)
     {
-        $this->ensureTables();
 
         $item = DB::table('hr_document_handovers')->where('id', (int) $id)->first();
         abort_unless($item, 404);
@@ -257,7 +252,6 @@ class DocumentHandoverController extends Controller
      */
     public function changeStatus(Request $request, $id)
     {
-        $this->ensureTables();
 
         $row = DB::table('hr_document_handovers')->where('id', (int) $id)->first();
         abort_unless($row, 404);
@@ -326,7 +320,6 @@ class DocumentHandoverController extends Controller
      */
     public function destroy($id)
     {
-        $this->ensureTables();
 
         $files = DB::table('hr_document_handover_files')->where('handover_id', (int) $id)->get();
 
@@ -355,7 +348,6 @@ class DocumentHandoverController extends Controller
      */
     public function deleteFile($id, $fileId)
     {
-        $this->ensureTables();
 
         $file = DB::table('hr_document_handover_files')
             ->where('id', (int) $fileId)
@@ -386,7 +378,6 @@ class DocumentHandoverController extends Controller
      */
     public function downloadFile($id, $fileId)
     {
-        $this->ensureTables();
 
         $file = DB::table('hr_document_handover_files')
             ->where('id', (int) $fileId)
@@ -407,7 +398,6 @@ class DocumentHandoverController extends Controller
      */
     public function previewFile($id, $fileId)
     {
-        $this->ensureTables();
 
         $file = DB::table('hr_document_handover_files')
             ->where('id', (int) $fileId)
@@ -498,64 +488,6 @@ class DocumentHandoverController extends Controller
     }
 
     /**
-     * Tạo các bảng hồ sơ bàn giao (handovers, histories, files) nếu chưa tồn tại.
-     */
-    protected function ensureTables(): void
-    {
-        if (! Schema::hasTable('hr_document_handovers')) {
-            Schema::create('hr_document_handovers', function ($table) {
-                $table->id();
-                $table->string('code', 80)->nullable()->index();
-                $table->string('title', 255);
-                $table->string('document_type', 120)->nullable();
-                $table->string('customer_name', 190)->nullable();
-                $table->string('department_name', 190)->nullable();
-                $table->string('priority', 50)->default('normal')->index();
-                $table->string('status', 50)->default('created')->index();
-                $table->unsignedBigInteger('created_by')->nullable()->index();
-                $table->unsignedBigInteger('assigned_to')->nullable()->index();
-                $table->string('current_holder', 190)->nullable();
-                $table->date('due_date')->nullable();
-                $table->text('description')->nullable();
-                $table->text('note')->nullable();
-                $table->string('storage_location', 255)->nullable();
-                $table->timestamp('assigned_at')->nullable();
-                $table->timestamp('received_at')->nullable();
-                $table->timestamp('sent_at')->nullable();
-                $table->timestamp('returned_at')->nullable();
-                $table->timestamp('completed_at')->nullable();
-                $table->timestamp('archived_at')->nullable();
-                $table->timestamps();
-            });
-        }
-
-        if (! Schema::hasTable('hr_document_handover_histories')) {
-            Schema::create('hr_document_handover_histories', function ($table) {
-                $table->id();
-                $table->unsignedBigInteger('handover_id')->index();
-                $table->string('status', 50)->nullable()->index();
-                $table->string('action', 120)->nullable();
-                $table->text('note')->nullable();
-                $table->unsignedBigInteger('user_id')->nullable()->index();
-                $table->timestamps();
-            });
-        }
-
-        if (! Schema::hasTable('hr_document_handover_files')) {
-            Schema::create('hr_document_handover_files', function ($table) {
-                $table->id();
-                $table->unsignedBigInteger('handover_id')->index();
-                $table->string('path', 500);
-                $table->string('original_name', 255)->nullable();
-                $table->string('mime_type', 190)->nullable();
-                $table->unsignedBigInteger('size')->nullable();
-                $table->unsignedBigInteger('uploaded_by')->nullable()->index();
-                $table->timestamps();
-            });
-        }
-    }
-
-    /**
      * Sinh mã hồ sơ dạng HS-{năm}-{số thứ tự 5 chữ số}.
      */
     protected function makeCode(): string
@@ -587,7 +519,7 @@ class DocumentHandoverController extends Controller
      */
     protected function users()
     {
-        return Schema::hasTable('users')
+        return SchemaCache::hasTable('users')
             ? DB::table('users')->select('id', 'name', 'email')->orderBy('name')->get()
             : collect();
     }
@@ -597,7 +529,7 @@ class DocumentHandoverController extends Controller
      */
     protected function userName(int $id): ?string
     {
-        return Schema::hasTable('users')
+        return SchemaCache::hasTable('users')
             ? DB::table('users')->where('id', $id)->value('name')
             : null;
     }

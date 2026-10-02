@@ -9,7 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('companies')) {
+        if (! Schema::hasTable('companies')) {
             Schema::create('companies', function (Blueprint $table) {
                 $table->id();
                 $table->string('name');
@@ -26,54 +26,60 @@ return new class extends Migration
                 $table->timestamps();
             });
         } else {
-            Schema::table('companies', function (Blueprint $table) {
-                if (!Schema::hasColumn('companies', 'tax_code')) {
-                    $table->string('tax_code')->nullable()->after('code');
-                }
+            if (Schema::hasTable('companies')) {
+                Schema::table('companies', function (Blueprint $table) {
+                    if (! Schema::hasColumn('companies', 'tax_code')) {
+                        $table->string('tax_code')->nullable()->after('code');
+                    }
 
-                if (!Schema::hasColumn('companies', 'phone')) {
-                    $table->string('phone')->nullable()->after('tax_code');
-                }
+                    if (! Schema::hasColumn('companies', 'phone')) {
+                        $table->string('phone')->nullable()->after('tax_code');
+                    }
 
-                if (!Schema::hasColumn('companies', 'email')) {
-                    $table->string('email')->nullable()->after('phone');
-                }
+                    if (! Schema::hasColumn('companies', 'email')) {
+                        $table->string('email')->nullable()->after('phone');
+                    }
 
-                if (!Schema::hasColumn('companies', 'address')) {
-                    $table->text('address')->nullable()->after('email');
-                }
+                    if (! Schema::hasColumn('companies', 'address')) {
+                        $table->text('address')->nullable()->after('email');
+                    }
 
-                if (!Schema::hasColumn('companies', 'logo')) {
-                    $table->string('logo')->nullable()->after('address');
-                }
+                    if (! Schema::hasColumn('companies', 'logo')) {
+                        $table->string('logo')->nullable()->after('address');
+                    }
 
-                if (!Schema::hasColumn('companies', 'bank_account')) {
-                    $table->string('bank_account')->nullable()->after('logo');
-                }
+                    if (! Schema::hasColumn('companies', 'bank_account')) {
+                        $table->string('bank_account')->nullable()->after('logo');
+                    }
 
-                if (!Schema::hasColumn('companies', 'bank_name')) {
-                    $table->string('bank_name')->nullable()->after('bank_account');
-                }
+                    if (! Schema::hasColumn('companies', 'bank_name')) {
+                        $table->string('bank_name')->nullable()->after('bank_account');
+                    }
 
-                if (!Schema::hasColumn('companies', 'bank_holder')) {
-                    $table->string('bank_holder')->nullable()->after('bank_name');
-                }
+                    if (! Schema::hasColumn('companies', 'bank_holder')) {
+                        $table->string('bank_holder')->nullable()->after('bank_name');
+                    }
 
-                if (!Schema::hasColumn('companies', 'is_active')) {
-                    $table->boolean('is_active')->default(true)->after('bank_holder');
-                }
-            });
+                    if (! Schema::hasColumn('companies', 'is_active')) {
+                        $table->boolean('is_active')->default(true)->after('bank_holder');
+                    }
+                });
+            }
         }
 
-        if (Schema::hasTable('crm_orders') && !Schema::hasColumn('crm_orders', 'company_id')) {
+        if (Schema::hasTable('crm_orders') && ! Schema::hasColumn('crm_orders', 'company_id')) {
             Schema::table('crm_orders', function (Blueprint $table) {
-                $table->unsignedBigInteger('company_id')->nullable()->after('warehouse_id');
+                if (! Schema::hasColumn('crm_orders', 'company_id')) {
+                    $table->unsignedBigInteger('company_id')->nullable()->after('warehouse_id');
+                }
             });
         }
 
-        if (Schema::hasTable('crm_warehouses') && !Schema::hasColumn('crm_warehouses', 'company_id')) {
+        if (Schema::hasTable('crm_warehouses') && ! Schema::hasColumn('crm_warehouses', 'company_id')) {
             Schema::table('crm_warehouses', function (Blueprint $table) {
-                $table->unsignedBigInteger('company_id')->nullable()->after('id');
+                if (! Schema::hasColumn('crm_warehouses', 'company_id')) {
+                    $table->unsignedBigInteger('company_id')->nullable()->after('id');
+                }
             });
         }
 
@@ -123,9 +129,9 @@ return new class extends Migration
                 DB::table('crm_warehouses')
                     ->where(function ($q) {
                         $q->where('name', 'like', '%QT%')
-                          ->orWhere('name', 'like', '%Quốc Tế%')
-                          ->orWhere('name', 'like', '%Quoc Te%')
-                          ->orWhere('name', 'like', '%EGO_QT%');
+                            ->orWhere('name', 'like', '%Quốc Tế%')
+                            ->orWhere('name', 'like', '%Quoc Te%')
+                            ->orWhere('name', 'like', '%EGO_QT%');
                     })
                     ->update(['company_id' => $egoIntId]);
             }
@@ -134,9 +140,9 @@ return new class extends Migration
                 DB::table('crm_warehouses')
                     ->where(function ($q) {
                         $q->where('name', 'like', '%VN%')
-                          ->orWhere('name', 'like', '%Việt Nam%')
-                          ->orWhere('name', 'like', '%Viet Nam%')
-                          ->orWhere('name', 'like', '%EGO_VN%');
+                            ->orWhere('name', 'like', '%Việt Nam%')
+                            ->orWhere('name', 'like', '%Viet Nam%')
+                            ->orWhere('name', 'like', '%EGO_VN%');
                     })
                     ->update(['company_id' => $egoVnId]);
             }
@@ -149,13 +155,13 @@ return new class extends Migration
             Schema::hasColumn('crm_orders', 'warehouse_id') &&
             Schema::hasColumn('crm_warehouses', 'company_id')
         ) {
-            DB::statement("
+            DB::statement('
                 UPDATE crm_orders o
                 JOIN crm_warehouses w ON w.id = o.warehouse_id
                 SET o.company_id = w.company_id
                 WHERE o.company_id IS NULL
                   AND w.company_id IS NOT NULL
-            ");
+            ');
         }
 
         if (
@@ -167,14 +173,14 @@ return new class extends Migration
             Schema::hasColumn('crm_order_items', 'warehouse_id') &&
             Schema::hasColumn('crm_warehouses', 'company_id')
         ) {
-            DB::statement("
+            DB::statement('
                 UPDATE crm_orders o
                 JOIN crm_order_items oi ON oi.order_id = o.id
                 JOIN crm_warehouses w ON w.id = oi.warehouse_id
                 SET o.company_id = w.company_id
                 WHERE o.company_id IS NULL
                   AND w.company_id IS NOT NULL
-            ");
+            ');
         }
     }
 

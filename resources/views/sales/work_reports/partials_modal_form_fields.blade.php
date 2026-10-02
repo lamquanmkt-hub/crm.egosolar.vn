@@ -24,7 +24,7 @@ Muốn lắp: Ngay trong tháng này
 Khu vực: Cần Thơ
 Diện tích mái: Trên 60m2
 Ngân sách: Trên 200 triệu"></textarea>
-    <div class="d-flex gap-2 flex-wrap mt-2">
+    <div class="tw:flex tw:gap-2 flex-wrap tw:mt-2">
         <button type="button" class="swr-btn sm js-quick-paste-btn"><i class="bi bi-stars"></i> Tự điền</button>
         <button type="button" class="swr-btn sm light js-quick-paste-clear-btn">Xoá ô dán</button>
     </div>
@@ -236,46 +236,8 @@ Ngân sách: Trên 200 triệu"></textarea>
 
 
 {{-- EGO_SALES_MANAGER_DROPDOWN_START --}}
-@php
-    $egoSalesManagerOptions = collect();
-
-    try {
-        $egoSalesManagerOptions = \App\Models\User::query()
-            ->get()
-            ->filter(function ($u) {
-                $roles = [];
-
-                foreach (['role', 'type', 'position', 'department'] as $field) {
-                    if (!empty($u->{$field})) {
-                        $roles[] = mb_strtolower((string) $u->{$field});
-                    }
-                }
-
-                if (method_exists($u, 'getRoleNames')) {
-                    foreach ($u->getRoleNames() as $roleName) {
-                        $roles[] = mb_strtolower((string) $roleName);
-                    }
-                }
-
-                $roleText = implode('|', array_unique(array_filter($roles)));
-
-                return str_contains($roleText, 'sales_manager')
-                    || str_contains($roleText, 'sales manager')
-                    || str_contains($roleText, 'trưởng phòng sales')
-                    || str_contains($roleText, 'truong_phong_sales')
-                    || str_contains($roleText, 'manager_sales');
-            })
-            ->map(function ($u) {
-                return [
-                    'id' => (string) $u->id,
-                    'name' => (string) ($u->name ?? $u->email ?? ('User #' . $u->id)),
-                ];
-            })
-            ->values();
-    } catch (\Throwable $e) {
-        $egoSalesManagerOptions = collect();
-    }
-@endphp
+{{-- $egoSalesManagerOptions do App\Services\Sales\SalesManagerDirectory cung cấp
+     qua ViewComposerServiceProvider — KHÔNG truy vấn User trong Blade. --}}
 
 <script>
 (function () {

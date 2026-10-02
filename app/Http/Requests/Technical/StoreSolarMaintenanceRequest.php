@@ -25,8 +25,7 @@ class StoreSolarMaintenanceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'maintenance_profile_id' => ['nullable', 'integer', 'exists:solar_maintenance_profiles,id'],
-            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'site_id' => ['required', 'integer', 'exists:sites,id'],
             'customer_name' => ['nullable', 'string', 'max:190'],
             'site_name' => ['nullable', 'string', 'max:190'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -55,6 +54,7 @@ class StoreSolarMaintenanceRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'site_id.required' => 'Vui lòng chọn công trình trước khi tạo lịch.',
             'site_id.exists' => 'Công trình đã chọn không còn tồn tại.',
             'type.in' => 'Loại lịch không hợp lệ.',
             'priority.in' => 'Mức ưu tiên không hợp lệ.',

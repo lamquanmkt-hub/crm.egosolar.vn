@@ -7,11 +7,11 @@ namespace App\Services;
 use App\Contracts\Services\ProductStockServiceInterface;
 use App\Models\Inventory\Stock\ProductStock;
 use App\Models\Inventory\Stock\StockMovement;
+use App\Support\SchemaCache;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Service xử lý tồn kho sản phẩm (ProductStock): kiểm tra, điều chỉnh, báo cáo.
@@ -121,8 +121,8 @@ class ProductStockService implements ProductStockServiceInterface
                     'last_updated' => now(),
                 ]);
 
-            if (Schema::hasTable('crm_stock_movements')) {
-                $columns = Schema::getColumnListing('crm_stock_movements');
+            if (SchemaCache::hasTable('crm_stock_movements')) {
+                $columns = SchemaCache::columns('crm_stock_movements');
                 $has = fn (string $column): bool => in_array($column, $columns, true);
                 $movement = [];
 

@@ -1,62 +1,64 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="container-fluid px-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="fw-bold text-uppercase text-secondary">Chỉnh sửa danh mục sản phẩm</h1>
-            <a href="{{ route('categories.index') }}" class="btn btn-outline-secondary">
+    {{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+         thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+         quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+    <div class="container-fluid tw:px-6 tw:py-4">
+        <div class="tw:flex tw:justify-between tw:items-center tw:mb-6">
+            <h1 class="tw:font-bold tw:uppercase tw:text-[#6c757d]">Chỉnh sửa danh mục sản phẩm</h1>
+            <x-ui.button href="{{ route('categories.index') }}" variant="outline-secondary">
                 <i class="bi bi-arrow-left"></i> Quay lại
-            </a>
+            </x-ui.button>
         </div>
 
         @if(session('error'))
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <x-ui.alert variant="danger" :dismissible="true">
                 <i class="bi bi-exclamation-circle"></i> {{ session('error') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
+            </x-ui.alert>
         @endif
 
-        <div class="card shadow-sm">
-            <div class="card-body">
+        <x-ui.card class="shadow-sm">
+            <x-ui.card-body>
                 <form action="{{ route('categories.update', $category->id) }}" method="POST">
                     @csrf
                     @method('PUT')
 
-                    <div class="row">
-                        <div class="col-md-8">
-                            <div class="mb-3">
-                                <label for="name" class="form-label">
-                                    Tên danh mục <span class="text-danger">*</span>
-                                </label>
-                                <input type="text"
-                                       class="form-control @error('name') is-invalid @enderror"
+                    <div class="tw:row">
+                        <div class="tw:md:col12-8">
+                            <div class="tw:mb-4">
+                                <x-ui.label for="name">
+                                    Tên danh mục <span class="tw:text-[#dc3545]">*</span>
+                                </x-ui.label>
+                                <x-ui.input type="text"
+                                       class="@error('name') is-invalid @enderror"
                                        id="name"
                                        name="name"
                                        value="{{ old('name', $category->name) }}"
                                        placeholder="Nhập tên danh mục"
-                                       required>
+                                       required />
                                 @error('name')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
-                            <div class="mb-3">
-                                <label for="description" class="form-label">Mô tả</label>
-                                <textarea class="form-control @error('description') is-invalid @enderror"
+                            <div class="tw:mb-4">
+                                <x-ui.label for="description">Mô tả</x-ui.label>
+                                <x-ui.input as="textarea" class="@error('description') is-invalid @enderror"
                                           id="description"
                                           name="description"
                                           rows="4"
-                                          placeholder="Nhập mô tả danh mục">{{ old('description', $category->description) }}</textarea>
+                                          placeholder="Nhập mô tả danh mục">{{ old('description', $category->description) }}</x-ui.input>
                                 @error('description')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
                         </div>
 
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="parent_id" class="form-label">Danh mục cha</label>
-                                <select class="form-select @error('parent_id') is-invalid @enderror"
+                        <div class="tw:md:col12-4">
+                            <div class="tw:mb-4">
+                                <x-ui.label for="parent_id">Danh mục cha</x-ui.label>
+                                <x-ui.select class="@error('parent_id') is-invalid @enderror"
                                         id="parent_id"
                                         name="parent_id">
                                     <option value="">— Không có —</option>
@@ -71,43 +73,43 @@
                                             </option>
                                         @endif
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                                 @error('parent_id')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
-                                <small class="form-text text-muted">
+                                <small class="form-text tw:text-[rgba(33,37,41,0.75)]">
                                     Chọn danh mục cha nếu muốn tạo danh mục con
                                 </small>
                             </div>
 
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6 class="card-title">Thông tin</h6>
-                                    <p class="card-text small mb-1">
+                            <x-ui.card class="bg-light">
+                                <x-ui.card-body>
+                                    <h6 class="tw:mb-2">Thông tin</h6>
+                                    <p class="tw:last:mb-0 small tw:mb-1">
                                         <strong>ID:</strong> {{ $category->id }}
                                     </p>
-                                    <p class="card-text small mb-1">
+                                    <p class="tw:last:mb-0 small tw:mb-1">
                                         <strong>Số sản phẩm:</strong> {{ $category->products()->count() }}
                                     </p>
-                                    <p class="card-text small mb-0">
+                                    <p class="tw:last:mb-0 small tw:mb-0">
                                         <strong>Số danh mục con:</strong> {{ $category->children()->count() }}
                                     </p>
-                                </div>
-                            </div>
+                                </x-ui.card-body>
+                            </x-ui.card>
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('categories.index') }}" class="btn btn-secondary">
+                    <div class="tw:flex tw:justify-end tw:gap-2">
+                        <x-ui.button href="{{ route('categories.index') }}" variant="secondary">
                             <i class="bi bi-x-circle"></i> Hủy
-                        </a>
-                        <button type="submit" class="btn btn-primary">
+                        </x-ui.button>
+                        <x-ui.button variant="primary" type="submit">
                             <i class="bi bi-check-circle"></i> Cập nhật
-                        </button>
+                        </x-ui.button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </x-ui.card-body>
+        </x-ui.card>
     </div>
 @endsection
 

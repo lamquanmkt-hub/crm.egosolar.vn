@@ -10,9 +10,7 @@
     $status = (string) $mr->status;
     $user = auth()->user();
     $isAdmin = $user && (((int) ($user->is_admin ?? 0) === 1) || (method_exists($user, 'hasRole') && $user->hasRole('admin')));
-    $isTechnical = $user && method_exists($user, 'hasAnyRole')
-        ? $user->hasAnyRole(['technical', 'ky_thuat'])
-        : ($user && method_exists($user, 'hasRole') && ($user->hasRole('technical') || $user->hasRole('ky_thuat')));
+    $isTechnical = $user && method_exists($user, 'hasRole') && $user->hasRole('technical');
     $canEdit = ($isAdmin && in_array($status, [MaterialRequestStatus::DRAFT->value, MaterialRequestStatus::SUBMITTED->value, MaterialRequestStatus::ADMIN_APPROVED->value], true)) || ($isTechnical && $status === MaterialRequestStatus::DRAFT->value);
     $statusLabels = [MaterialRequestStatus::DRAFT->value => 'Nháp', MaterialRequestStatus::SUBMITTED->value => 'Chờ Admin duyệt', MaterialRequestStatus::ADMIN_APPROVED->value => 'Kho đang xử lý', MaterialRequestStatus::EXPORTED->value => 'Đã xuất kho', MaterialRequestStatus::REJECTED->value => 'Đã từ chối'];
     $statusTone = match ($status) { MaterialRequestStatus::SUBMITTED->value => 'amber', MaterialRequestStatus::ADMIN_APPROVED->value => 'blue', MaterialRequestStatus::EXPORTED->value => 'green', MaterialRequestStatus::REJECTED->value => 'red', default => 'neutral' };

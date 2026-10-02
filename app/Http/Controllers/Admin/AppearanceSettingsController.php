@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class AppearanceSettingsController extends Controller
@@ -120,7 +120,7 @@ class AppearanceSettingsController extends Controller
 
     public function reset(): RedirectResponse
     {
-        if (Schema::hasTable('ego_system_settings')) {
+        if (SchemaCache::hasTable('ego_system_settings')) {
             DB::table('ego_system_settings')
                 ->whereIn('key', array_keys(self::DEFAULTS))
                 ->delete();
@@ -137,7 +137,7 @@ class AppearanceSettingsController extends Controller
     {
         $stored = [];
 
-        if (Schema::hasTable('ego_system_settings')) {
+        if (SchemaCache::hasTable('ego_system_settings')) {
             $stored = DB::table('ego_system_settings')
                 ->whereIn('key', array_keys(self::DEFAULTS))
                 ->pluck('value', 'key')

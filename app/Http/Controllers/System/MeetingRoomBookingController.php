@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\System;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
+use App\View\Presenters\System\MeetingRoomCalendarPresenter;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\ViewErrorBag;
 use Illuminate\View\View;
 
 /**
@@ -23,6 +25,8 @@ use Illuminate\View\View;
  */
 final class MeetingRoomBookingController extends Controller
 {
+    public function __construct(private readonly MeetingRoomCalendarPresenter $calendarPresenter) {}
+
     private string $table = 'meeting_room_bookings';
 
     public function index(Request $request): View
@@ -50,10 +54,6 @@ final class MeetingRoomBookingController extends Controller
 
         /** @var Collection<int, object> $monthBookings */
         $monthBookings = $query->get();
-
-        $bookingsByDate = $monthBookings->groupBy(
-            static fn (object $booking): string => Carbon::parse($booking->start_at)->toDateString()
-        );
 
         $calendarStart = $monthStart->copy()->startOfWeek(Carbon::MONDAY);
         $calendarEnd = $monthEnd->copy()->endOfWeek(Carbon::SUNDAY);
@@ -86,26 +86,19 @@ final class MeetingRoomBookingController extends Controller
 
         $usageStatuses = $this->usageStatuses();
         $organizers = $this->organizers();
-        $monthLabel = 'Tháng '.$monthStart->format('m/Y');
-        $previousMonth = $monthStart->copy()->subMonthNoOverflow()->format('Y-m');
-        $nextMonth = $monthStart->copy()->addMonthNoOverflow()->format('Y-m');
-        $currentMonth = now()->format('Y-m');
 
-        return view('meeting-room-bookings.index', compact(
-            'monthBookings',
-            'bookingsByDate',
-            'calendarDays',
-            'monthStart',
-            'monthLabel',
-            'previousMonth',
-            'nextMonth',
-            'currentMonth',
-            'rooms',
-            'usageStatuses',
-            'organizers',
-            'stats',
-            'room',
-            'usageStatus'
+        return view('meeting-room-bookings.index', array_merge(
+            compact('monthBookings', 'calendarDays', 'monthStart', 'rooms', 'usageStatuses', 'organizers', 'stats', 'room', 'usageStatus'),
+            $this->calendarPresenter->viewData(
+                $monthBookings,
+                $calendarDays,
+                $monthStart,
+                $room,
+                $usageStatus,
+                session()->get('errors') ?? new ViewErrorBag,
+                session('open_booking_modal'),
+                session('editing_booking_id'),
+            ),
         ));
     }
 
@@ -315,11 +308,11 @@ final class MeetingRoomBookingController extends Controller
         $roleByUserId = [];
 
         if (
-            Schema::hasTable('roles')
-            && Schema::hasTable('model_has_roles')
-            && Schema::hasColumn('roles', 'name')
-            && Schema::hasColumn('model_has_roles', 'model_id')
-            && Schema::hasColumn('model_has_roles', 'role_id')
+            SchemaCache::hasTable('roles')
+            && SchemaCache::hasTable('model_has_roles')
+            && SchemaCache::hasColumn('roles', 'name')
+            && SchemaCache::hasColumn('model_has_roles', 'model_id')
+            && SchemaCache::hasColumn('model_has_roles', 'role_id')
         ) {
             try {
                 $roleRows = DB::table('model_has_roles')
@@ -339,8 +332,8 @@ final class MeetingRoomBookingController extends Controller
             }
         }
 
-        if (Schema::hasTable('users')) {
-            $columns = Schema::getColumnListing('users');
+        if (SchemaCache::hasTable('users')) {
+            $columns = SchemaCache::columns('users');
             $select = ['id'];
 
             foreach (['name', 'email', 'role'] as $column) {
@@ -413,13 +406,13 @@ final class MeetingRoomBookingController extends Controller
     private function ensureTableReady(): void
     {
         abort_unless(
-            Schema::hasTable($this->table),
+            SchemaCache::hasTable($this->table),
             500,
             'Chưa có bảng meeting_room_bookings. Vui lòng chạy migration.'
         );
 
         abort_unless(
-            Schema::hasColumn($this->table, 'usage_status'),
+            SchemaCache::hasColumn($this->table, 'usage_status'),
             500,
             'Bảng meeting_room_bookings chưa có cột usage_status. Vui lòng chạy migration.'
         );

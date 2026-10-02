@@ -26,7 +26,7 @@ final class OrderProductPickerCharacterizationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->salesUser = $this->userWithRole('sales');
+        $this->salesUser = $this->userWithRole('sales', permissions: ['page.orders']);
     }
 
     /** Id user thao tác trong fixture đơn hàng. */

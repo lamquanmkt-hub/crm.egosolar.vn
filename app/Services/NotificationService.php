@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\Services\NotificationServiceInterface;
+use App\Enums\OrderDepartment;
 use App\Models\CRM\Orders\Order;
 use App\Models\CRM\Orders\OrderNotification;
 use App\Models\User;
@@ -210,16 +211,6 @@ class NotificationService implements NotificationServiceInterface
      */
     protected function getDepartmentName(string $dept): string
     {
-        $names = [
-            'sales' => 'Kinh doanh',
-            'sales_manager' => 'Quản lý kinh doanh',
-            'accounting' => 'Kế toán',
-            'management' => 'Ban Giám đốc',
-            'warehouse' => 'Kho vận',
-            'completed' => 'Hoàn tất',
-            'canceled' => 'Đã hủy',
-        ];
-
-        return $names[$dept] ?? ucfirst($dept);
+        return OrderDepartment::labelFor($dept);
     }
 }

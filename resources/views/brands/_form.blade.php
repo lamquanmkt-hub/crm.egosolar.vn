@@ -1,36 +1,34 @@
 @csrf
 @if ($errors->any())
-    <div class="alert alert-danger">
-        <div class="fw-semibold mb-1">Dữ liệu chưa hợp lệ:</div>
-        <ul class="mb-0">
+    <x-ui.alert variant="danger">
+        <div class="tw:font-semibold tw:mb-1">Dữ liệu chưa hợp lệ:</div>
+        <ul class="tw:mb-0">
             @foreach($errors->all() as $err)
                 <li>{{ $err }}</li>
             @endforeach
         </ul>
-    </div>
+    </x-ui.alert>
 @endif
 @php
     $brandInstance = $brand ?? null;
 @endphp
-<div class="mb-3">
-    <label class="form-label">Tên brand</label>
-    <input type="text" name="name" class="form-control"
-           value="{{ old('name', $brandInstance?->name ?? '') }}"
-           required>
+<div class="tw:mb-4">
+    <x-ui.label>Tên brand</x-ui.label>
+    <x-ui.input type="text" name="name" value="{{ old('name', $brandInstance?->name ?? '') }}"
+           required />
 </div>
-<div class="mb-3">
-    <label class="form-label">Slug</label>
-    <input type="text" name="slug" class="form-control"
-           value="{{ old('slug', $brandInstance?->slug ?? '') }}"
-           placeholder="Tự sinh theo tên nếu để trống">
-    <small class="text-muted">Unique. Không dấu, viết thường, dùng dấu gạch ngang.</small>
+<div class="tw:mb-4">
+    <x-ui.label>Slug</x-ui.label>
+    <x-ui.input type="text" name="slug" value="{{ old('slug', $brandInstance?->slug ?? '') }}"
+           placeholder="Tự sinh theo tên nếu để trống" />
+    <small class="tw:text-[rgba(33,37,41,0.75)]">Unique. Không dấu, viết thường, dùng dấu gạch ngang.</small>
 </div>
-<div class="mb-3">
-    <label class="form-label">Mô tả</label>
-    <textarea name="description" class="form-control" rows="3"
-              placeholder="Mô tả brand...">{{ old('description', $brandInstance?->description ?? '') }}</textarea>
+<div class="tw:mb-4">
+    <x-ui.label>Mô tả</x-ui.label>
+    <x-ui.input as="textarea" name="description" rows="3"
+              placeholder="Mô tả brand...">{{ old('description', $brandInstance?->description ?? '') }}</x-ui.input>
 </div>
-<div class="mb-3">
+<div class="tw:mb-4">
     <div class="form-check form-switch">
         <input class="form-check-input"
                type="checkbox"
@@ -41,9 +39,9 @@
         <label class="form-check-label" for="is_active">Đang sử dụng</label>
     </div>
 </div>
-<div class="d-flex gap-2">
-    <button class="btn btn-primary">
+<div class="tw:flex tw:gap-2">
+    <x-ui.button variant="primary" type="submit">
         <i class="bi bi-save"></i> {{ $buttonText ?? 'Lưu' }}
-    </button>
-    <a href="{{ route('brands.index') }}" class="btn btn-outline-secondary">Huỷ</a>
+    </x-ui.button>
+    <x-ui.button href="{{ route('brands.index') }}" variant="outline-secondary">Huỷ</x-ui.button>
 </div>

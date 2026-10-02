@@ -1,58 +1,189 @@
+{{-- Bỏ truy vấn lặp bảng payment_attachments ở đây: controller đã eager load
+     quan hệ $item->attachments (PaymentRequest::with([...,'attachments'])), và
+     quan hệ đó nay ghim orderBy('id') đúng như truy vấn cũ. --}}
+<!-- EGO_DNTT_EDIT_KEEP_VALUE_V2 -->
 @extends('layouts.app')
 
 @section('title', 'Sửa đề nghị thanh toán')
 
 @section('content')
-@php
-    $statusMap = [
-        'draft' => 'Nháp',
-        'submitted' => 'Đã gửi duyệt',
-        'admin_approved' => 'Quản lý tài chính đã duyệt',
-        'admin_rejected' => 'Quản lý tài chính từ chối',
-        'accounting_approved' => 'Kế toán đã chi',
-        'accounting_rejected' => 'Kế toán từ chối',
-    ];
 
-    $statusToneMap = [
-        'draft' => 'neutral',
-        'submitted' => 'info',
-        'admin_approved' => 'primary',
-        'admin_rejected' => 'danger',
-        'accounting_approved' => 'success',
-        'accounting_rejected' => 'warning',
-    ];
+<style id="egoDnttAutoUploadCssV4">
+.ego-auto-upload{
+    border:1px solid #dceaf0;
+    border-radius:16px;
+    padding:14px;
+    background:linear-gradient(180deg,#fbfeff 0%,#f6fcfe 100%);
+}
 
-    $statusLabel = $statusMap[$item->status] ?? ($item->status ?? '-');
-    $statusTone = $statusToneMap[$item->status] ?? 'neutral';
+.ego-auto-upload-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:12px;
+}
 
-    $dueValue = old('payment_due_date');
-    if ($dueValue === null && !empty($item->payment_due_date)) {
-        try {
-            $dueValue = \Illuminate\Support\Carbon::parse($item->payment_due_date)->format('Y-m-d');
-        } catch (\Throwable $e) {
-            $dueValue = '';
-        }
+.ego-auto-upload-title{
+    color:#153747;
+    font-size:13px;
+    font-weight:900;
+}
+
+.ego-auto-upload-desc{
+    color:#7d909a;
+    font-size:11px;
+    font-weight:600;
+    margin-top:2px;
+}
+
+.ego-auto-upload-limit{
+    white-space:nowrap;
+    border-radius:999px;
+    padding:5px 9px;
+    background:#e4f9fc;
+    color:#07889a;
+    font-size:10.5px;
+    font-weight:900;
+}
+
+.ego-auto-upload-zone{
+    display:flex;
+    min-height:116px;
+    padding:18px;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    text-align:center;
+    border:1.5px dashed #80d7e8;
+    border-radius:14px;
+    background:#fff;
+    cursor:pointer;
+    transition:.18s ease;
+}
+
+.ego-auto-upload-zone:hover,
+.ego-auto-upload-zone.is-dragover{
+    border-color:#05a6c0;
+    background:#f1fcff;
+    transform:translateY(-1px);
+}
+
+.ego-auto-upload-zone.is-uploading{
+    pointer-events:none;
+    opacity:.7;
+}
+
+.ego-auto-upload-icon{
+    width:42px;
+    height:42px;
+    border-radius:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#e5f8fb;
+    font-size:20px;
+    margin-bottom:8px;
+}
+
+.ego-auto-upload-main{
+    color:#143544;
+    font-size:13px;
+    font-weight:900;
+}
+
+.ego-auto-upload-sub{
+    color:#82959e;
+    font-size:11.5px;
+    margin-top:3px;
+}
+
+.ego-auto-upload-sub b{
+    color:#049db4;
+}
+
+.ego-auto-upload-types{
+    color:#9aa8af;
+    font-size:10.5px;
+    margin-top:7px;
+}
+
+.ego-auto-progress{
+    display:grid;
+    gap:7px;
+    margin-top:10px;
+}
+
+.ego-auto-file{
+    display:grid;
+    grid-template-columns:34px minmax(0,1fr) auto;
+    align-items:center;
+    gap:9px;
+    padding:9px 10px;
+    background:#fff;
+    border:1px solid #e1ebef;
+    border-radius:11px;
+}
+
+.ego-auto-file-icon{
+    width:32px;
+    height:32px;
+    border-radius:9px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#eaf8fb;
+}
+
+.ego-auto-file-info{
+    min-width:0;
+}
+
+.ego-auto-file-name{
+    color:#183744;
+    font-size:11.5px;
+    font-weight:800;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.ego-auto-file-size{
+    color:#95a3aa;
+    font-size:10.5px;
+    margin-top:2px;
+}
+
+.ego-auto-file-status{
+    border-radius:999px;
+    padding:5px 8px;
+    font-size:10.5px;
+    font-weight:900;
+    white-space:nowrap;
+}
+
+.ego-auto-file-status.uploading{
+    background:#eaf7ff;
+    color:#1779a6;
+}
+
+.ego-auto-file-status.done{
+    background:#e8faef;
+    color:#198754;
+}
+
+.ego-auto-file-status.error{
+    background:#fff0f1;
+    color:#d83b4c;
+}
+
+@media(max-width:700px){
+    .ego-auto-upload-head{
+        flex-direction:column;
     }
+}
+</style>
 
-    $createdAt = !empty($item->created_at)
-        ? \Illuminate\Support\Carbon::parse($item->created_at)->format('d/m/Y H:i')
-        : '-';
-
-    $attachments = $item->attachments ?? collect();
-    /* EGO_ATTACHMENTS_DIRECT_QUERY_START */
-    try {
-        if (!empty($item->id) && \Illuminate\Support\Facades\Schema::hasTable('payment_attachments')) {
-            $attachments = \Illuminate\Support\Facades\DB::table('payment_attachments')
-                ->where('payment_request_id', (int) $item->id)
-                ->orderBy('id', 'asc')
-                ->get();
-        }
-    } catch (\Throwable $e) {
-        $attachments = $attachments ?? collect();
-    }
-    /* EGO_ATTACHMENTS_DIRECT_QUERY_END */
-
-@endphp
 
 <style>
     .pay-edit {
@@ -569,28 +700,55 @@
                                class="pay-edit-control"
                                value="{{ $dueValue }}">
                     </div>
+                    {{-- EGO_DNTT_BANK_EDIT_V3 --}}
+                    <div class="pay-edit-field">
+                        <label class="pay-edit-label">Ngân hàng</label>
+                        <input type="text" name="bank_name" class="pay-edit-control" value="{{ old('bank_name', $item->bank_name) }}" placeholder="VD: Vietcombank, MB Bank...">
+                    </div>
 
                     <div class="pay-edit-field">
-                        <label class="pay-edit-label">Thông tin chuyển khoản</label>
-                        <input type="text"
-                               name="bank_info"
-                               class="pay-edit-control"
-                               value="{{ old('bank_info', $item->bank_info) }}"
-                               placeholder="VD: MB BANK - 0123... - Nguyễn Văn A">
+                        <label class="pay-edit-label">Số tài khoản</label>
+                        <input type="text" name="bank_account" class="pay-edit-control" value="{{ old('bank_account', $item->bank_account) }}" inputmode="numeric" placeholder="Nhập số tài khoản">
+                    </div>
+
+                    <div class="pay-edit-field">
+                        <label class="pay-edit-label">Chủ tài khoản</label>
+                        <input type="text" name="bank_account_name" class="pay-edit-control tw:uppercase" value="{{ old('bank_account_name', $item->bank_account_name) }}" placeholder="NGUYEN VAN A">
                     </div>
 
                     {{-- EGO_FIX_REASON_FIELD_START --}}
-                    <div class="pay-edit-field" style="grid-column:1 / -1;">
-                        <label class="pay-edit-label">Nội dung / Lý do thanh toán</label>
-                        <textarea name="reason"
-                                  class="pay-edit-control"
-                                  rows="3"
-                                  placeholder="Nhập nội dung hoặc lý do thanh toán">{{ old('reason', $item->reason ?? $item->payment_content ?? 'Thanh toán theo đề nghị') }}</textarea>
-                    </div>
+                    <!-- EGO_DNTT_EDIT_CONTENT_SPLIT_V1 -->
 
-                    <input type="hidden"
-                           name="payment_content"
-                           value="{{ old('payment_content', $item->payment_content ?? $item->reason ?? 'Thanh toán theo đề nghị') }}">
+<div class="tw:row tw:g-3">
+    <div class="tw:md:col12-6">
+        <x-ui.label class="tw:font-semibold">
+            Nội dung thanh toán
+        </x-ui.label>
+
+        <textarea
+            name="payment_content"
+            class="pay-edit-control"
+            rows="4"
+            placeholder="VD: Thanh toán đợt 1, tạm ứng vật tư..."
+        >{{ old('payment_content', $item->payment_content ?? '') }}</textarea>
+    </div>
+
+    <div class="tw:md:col12-6">
+        <x-ui.label class="tw:font-semibold">
+            Lý do / Diễn giải
+        </x-ui.label>
+
+        <textarea
+            name="reason"
+            class="pay-edit-control"
+            rows="4"
+            placeholder="Mô tả mục đích và nội dung khoản thanh toán..."
+        >{{ old('reason', $item->reason ?? '') }}</textarea>
+    </div>
+</div>
+
+
+
                     {{-- EGO_FIX_REASON_FIELD_END --}}
                 </div>
             </div>
@@ -600,21 +758,6 @@
 
         
         {{-- EGO_AJAX_ATTACHMENTS_START --}}
-        @php
-            $egoPrId = isset($item) && !empty($item->id) ? (int) $item->id : 0;
-            $egoAttachments = collect();
-
-            try {
-                if ($egoPrId && \Illuminate\Support\Facades\Schema::hasTable('payment_attachments')) {
-                    $egoAttachments = \Illuminate\Support\Facades\DB::table('payment_attachments')
-                        ->where('payment_request_id', $egoPrId)
-                        ->orderBy('id', 'asc')
-                        ->get();
-                }
-            } catch (\Throwable $e) {
-                $egoAttachments = collect();
-            }
-        @endphp
 
         <section class="pay-edit-card pay-edit-animate" style="animation-delay:.09s;" id="ego-pr-attachments-card">
             <div class="pay-edit-card-head">
@@ -627,40 +770,35 @@
             <div class="pay-edit-card-body">
                 <div id="ego-pr-attachment-message" style="display:none;margin-bottom:10px;padding:10px 12px;border-radius:12px;font-weight:800;"></div>
 
-                @if($egoAttachments->count())
+                @if($egoAttachments)
                     <div class="pay-edit-file-list" style="margin-bottom:14px;">
-                        @foreach($egoAttachments as $att)
-                            @php
-                                $egoFileName = !empty($att->original_name) ? $att->original_name : basename($att->path ?? '');
-                                $egoFileSize = !empty($att->size) ? number_format(((float) $att->size) / 1024, 1) . ' KB' : '';
-                                $egoDownloadUrl = url('/payment-requests/' . $egoPrId . '/attachments-thao/' . $att->id . '/download');
-                            @endphp
+                        @foreach($egoAttachments as $row)
 
                             <div class="pay-edit-file" style="align-items:center;">
-                                <a href="{{ $egoDownloadUrl }}" target="_blank" style="display:flex;align-items:center;gap:10px;flex:1;min-width:220px;color:inherit;text-decoration:none;">
+                                <a href="{{ url($row->downloadPath) }}" target="_blank" style="display:flex;align-items:center;gap:10px;flex:1;min-width:220px;color:inherit;text-decoration:none;">
                                     <div class="pay-edit-file-icon">FILE</div>
                                     <div>
-                                        <div class="pay-edit-file-name">{{ $egoFileName }}</div>
-                                        <div class="pay-edit-file-meta">{{ $att->mime_type ?? 'Tệp đính kèm' }} {{ $egoFileSize ? ' - ' . $egoFileSize : '' }}</div>
+                                        <div class="pay-edit-file-name">{{ $row->fileName }}</div>
+                                        <div class="pay-edit-file-meta">{{ $row->fileMeta }}</div>
                                     </div>
                                 </a>
 
                                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                                     <input type="file"
                                            class="ego-pr-replace-file"
-                                           data-attachment-id="{{ $att->id }}"
+                                           data-attachment-id="{{ $row->attachment->id }}"
                                            style="max-width:210px;font-size:12px;">
 
                                     <button type="button"
                                             class="pay-edit-btn yellow ego-pr-replace-btn"
-                                            data-attachment-id="{{ $att->id }}"
+                                            data-attachment-id="{{ $row->attachment->id }}"
                                             style="padding:8px 10px;">
                                         Sửa
                                     </button>
 
                                     <button type="button"
                                             class="pay-edit-btn danger ego-pr-delete-btn"
-                                            data-attachment-id="{{ $att->id }}"
+                                            data-attachment-id="{{ $row->attachment->id }}"
                                             style="padding:8px 10px;">
                                         Xóa
                                     </button>
@@ -672,19 +810,52 @@
                     <div class="pay-edit-empty" style="margin-bottom:14px;">Phiếu này chưa có chứng từ đính kèm.</div>
                 @endif
 
-                <div style="border:1px dashed #bae6fd;background:#f8fcff;border-radius:16px;padding:14px;">
-                    <label class="pay-edit-label">Thêm chứng từ mới</label>
-                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                        <input type="file"
-                               id="ego-pr-new-attachments"
-                               multiple
-                               class="pay-edit-control"
-                               style="max-width:520px;">
-                        <button type="button" id="ego-pr-upload-btn" class="pay-edit-btn blue">
-                            + Thêm chứng từ
-                        </button>
+                {{-- EGO_DNTT_AUTO_UPLOAD_V4 --}}
+                <div class="ego-auto-upload">
+                    <div class="ego-auto-upload-head">
+                        <div>
+                            <div class="ego-auto-upload-title">
+                                Thêm chứng từ
+                            </div>
+                            <div class="ego-auto-upload-desc">
+                                Chọn hoặc kéo thả file. Hệ thống tự tải lên ngay.
+                            </div>
+                        </div>
+
+                        <span class="ego-auto-upload-limit">
+                            20MB / file
+                        </span>
                     </div>
-                    <div class="pay-edit-help">Hỗ trợ PDF, ảnh, Word, Excel... Mỗi file tối đa 20MB.</div>
+
+                    <input type="file"
+                           id="ego-pr-new-attachments"
+                           multiple
+                           accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
+                           style="display:none;">
+
+                    <label for="ego-pr-new-attachments"
+                           id="ego-pr-drop-zone"
+                           class="ego-auto-upload-zone">
+
+                        <div class="ego-auto-upload-icon">📎</div>
+
+                        <div class="ego-auto-upload-main">
+                            Kéo thả chứng từ vào đây
+                        </div>
+
+                        <div class="ego-auto-upload-sub">
+                            hoặc <b>bấm để chọn file</b>
+                        </div>
+
+                        <div class="ego-auto-upload-types">
+                            JPG, PNG, WEBP, PDF, Word, Excel
+                        </div>
+                    </label>
+
+                    <div id="ego-pr-upload-progress"
+                         class="ego-auto-progress"
+                         style="display:none;">
+                    </div>
                 </div>
             </div>
         </section>
@@ -767,37 +938,175 @@
                 });
             }
 
-            var uploadBtn = document.getElementById('ego-pr-upload-btn');
+            /* EGO_DNTT_AUTO_UPLOAD_JS_V4 */
             var fileInput = document.getElementById('ego-pr-new-attachments');
+            var dropZone = document.getElementById('ego-pr-drop-zone');
+            var progressBox = document.getElementById('ego-pr-upload-progress');
+            var isUploading = false;
 
-            if (uploadBtn && fileInput) {
-                uploadBtn.addEventListener('click', function (event) {
-                    event.preventDefault();
-                    event.stopPropagation();
+            function egoFormatSize(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) {
+                    return (bytes / 1024).toFixed(1) + ' KB';
+                }
+                return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+            }
 
-                    if (!fileInput.files || fileInput.files.length === 0) {
-                        showMessage('error', 'Bạn chưa chọn file chứng từ.');
-                        return false;
+            function egoEscape(text) {
+                var div = document.createElement('div');
+                div.textContent = text || '';
+                return div.innerHTML;
+            }
+
+            function egoShowFiles(files, state) {
+                if (!progressBox) return;
+
+                progressBox.style.display = 'grid';
+
+                var html = '';
+
+                Array.prototype.forEach.call(files, function (file) {
+                    html +=
+                        '<div class="ego-auto-file">' +
+                            '<div class="ego-auto-file-icon">📄</div>' +
+                            '<div class="ego-auto-file-info">' +
+                                '<div class="ego-auto-file-name">' +
+                                    egoEscape(file.name) +
+                                '</div>' +
+                                '<div class="ego-auto-file-size">' +
+                                    egoFormatSize(file.size) +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="ego-auto-file-status ' + state + '">' +
+                                (state === 'uploading'
+                                    ? 'Đang tải...'
+                                    : state === 'done'
+                                        ? 'Đã tải'
+                                        : 'Lỗi') +
+                            '</div>' +
+                        '</div>';
+                });
+
+                progressBox.innerHTML = html;
+            }
+
+            function egoUploadFiles(files) {
+                files = Array.prototype.slice.call(files || []);
+
+                if (!files.length || isUploading) {
+                    return;
+                }
+
+                var validFiles = [];
+
+                files.forEach(function (file) {
+                    if (file.size > 20 * 1024 * 1024) {
+                        showMessage(
+                            'error',
+                            'File "' + file.name + '" vượt quá 20MB.'
+                        );
+                        return;
                     }
 
-                    var done = setBusy(uploadBtn, 'Đang thêm...');
-                    var fd = new FormData();
+                    validFiles.push(file);
+                });
 
-                    Array.prototype.forEach.call(fileInput.files, function (file) {
-                        fd.append('attachments[]', file);
+                if (!validFiles.length) {
+                    return;
+                }
+
+                isUploading = true;
+
+                if (dropZone) {
+                    dropZone.classList.add('is-uploading');
+                }
+
+                egoShowFiles(validFiles, 'uploading');
+
+                var fd = new FormData();
+
+                validFiles.forEach(function (file) {
+                    fd.append('attachments[]', file);
+                });
+
+                postForm(
+                    '/payment-requests/' +
+                    paymentRequestId +
+                    '/attachments-thao',
+                    fd
+                )
+                .then(function (data) {
+                    egoShowFiles(validFiles, 'done');
+
+                    showMessage(
+                        'success',
+                        data && data.message
+                            ? data.message
+                            : 'Đã tải chứng từ thành công.'
+                    );
+
+                    window.setTimeout(function () {
+                        window.location.reload();
+                    }, 650);
+                })
+                .catch(function (err) {
+                    isUploading = false;
+
+                    if (dropZone) {
+                        dropZone.classList.remove('is-uploading');
+                    }
+
+                    egoShowFiles(validFiles, 'error');
+
+                    showMessage(
+                        'error',
+                        err.message || 'Không tải được chứng từ.'
+                    );
+
+                    if (fileInput) {
+                        fileInput.value = '';
+                    }
+                });
+            }
+
+            if (fileInput) {
+                fileInput.addEventListener('change', function () {
+                    if (this.files && this.files.length) {
+                        egoUploadFiles(this.files);
+                    }
+                });
+            }
+
+            if (dropZone) {
+                ['dragenter', 'dragover'].forEach(function (name) {
+                    dropZone.addEventListener(name, function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        if (!isUploading) {
+                            dropZone.classList.add('is-dragover');
+                        }
                     });
+                });
 
-                    postForm('/payment-requests/' + paymentRequestId + '/attachments-thao', fd)
-                        .then(function () {
-                            showMessage('success', 'Đã thêm chứng từ. Đang tải lại...');
-                            window.location.reload();
-                        })
-                        .catch(function (err) {
-                            showMessage('error', err.message || 'Không thêm được chứng từ.');
-                            done();
-                        });
+                ['dragleave', 'drop'].forEach(function (name) {
+                    dropZone.addEventListener(name, function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
 
-                    return false;
+                        dropZone.classList.remove('is-dragover');
+                    });
+                });
+
+                dropZone.addEventListener('drop', function (event) {
+                    if (
+                        !isUploading &&
+                        event.dataTransfer &&
+                        event.dataTransfer.files &&
+                        event.dataTransfer.files.length
+                    ) {
+                        egoUploadFiles(event.dataTransfer.files);
+                    }
                 });
             }
 
@@ -847,7 +1156,7 @@
                     var fd = new FormData();
                     fd.append('_method', 'DELETE');
 
-                    postForm('/payment-requests/' + paymentRequestId + '/attachments-thao/' + id + '/xoa', fd)
+                    postForm('/payment-requests/' + paymentRequestId + '/attachments-thao/' + id, fd)
                         .then(function () {
                             showMessage('success', 'Đã xóa chứng từ. Đang tải lại...');
                             window.location.reload();
@@ -863,31 +1172,6 @@
         });
         </script>
         {{-- EGO_AJAX_ATTACHMENTS_END --}}
-
-{{-- EGO_PR_AUDIT_REASON_START
-     Phiếu đã duyệt/đã chi: bắt buộc nhập lý do thay đổi, lý do sẽ được ghi
-     vào nhật ký `payment_request_edit_logs` kèm người thực hiện và IP. --}}
-@if(\App\Services\Payments\PaymentRequestAuditLogger::isLockedStatus($item->status ?? null))
-        <div class="pay-edit-footer pay-edit-animate" style="animation-delay:.1s;">
-            <div class="pay-edit-footer-note" style="width:100%">
-                <label for="egoPrAuditReason" style="display:block;font-weight:700;margin-bottom:6px">
-                    Lý do sửa phiếu đã duyệt/đã chi <span style="color:#be123c">*</span>
-                </label>
-                <textarea id="egoPrAuditReason"
-                          name="audit_reason"
-                          required
-                          minlength="5"
-                          maxlength="2000"
-                          rows="2"
-                          style="width:100%"
-                          placeholder="Ví dụ: Sửa số tài khoản người nhận theo công văn NCC ngày ...">{{ old('audit_reason') }}</textarea>
-                @error('audit_reason')
-                    <div style="color:#be123c;font-size:13px;margin-top:4px">{{ $message }}</div>
-                @enderror
-            </div>
-        </div>
-@endif
-{{-- EGO_PR_AUDIT_REASON_END --}}
 
 <div class="pay-edit-footer pay-edit-animate" style="animation-delay:.12s;">
             <div class="pay-edit-footer-note">

@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Sales;
 
-use App\Models\User;
+use App\Services\Sales\Commission\CommissionEligibilityPolicy;
+use App\Services\Sales\Commission\CommissionRuleMatcher;
+use App\Services\Sales\Commission\CommissionSchema;
+use App\Services\Sales\Commission\OrderColumnMap;
+use App\Support\ProbeFailureLog;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -58,8 +62,8 @@ class SalesCommissionExcelExporter
         $periodFrom = $periodStart->format('Y-m-d 00:00:00');
         $periodTo = $periodEnd->format('Y-m-d 23:59:59');
 
-        $hasTable = fn ($t) => Schema::hasTable($t);
-        $hasCol = fn ($t, $c) => $hasTable($t) && Schema::hasColumn($t, $c);
+        $hasTable = fn ($t) => SchemaCache::hasTable($t);
+        $hasCol = fn ($t, $c) => $hasTable($t) && SchemaCache::hasColumn($t, $c);
 
         $firstCol = function ($table, array $cols) use ($hasCol) {
             foreach ($cols as $c) {
@@ -69,23 +73,6 @@ class SalesCommissionExcelExporter
             }
 
             return null;
-        };
-
-        $normalize = function ($value) {
-            $value = trim((string) ($value ?? ''));
-
-            if (class_exists(Str::class)) {
-                $value = Str::ascii($value);
-            }
-
-            $value = strtolower($value);
-            $value = preg_replace('/[^a-z0-9]+/u', '', $value);
-
-            return $value ?: '';
-        };
-
-        $normType = function ($value) use ($normalize) {
-            return $normalize(str_replace(['_', '-'], '', (string) $value));
         };
 
         $findTable = function (array $candidates) {
@@ -108,6 +95,8 @@ class SalesCommissionExcelExporter
                     }
                 }
             } catch (\Throwable $e) {
+                ProbeFailureLog::warn('SalesCommissionExcelExporter::download', $e);
+
                 //
             }
 
@@ -137,19 +126,18 @@ class SalesCommissionExcelExporter
         $salesUsers = collect();
 
         try {
-            $salesUsers = DB::table('users')
+            /*
+             * Nhận diện nhân sự kinh doanh theo phòng ban / chức danh / vai trò —
+             * xem SalesCommissionScope. Chỉ xét vai trò như trước thì danh sách
+             * rỗng trên production (0/235 đơn), tức bản Excel cũng rỗng.
+             */
+            $query = DB::table('users')
                 ->select('users.id', 'users.name', 'users.email')
-                ->where('users.name', '!=', SalesCommissionScope::EXCLUDED_SALES_NAME)
-                ->whereExists(function ($sub) {
-                    $sub->select(DB::raw(1))
-                        ->from('model_has_roles as mhr')
-                        ->join('roles as r', 'r.id', '=', 'mhr.role_id')
-                        ->whereColumn('mhr.model_id', 'users.id')
-                        ->where('mhr.model_type', User::class)
-                        ->whereIn('r.name', ['sales', 'sales_manager']);
-                })
-                ->orderBy('users.name')
-                ->get();
+                ->where('users.name', '!=', SalesCommissionScope::EXCLUDED_SALES_NAME);
+
+            SalesCommissionScope::constrainToSalesStaff($query, 'users');
+
+            $salesUsers = $query->orderBy('users.name')->get();
         } catch (\Throwable $e) {
             $salesUsers = DB::table('users')
                 ->select('id', 'name', 'email')
@@ -239,6 +227,8 @@ class SalesCommissionExcelExporter
 
                 $itemsByOrder = $iq->get($selects)->groupBy($itemOrderCol);
             } catch (\Throwable $e) {
+                ProbeFailureLog::warn('SalesCommissionExcelExporter::download', $e);
+
                 $itemsByOrder = collect();
             }
         }
@@ -447,7 +437,7 @@ class SalesCommissionExcelExporter
             'period_month' => $month,
             'project_rate_percent' => 4,
             'trade_rate_percent' => 1,
-            'panel_fixed_amount' => 0,
+            'panel_fixed_amount' => 15000,
             'only_paid' => 1,
             'only_shipped' => 0,
             'only_completed' => 0,
@@ -484,121 +474,17 @@ class SalesCommissionExcelExporter
             }
         }
 
-        $splitTargetText = function ($text) use ($normalize) {
-            $parts = preg_split('/[,;|\/]+/', (string) $text) ?: [];
-
-            return collect($parts)
-                ->map(fn ($v) => $normalize($v))
-                ->filter()
-                ->values()
-                ->all();
-        };
-
-        $calcRuleAmount = function ($rule, float $beforeVat, float $afterVat, float $monthlyBeforeVat, float $quantity) use ($normType) {
-            $fromAmount = ($rule->from_amount ?? '') !== '' && $rule->from_amount !== null ? (float) $rule->from_amount : null;
-            $toAmount = ($rule->to_amount ?? '') !== '' && $rule->to_amount !== null ? (float) $rule->to_amount : null;
-
-            if ($fromAmount !== null && $monthlyBeforeVat + 0.01 < $fromAmount) {
-                return null;
-            }
-
-            if ($toAmount !== null && $monthlyBeforeVat - 0.01 > $toAmount) {
-                return null;
-            }
-
-            $fromQty = ($rule->from_qty ?? '') !== '' && $rule->from_qty !== null ? (float) $rule->from_qty : null;
-            $toQty = ($rule->to_qty ?? '') !== '' && $rule->to_qty !== null ? (float) $rule->to_qty : null;
-
-            if ($fromQty !== null && $quantity + 0.01 < $fromQty) {
-                return null;
-            }
-
-            if ($toQty !== null && $quantity - 0.01 > $toQty) {
-                return null;
-            }
-
-            $baseType = $normType($rule->base_type ?? 'revenue_before_vat');
-            $calcType = $normType($rule->calculation_type ?? 'percent');
-
-            $base = in_array($baseType, ['revenueaftervat', 'aftervat', 'sauvat'], true)
-                ? $afterVat
-                : (in_array($baseType, ['quantity', 'qty', 'soluong'], true) ? $quantity : $beforeVat);
-
-            if (in_array($calcType, ['fixedperitem', 'peritem', 'theosanpham'], true)) {
-                return $quantity * (float) ($rule->amount_per_unit ?? ($rule->fixed_amount ?? 0));
-            }
-
-            if (in_array($calcType, ['fixedperkwp', 'perkwp'], true)) {
-                return $quantity * (float) ($rule->amount_per_kwp ?? 0);
-            }
-
-            if (in_array($calcType, ['fixedperorder', 'perorder', 'fixed'], true)) {
-                return (float) ($rule->fixed_amount ?? 0);
-            }
-
-            return $base * (float) ($rule->rate_percent ?? 0) / 100;
-        };
-
-        $matchesRuleTarget = function ($rule, string $customerStatus, string $productText) use ($normType, $normalize, $splitTargetText) {
-            $targetType = $normType($rule->target_type ?? 'all');
-            $needles = $splitTargetText($rule->target_text ?? '');
-            $status = $normalize($customerStatus);
-            $productTextNorm = $normalize($productText);
-
-            if ($targetType === '' || $targetType === 'all' || empty($needles)) {
-                return true;
-            }
-
-            if (in_array($targetType, ['customerstatus', 'khachhang', 'trangthaikhach'], true)) {
-                if ($status === '') {
-                    return false;
-                }
-
-                foreach ($needles as $needle) {
-                    if ($needle === $status) {
-                        return true;
-                    }
-
-                    $isLeadNeedle = strpos($needle, 'lead') !== false || strpos($needle, 'ads') !== false;
-                    $isLeadStatus = strpos($status, 'lead') !== false || strpos($status, 'ads') !== false;
-
-                    if ($isLeadNeedle && $isLeadStatus) {
-                        return true;
-                    }
-
-                    $retailNeedles = ['khachle', 'khachhangle', 'retail', 'retailcustomer', 'le'];
-                    if (in_array($needle, $retailNeedles, true) && in_array($status, $retailNeedles, true)) {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            if (in_array($targetType, ['keyword', 'product', 'productname', 'model', 'sku', 'barcode', 'brand', 'category', 'sanpham'], true)) {
-                foreach ($needles as $needle) {
-                    if ($needle !== '' && strpos($productTextNorm, $needle) !== false) {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            return true;
-        };
-
-        $isTradeRule = function ($rule) use ($normType) {
-            $type = $normType($rule->commission_type ?? 'trade_product');
-
-            return in_array($type, ['tradeproduct', 'thuongmai', 'commercial', 'sales', 'order'], true);
-        };
-
-        $isSolarPanelRule = function ($rule) use ($normType) {
-            $type = $normType($rule->commission_type ?? '');
-
-            return in_array($type, ['solarpanel', 'tampin', 'panel'], true);
-        };
+        /*
+         * Điều kiện tính hoa hồng dùng CHUNG với màn hình báo cáo. Trước đây mỗi
+         * bên tự viết một bản: bản này đọc bốn công tắc trong chính sách, bản kia
+         * bỏ qua cả bốn — nên hai màn hình nói hai con số khác nhau ngay khi kế
+         * toán đổi chính sách.
+         */
+        $matcher = new CommissionRuleMatcher;
+        $eligibility = new CommissionEligibilityPolicy(
+            OrderColumnMap::discover(new CommissionSchema),
+            $policy,
+        );
 
         $orderRows = collect();
 
@@ -629,30 +515,8 @@ class SalesCommissionExcelExporter
                 }
             }
 
-            $isPaid = $afterVat <= 0 || $paid + 0.01 >= $afterVat;
-            $isShipped = isset($order->inventory_issued) ? ((int) $order->inventory_issued === 1) : true;
             $statusRaw = $orderStatusCol ? strtolower((string) ($order->{$orderStatusCol} ?? '')) : '';
-            $isCompleted = in_array($statusRaw, ['completed', 'hoan_tat', 'done', 'da_hoan_thanh'], true)
-                || strpos($statusRaw, 'completed') !== false
-                || strpos($statusRaw, 'hoan') !== false;
-
-            $eligible = true;
-
-            if ((int) ($policy->only_paid ?? 1) === 1 && ! $isPaid) {
-                $eligible = false;
-            }
-
-            if ((int) ($policy->hold_if_debt ?? 1) === 1 && $debt > 1) {
-                $eligible = false;
-            }
-
-            if ((int) ($policy->only_shipped ?? 0) === 1 && ! $isShipped) {
-                $eligible = false;
-            }
-
-            if ((int) ($policy->only_completed ?? 0) === 1 && ! $isCompleted) {
-                $eligible = false;
-            }
+            $eligible = $eligibility->isEligible($order, $afterVat, $paid);
 
             $orderRows->push((object) [
                 'order' => $order,
@@ -688,36 +552,34 @@ class SalesCommissionExcelExporter
             ->groupBy('sales_id')
             ->map(fn ($g) => (float) $g->sum('before_vat'));
 
-        $calcCommissionForOrder = function ($r) use (
-            $rules,
-            $policy,
-            $monthlyRevenueBySales,
-            $isTradeRule,
-            $isSolarPanelRule,
-            $matchesRuleTarget,
-            $calcRuleAmount
-        ) {
+        /*
+         * Việc đọc từng quy tắc dùng CHUNG với màn hình báo cáo qua
+         * CommissionRuleMatcher. Phần chọn quy tắc nào thắng vẫn ở đây vì bản
+         * Excel còn phải kèm ghi chú nguồn hoa hồng cho kế toán soát lại.
+         */
+        $calcCommissionForOrder = function ($r) use ($rules, $policy, $monthlyRevenueBySales, $matcher) {
             if (! $r->eligible) {
                 return [0, 0, 'Chưa đủ điều kiện'];
             }
 
-            $monthlyBefore = (float) ($monthlyRevenueBySales->get($r->sales_id, 0));
-            $tradeCommission = null;
-            $fallbackCandidates = [];
-            $extraCommission = 0;
+            $hasRevenueFloor = fn ($rule) => ($rule->from_amount ?? null) !== null
+                && (float) ($rule->from_amount ?? 0) > 0;
 
-            $hasRevenueFloorTradeRule = $rules->contains(function ($rule) use ($isTradeRule) {
-                return $isTradeRule($rule)
-                    && ($rule->from_amount ?? null) !== null
-                    && (float) ($rule->from_amount ?? 0) > 0;
-            });
+            $monthlyBefore = (float) ($monthlyRevenueBySales->get($r->sales_id, 0));
+            $anyRevenueFloor = $rules->contains(fn ($rule) => $matcher->isTrade($rule) && $hasRevenueFloor($rule));
+
+            $tradeCommission = null;
+            $extraCommission = 0;
+            $fallbackCandidates = [];
 
             foreach ($rules as $rule) {
-                if (! $isTradeRule($rule) && ! $isSolarPanelRule($rule)) {
+                $isTrade = $matcher->isTrade($rule);
+
+                if (! $isTrade && ! $matcher->isSolarPanel($rule)) {
                     continue;
                 }
 
-                $amount = $calcRuleAmount(
+                $amount = $matcher->amountFor(
                     $rule,
                     (float) $r->before_vat,
                     (float) $r->after_vat,
@@ -729,10 +591,10 @@ class SalesCommissionExcelExporter
                     continue;
                 }
 
-                $amount = max(0, (float) $amount);
-                $matches = $matchesRuleTarget($rule, (string) $r->customer_status, (string) $r->product_text);
+                $amount = max(0, $amount);
+                $matches = $matcher->matchesTarget($rule, (string) $r->customer_status, (string) $r->product_text);
 
-                if ($isSolarPanelRule($rule)) {
+                if (! $isTrade) {
                     if ($matches) {
                         $extraCommission += $amount;
                     }
@@ -740,28 +602,18 @@ class SalesCommissionExcelExporter
                     continue;
                 }
 
-                if ($isTradeRule($rule) && $matches && $tradeCommission === null) {
-                    $tradeCommission = $amount;
+                if ($matches) {
+                    $tradeCommission ??= $amount;
 
                     continue;
                 }
 
-                if ($isTradeRule($rule) && ! $matches) {
-                    if ($hasRevenueFloorTradeRule) {
-                        if (($rule->from_amount ?? null) !== null && (float) ($rule->from_amount ?? 0) > 0) {
-                            $fallbackCandidates[] = [
-                                'amount' => $amount,
-                                'rate' => (float) ($rule->rate_percent ?? 0),
-                                'name' => $rule->rule_name ?? ($rule->name ?? 'Fallback rule'),
-                            ];
-                        }
-                    } else {
-                        $fallbackCandidates[] = [
-                            'amount' => $amount,
-                            'rate' => (float) ($rule->rate_percent ?? 0),
-                            'name' => $rule->rule_name ?? ($rule->name ?? 'Fallback rule'),
-                        ];
-                    }
+                if (! $anyRevenueFloor || $hasRevenueFloor($rule)) {
+                    $fallbackCandidates[] = [
+                        'amount' => $amount,
+                        'rate' => (float) ($rule->rate_percent ?? 0),
+                        'name' => $rule->rule_name ?? ($rule->name ?? 'Fallback rule'),
+                    ];
                 }
             }
 

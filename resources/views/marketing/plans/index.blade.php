@@ -156,7 +156,7 @@ textarea.egomp-control{min-height:130px;resize:vertical;line-height:1.7}
         </div>
 
         @if(session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
+            <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
         @endif
 
         <div class="egomp-card">

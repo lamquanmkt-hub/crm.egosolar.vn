@@ -3,16 +3,26 @@
 namespace App\Http\Controllers\TechnicalKpi;
 
 use App\Http\Controllers\Controller;
+use App\Services\TechnicalKpi\ProjectKpiLinkService;
+use App\Support\DisplayFormat;
+use App\Support\SchemaCache;
+use App\View\Presenters\Technical\TechnicalPayrollPagePresenter;
+use App\View\Presenters\Technical\TechnicalPayrollSettingsPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Controller tính lương KPI cho nhân viên kỹ thuật (cài đặt, bảng lương, duyệt).
  */
 class TechnicalPayrollController extends Controller
 {
+    public function __construct(
+        private readonly TechnicalPayrollSettingsPresenter $settingsPresenter,
+        private readonly TechnicalPayrollPagePresenter $pagePresenter,
+    ) {}
+
     /*
     |--------------------------------------------------------------------------
     | Helpers
@@ -24,7 +34,7 @@ class TechnicalPayrollController extends Controller
      */
     private function tableExists(string $table): bool
     {
-        return Schema::hasTable($table);
+        return SchemaCache::hasTable($table);
     }
 
     /**
@@ -32,7 +42,7 @@ class TechnicalPayrollController extends Controller
      */
     private function hasColumn(string $table, string $column): bool
     {
-        return Schema::hasTable($table) && Schema::hasColumn($table, $column);
+        return SchemaCache::hasTable($table) && SchemaCache::hasColumn($table, $column);
     }
 
     /**
@@ -40,11 +50,11 @@ class TechnicalPayrollController extends Controller
      */
     private function filterColumns(string $table, array $data): array
     {
-        if (! Schema::hasTable($table)) {
+        if (! SchemaCache::hasTable($table)) {
             return $data;
         }
 
-        $columns = Schema::getColumnListing($table);
+        $columns = SchemaCache::columns($table);
 
         return collect($data)
             ->only($columns)
@@ -193,12 +203,7 @@ class TechnicalPayrollController extends Controller
     }
 
     /**
-     * Danh sách nhân sự Kỹ thuật đang hoạt động.
-     *
-     * Không phụ thuộc duy nhất vào role "technical" vì CRM đang dùng song song
-     * ky_thuat / technical / technician / technical_staff...
-     * Đồng thời nhận diện theo phòng ban/chức vụ để nhân sự HR đã xếp vào
-     * phòng Kỹ thuật vẫn xuất hiện dù role chưa được chuẩn hoá.
+     * Danh sách nhân viên kỹ thuật đang hoạt động kèm tên chức vụ.
      */
     private function employees()
     {
@@ -206,90 +211,31 @@ class TechnicalPayrollController extends Controller
             return collect();
         }
 
-        $technicalRoles = [
-            'ky_thuat',
-            'technical',
-            'technician',
-            'technical_staff',
-            'engineer',
-            'technical_leader',
-            'technical_manager',
-            'truong_phong_ky_thuat',
-        ];
-
-        $hasRoleClassifier = $this->tableExists('roles')
-            && $this->tableExists('model_has_roles');
-
-        $hasDepartmentClassifier = $this->tableExists('departments')
-            && $this->hasColumn('users', 'department_id')
-            && $this->hasColumn('departments', 'id');
-
-        $hasPositionClassifier = $this->tableExists('positions')
-            && $this->hasColumn('users', 'position_id')
-            && $this->hasColumn('positions', 'id');
-
-        if (! $hasRoleClassifier && ! $hasDepartmentClassifier && ! $hasPositionClassifier) {
-            return collect();
-        }
-
         $query = DB::table('users');
 
-        if ($hasPositionClassifier) {
+        if (
+            $this->tableExists('roles')
+            && $this->tableExists('model_has_roles')
+        ) {
+            $query
+                ->join('model_has_roles', function ($join) {
+                    $join->on('users.id', '=', 'model_has_roles.model_id');
+                })
+                ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                ->where('roles.name', 'technical');
+        }
+
+        if (
+            $this->tableExists('positions')
+            && $this->hasColumn('users', 'position_id')
+            && $this->hasColumn('positions', 'id')
+        ) {
             $query->leftJoin('positions', 'positions.id', '=', 'users.position_id');
+
             $positionSelect = DB::raw('COALESCE(positions.name, "Kỹ thuật") as position_name');
         } else {
             $positionSelect = DB::raw('"Kỹ thuật" as position_name');
         }
-
-        $query->where(function ($scope) use (
-            $technicalRoles,
-            $hasRoleClassifier,
-            $hasDepartmentClassifier,
-            $hasPositionClassifier
-        ) {
-            $hasCondition = false;
-
-            if ($hasRoleClassifier) {
-                $scope->whereExists(function ($roleQuery) use ($technicalRoles) {
-                    $roleQuery->selectRaw('1')
-                        ->from('model_has_roles as mhr')
-                        ->join('roles as r', 'r.id', '=', 'mhr.role_id')
-                        ->whereColumn('mhr.model_id', 'users.id')
-                        ->where('mhr.model_type', \App\Models\User::class)
-                        ->whereIn('r.name', $technicalRoles);
-                });
-                $hasCondition = true;
-            }
-
-            if ($hasDepartmentClassifier) {
-                $method = $hasCondition ? 'orWhereExists' : 'whereExists';
-                $scope->{$method}(function ($departmentQuery) {
-                    $departmentQuery->selectRaw('1')
-                        ->from('departments as d')
-                        ->whereColumn('d.id', 'users.department_id')
-                        ->where(function ($nameQuery) {
-                            $nameQuery
-                                ->where('d.name', 'like', '%Kỹ thuật%')
-                                ->orWhere('d.name', 'like', '%Ky thuat%')
-                                ->orWhere('d.name', 'like', '%Technical%')
-                                ->orWhere('d.code', 'like', '%ky_thuat%')
-                                ->orWhere('d.code', 'like', '%technical%');
-                        });
-                });
-                $hasCondition = true;
-            }
-
-            if ($hasPositionClassifier) {
-                $method = $hasCondition ? 'orWhere' : 'where';
-                $scope->{$method}(function ($positionQuery) {
-                    $positionQuery
-                        ->where('positions.name', 'like', '%Kỹ thuật%')
-                        ->orWhere('positions.name', 'like', '%Ky thuat%')
-                        ->orWhere('positions.name', 'like', '%Technical%')
-                        ->orWhere('positions.name', 'like', '%Engineer%');
-                });
-            }
-        });
 
         if ($this->hasColumn('users', 'is_active')) {
             $query->where('users.is_active', 1);
@@ -302,11 +248,9 @@ class TechnicalPayrollController extends Controller
                 'users.email',
                 $positionSelect
             )
-            ->distinct()
             ->orderBy('users.name')
             ->get();
     }
-
 
     /**
      * Lấy thông tin một nhân viên kỹ thuật theo id kèm tên chức vụ.
@@ -343,93 +287,234 @@ class TechnicalPayrollController extends Controller
     }
 
     /**
-     * Bộ khung 9 chỉ tiêu KPI kỹ thuật (tên, trọng số, cách tính, nguồn dữ liệu).
+     * Bộ KPI động dùng thống nhất cho Cấu hình -> Chấm KPI -> Dashboard -> Phiếu lương.
+     * Khi đã có bảng cấu hình, số tiêu chí không bị giới hạn 5 dòng.
      */
     private function kpiTemplate(): array
     {
-        return [
-            1 => [
-                'name' => 'Tiến độ thi công tổng thể',
-                'subject' => 'Quản lý dự án',
-                'unit' => 'Ngày',
-                'weight' => 0.20,
-                'type' => 'plan_div_actual',
-                'rule' => 'KH / TH. Ít ngày hơn là tốt.',
-                'source' => 'Báo cáo tiến độ hoàn thành',
-            ],
-            2 => [
-                'name' => 'Chất lượng công trình',
-                'subject' => 'Đội ngũ thi công',
-                'unit' => 'Lỗi',
-                'weight' => 0.10,
-                'type' => 'minus_quality',
-                'rule' => 'Mỗi lỗi bị trừ theo setting.',
-                'source' => 'Báo cáo kiểm tra chất lượng',
-            ],
-            3 => [
-                'name' => 'An toàn lao động',
-                'subject' => 'An toàn lao động',
-                'unit' => 'Sự cố',
-                'weight' => 0.10,
-                'type' => 'minus_safety',
-                'rule' => 'Mỗi sự cố bị trừ theo setting.',
-                'source' => 'Báo cáo tai nạn lao động',
-            ],
-            4 => [
-                'name' => 'Mức độ hài lòng khách hàng',
-                'subject' => 'Khách hàng / QA',
-                'unit' => 'Feedback',
-                'weight' => 0.10,
-                'type' => 'customer_feedback',
-                'rule' => 'Feedback không tốt trừ, trung lập không cộng/trừ, feedback tốt cộng.',
-                'source' => 'Feedback khách hàng',
-            ],
-            5 => [
-                'name' => 'Kiểm tra bảo hành định kỳ',
-                'subject' => 'Bộ phận bảo trì',
-                'unit' => 'Lần',
-                'weight' => 0.10,
-                'type' => 'actual_div_plan',
-                'rule' => 'TH / KH.',
-                'source' => 'Báo cáo lịch bảo hành',
-            ],
-            6 => [
-                'name' => 'Số giờ làm thêm',
-                'subject' => 'Quản lý nhân sự',
-                'unit' => 'Giờ',
-                'weight' => 0.10,
-                'type' => 'ot_rule',
-                'rule' => 'OT càng ít càng tốt.',
-                'source' => 'Báo cáo chấm công / OT',
-            ],
-            7 => [
-                'name' => 'Công trình hỗ trợ chốt thành công',
-                'subject' => 'Kinh doanh + kỹ thuật',
+        $defaults = [
+            'default_1' => [
+                'definition_id' => null,
+                'key' => 'default_1',
+                'sort_order' => 1,
+                'name' => 'Tiến độ hoàn thành lắp đặt hệ thống',
+                'subject' => 'Tiến độ',
                 'unit' => 'Công trình',
-                'weight' => 0.10,
-                'type' => 'success_project',
-                'rule' => 'Mỗi công trình cộng theo setting, có trần.',
-                'source' => 'Báo cáo doanh thu',
-            ],
-            8 => [
-                'name' => 'Bảo quản máy móc, thiết bị',
-                'subject' => 'Quản lý thiết bị',
-                'unit' => 'Hư hỏng',
-                'weight' => 0.10,
-                'type' => 'minus_equipment',
-                'rule' => 'Mỗi hư hỏng/mất mát bị trừ theo setting.',
-                'source' => 'Báo cáo quản lý thiết bị',
-            ],
-            9 => [
-                'name' => 'Tuân thủ quy định chấm công',
-                'subject' => 'Quản lý nhân sự',
-                'unit' => 'Ngày công',
-                'weight' => 0.10,
+                'weight' => 0.30,
                 'type' => 'actual_div_plan',
-                'rule' => 'Ngày công thực tế / ngày công chuẩn.',
-                'source' => 'Báo cáo chấm công',
+                'rule' => 'TH / KH. TH là số công trình hoàn thành đúng hạn; KH là tổng công trình đến hạn trong kỳ.',
+                'source' => 'Tiến độ / nghiệm thu công trình',
+                'default_plan' => 1,
+                'default_actual' => 1,
+            ],
+            'default_2' => [
+                'definition_id' => null,
+                'key' => 'default_2',
+                'sort_order' => 2,
+                'name' => 'Chất lượng thi công & thẩm mỹ',
+                'subject' => 'Chất lượng',
+                'unit' => 'Công trình',
+                'weight' => 0.25,
+                'type' => 'actual_div_plan',
+                'rule' => 'TH / KH. TH là số công trình nghiệm thu đạt ngay lần đầu; KH là tổng công trình nghiệm thu.',
+                'source' => 'Biên bản nghiệm thu / phản hồi khách hàng',
+                'default_plan' => 1,
+                'default_actual' => 1,
+            ],
+            'default_3' => [
+                'definition_id' => null,
+                'key' => 'default_3',
+                'sort_order' => 3,
+                'name' => 'Khảo sát kỹ thuật & khối lượng',
+                'subject' => 'Khảo sát / Vật tư',
+                'unit' => '% hao hụt',
+                'weight' => 0.15,
+                'type' => 'material_waste',
+                'rule' => '0% = 120%; >0–2% = 100%; >2–4% = 85%; >4–6% = 70%; >6% = 0%.',
+                'source' => 'Vật tư xuất kho - vật tư hoàn trả nguyên vẹn',
+                'default_plan' => 0,
+                'default_actual' => 0,
+            ],
+            'default_4' => [
+                'definition_id' => null,
+                'key' => 'default_4',
+                'sort_order' => 4,
+                'name' => 'An toàn lao động (HSE) & vệ sinh',
+                'subject' => 'HSE',
+                'unit' => 'Công trình',
+                'weight' => 0.15,
+                'type' => 'actual_div_plan',
+                'rule' => 'TH / KH. TH là số công trình đạt checklist HSE; vi phạm nghiêm trọng có thể trừ thêm 10–20 điểm KPI.',
+                'source' => 'Checklist HSE / biên bản sự cố',
+                'default_plan' => 1,
+                'default_actual' => 1,
+            ],
+            'default_5' => [
+                'definition_id' => null,
+                'key' => 'default_5',
+                'sort_order' => 5,
+                'name' => 'Hỗ trợ thủ tục EVN & cài đặt App',
+                'subject' => 'EVN / App',
+                'unit' => 'Công trình',
+                'weight' => 0.15,
+                'type' => 'actual_div_plan',
+                'rule' => 'TH / KH. TH là số công trình hoàn tất các hạng mục EVN/App cần thực hiện; KH là số công trình có yêu cầu.',
+                'source' => 'Nghiệm thu / bàn giao / cấu hình App',
+                'default_plan' => 1,
+                'default_actual' => 1,
             ],
         ];
+
+        if (! $this->tableExists('technical_payroll_kpi_items')) {
+            return $defaults;
+        }
+
+        $rows = DB::table('technical_payroll_kpi_items')
+            ->where('is_enabled', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return $defaults;
+        }
+
+        $allowedTypes = [
+            'actual_div_plan',
+            'plan_div_actual',
+            'minus_quality',
+            'minus_safety',
+            'material_waste',
+        ];
+
+        return $rows->mapWithKeys(function ($row, $idx) use ($allowedTypes) {
+            $definitionId = (int) $row->id;
+            $key = 'cfg_'.$definitionId;
+            $name = trim((string) ($row->name ?? '')) ?: 'Tiêu chí KPI '.($idx + 1);
+            $type = in_array((string) ($row->calc_type ?? ''), $allowedTypes, true)
+                ? (string) $row->calc_type
+                : 'actual_div_plan';
+            $sourceCode = $this->hasColumn('technical_payroll_kpi_items', 'source_code')
+                ? (trim((string) ($row->source_code ?? ProjectKpiLinkService::SOURCE_MANUAL)) ?: ProjectKpiLinkService::SOURCE_MANUAL)
+                : ProjectKpiLinkService::SOURCE_MANUAL;
+            $sourceLabel = ProjectKpiLinkService::sourceOptions()[$sourceCode] ?? 'Cấu hình KPI kỹ thuật';
+
+            return [
+                $key => [
+                    'definition_id' => $definitionId,
+                    'key' => $key,
+                    'sort_order' => (int) ($row->sort_order ?? ($idx + 1)),
+                    'name' => $name,
+                    'subject' => $name,
+                    'unit' => trim((string) ($row->unit ?? '')),
+                    'weight' => (float) ($row->weight ?? 0),
+                    'type' => $type,
+                    'source_code' => $sourceCode,
+                    'rule' => trim((string) ($row->note ?? '')),
+                    'source' => $sourceLabel,
+                    'default_plan' => (float) ($row->plan_value ?? 0),
+                    'default_actual' => (float) ($row->actual_value ?? 0),
+                ],
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Tổng trọng số của bộ KPI hiện hành.
+     */
+    private function kpiWeightTotal(array $kpis): float
+    {
+        return (float) collect($kpis)->sum(fn ($kpi) => (float) ($kpi['weight'] ?? 0));
+    }
+
+    /**
+     * Không âm thầm quay về bộ mặc định khi cấu hình sai trọng số.
+     * Người quản trị phải sửa cấu hình về đúng 100% trước khi chấm/cập nhật KPI.
+     */
+    private function assertValidKpiTemplate(array $kpis): void
+    {
+        if (empty($kpis)) {
+            throw ValidationException::withMessages([
+                'kpis' => 'Chưa có tiêu chí KPI đang hoạt động.',
+            ]);
+        }
+
+        $weightTotal = $this->kpiWeightTotal($kpis);
+        if (abs($weightTotal - 1.0) > 0.0001) {
+            throw ValidationException::withMessages([
+                'kpis' => 'Tổng trọng số KPI hiện tại là '.DisplayFormat::percent($weightTotal * 100, 2).'. Hãy vào Cấu hình KPI và chỉnh tổng trọng số về đúng 100% trước khi chấm KPI.',
+            ]);
+        }
+    }
+
+    /**
+     * Tạo template từ snapshot của một phiếu KPI đã lưu để khi sửa lịch sử không bị lệch
+     * theo cấu hình KPI mới ở các tháng sau.
+     */
+    private function payrollKpiTemplate(int $payrollId): array
+    {
+        if (! $this->tableExists('technical_kpi_payroll_items')) {
+            return $this->kpiTemplate();
+        }
+
+        $rows = DB::table('technical_kpi_payroll_items')
+            ->where('payroll_id', $payrollId)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return $this->kpiTemplate();
+        }
+
+        $current = collect($this->kpiTemplate());
+
+        return $rows->mapWithKeys(function ($row, $idx) use ($current) {
+            $definitionId = $this->hasColumn('technical_kpi_payroll_items', 'kpi_definition_id')
+                ? (int) ($row->kpi_definition_id ?? 0)
+                : 0;
+
+            $currentMatch = null;
+            if ($definitionId > 0) {
+                $currentMatch = $current->first(fn ($kpi) => (int) ($kpi['definition_id'] ?? 0) === $definitionId);
+            }
+
+            if (! $currentMatch) {
+                $savedName = Str::lower(Str::ascii(trim((string) ($row->kpi_name ?? ''))));
+                $currentMatch = $current->first(function ($kpi) use ($savedName) {
+                    return Str::lower(Str::ascii(trim((string) ($kpi['name'] ?? '')))) === $savedName;
+                });
+            }
+
+            $calcType = $this->hasColumn('technical_kpi_payroll_items', 'calc_type')
+                ? trim((string) ($row->calc_type ?? ''))
+                : '';
+            if ($calcType === '') {
+                $calcType = (string) data_get($currentMatch, 'type', 'actual_div_plan');
+            }
+
+            $key = 'saved_'.(int) $row->id;
+
+            return [
+                $key => [
+                    'definition_id' => $definitionId ?: data_get($currentMatch, 'definition_id'),
+                    'key' => $key,
+                    'sort_order' => (int) ($row->sort_order ?? ($idx + 1)),
+                    'name' => (string) ($row->kpi_name ?? data_get($currentMatch, 'name', 'KPI '.($idx + 1))),
+                    'subject' => (string) ($row->subject_name ?? data_get($currentMatch, 'subject', 'KPI '.($idx + 1))),
+                    'unit' => (string) ($row->unit_name ?? data_get($currentMatch, 'unit', '')),
+                    'weight' => (float) ($row->weight ?? data_get($currentMatch, 'weight', 0)),
+                    'type' => $calcType,
+                    'source_code' => $this->hasColumn('technical_kpi_payroll_items', 'source_code')
+                        ? (trim((string) ($row->source_code ?? 'manual')) ?: 'manual')
+                        : (string) data_get($currentMatch, 'source_code', 'manual'),
+                    'rule' => (string) ($row->rule_note ?? data_get($currentMatch, 'rule', '')),
+                    'source' => (string) ($row->data_source ?? data_get($currentMatch, 'source', 'Snapshot KPI')),
+                    'default_plan' => (float) ($row->plan_value ?? 0),
+                    'default_actual' => (float) ($row->actual_value ?? 0),
+                ],
+            ];
+        })->toArray();
     }
 
     /**
@@ -442,7 +527,27 @@ class TechnicalPayrollController extends Controller
         }
 
         if ($type === 'actual_div_plan') {
-            return $plan == 0 ? 0 : $actual / $plan;
+            return $plan == 0 ? 0 : min(1, $actual / $plan);
+        }
+
+        if ($type === 'material_waste') {
+            if ($actual <= 0) {
+                return 1.20;
+            }
+
+            if ($actual <= 2) {
+                return 1.00;
+            }
+
+            if ($actual <= 4) {
+                return 0.85;
+            }
+
+            if ($actual <= 6) {
+                return 0.70;
+            }
+
+            return 0;
         }
 
         if ($type === 'minus_quality') {
@@ -486,7 +591,7 @@ class TechnicalPayrollController extends Controller
     /**
      * Tính toàn bộ bảng lương KPI: điểm từng chỉ tiêu, tổng KPI, lương cứng và lương KPI thực nhận.
      */
-    private function calculate(Request $request, $employee): array
+    private function calculate(Request $request, $employee, ?array $template = null): array
     {
         $settings = $this->settingsMap();
 
@@ -497,6 +602,15 @@ class TechnicalPayrollController extends Controller
         $badFeedback = (int) $request->input('feedback_bad_count', 0);
         $neutralFeedback = (int) $request->input('feedback_neutral_count', 0);
         $goodFeedback = (int) $request->input('feedback_good_count', 0);
+
+        $projectMetrics = app(ProjectKpiLinkService::class)->metricsForUserMonth(
+            (int) ($employee->id ?? 0),
+            (string) $request->input('payroll_month', now()->format('Y-m'))
+        );
+        $manualPenaltyPoints = max(0, min(100, (float) $request->input('penalty_points', 0)));
+        $projectPenaltyPoints = max(0, min(100, (float) ($projectMetrics['project_penalty_points'] ?? 0)));
+        // Điểm phạt công trình là nguồn có bằng chứng; dùng mức cao hơn để tránh cộng trùng nếu quản lý đã nhập tay cùng lỗi.
+        $penaltyPoints = max($manualPenaltyPoints, $projectPenaltyPoints);
 
         $badPenalty = (float) ($settings['bad_feedback_penalty'] ?? 0.1);
         $goodBonus = (float) ($settings['good_feedback_bonus'] ?? 0.05);
@@ -511,15 +625,25 @@ class TechnicalPayrollController extends Controller
         );
 
         $itemsInput = $request->input('kpis', []);
-        $kpis = $this->kpiTemplate();
+        $kpis = $template ?? $this->kpiTemplate();
+        $this->assertValidKpiTemplate($kpis);
 
         $totalScore = 0;
         $totalWeight = 0;
         $items = [];
 
         foreach ($kpis as $index => $kpi) {
-            $plan = (float) data_get($itemsInput, $index.'.plan', 0);
-            $actual = (float) data_get($itemsInput, $index.'.actual', 0);
+            $plan = (float) data_get($itemsInput, $index.'.plan', $kpi['default_plan'] ?? 0);
+            $actual = (float) data_get($itemsInput, $index.'.actual', $kpi['default_actual'] ?? 0);
+            $sourceCode = (string) ($kpi['source_code'] ?? ProjectKpiLinkService::SOURCE_MANUAL);
+            $sourceMetric = $projectMetrics[$sourceCode] ?? null;
+
+            // Khi nguồn Công trình có dữ liệu, hệ thống lấy số thật và bỏ qua số nhập tay.
+            // Nếu chưa có bằng chứng công trình, vẫn giữ số cũ để không làm mất KPI lịch sử/đang vận hành.
+            if ($sourceCode !== ProjectKpiLinkService::SOURCE_MANUAL && is_array($sourceMetric) && ! empty($sourceMetric['available'])) {
+                $plan = (float) ($sourceMetric['plan'] ?? $plan);
+                $actual = (float) ($sourceMetric['actual'] ?? $actual);
+            }
 
             if ($kpi['type'] === 'customer_feedback') {
                 $plan = $badFeedback + $neutralFeedback + $goodFeedback;
@@ -545,10 +669,13 @@ class TechnicalPayrollController extends Controller
             }
 
             $items[] = [
-                'sort_order' => $index,
+                'kpi_definition_id' => $kpi['definition_id'] ?? null,
+                'sort_order' => (int) ($kpi['sort_order'] ?? 0),
                 'kpi_name' => $kpi['name'],
                 'subject_name' => $kpi['subject'],
                 'unit_name' => $kpi['unit'],
+                'calc_type' => $kpi['type'],
+                'source_code' => $sourceCode,
                 'plan_value' => $plan,
                 'actual_value' => $actual,
                 'achievement_rate' => $rate,
@@ -556,7 +683,9 @@ class TechnicalPayrollController extends Controller
                 'kpi_score' => $score,
                 'rating' => $rating,
                 'rule_note' => $kpi['rule'],
-                'data_source' => $kpi['source'],
+                'data_source' => ($sourceCode !== ProjectKpiLinkService::SOURCE_MANUAL && is_array($sourceMetric) && ! empty($sourceMetric['available']))
+                    ? (string) ($sourceMetric['label'] ?? 'Dữ liệu Công trình')
+                    : $kpi['source'],
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -567,6 +696,7 @@ class TechnicalPayrollController extends Controller
 
         $totalKpiPercent = $totalWeight > 0 ? $totalScore / $totalWeight : 0;
         $totalKpiPercent = min(($settings['kpi_max_rate'] ?? 1.3), $totalKpiPercent);
+        $totalKpiPercent = max(0, $totalKpiPercent - ($penaltyPoints / 100));
 
         $baseSalary = $grossSalary * $baseRate;
         $kpiBaseSalary = $grossSalary * $kpiRate;
@@ -583,6 +713,7 @@ class TechnicalPayrollController extends Controller
             'neutralFeedback' => $neutralFeedback,
             'goodFeedback' => $goodFeedback,
             'customerFeedbackRate' => $customerFeedbackRate,
+            'penaltyPoints' => $penaltyPoints,
             'totalKpiPercent' => $totalKpiPercent,
             'baseSalary' => $baseSalary,
             'kpiBaseSalary' => $kpiBaseSalary,
@@ -608,6 +739,9 @@ class TechnicalPayrollController extends Controller
 
         $settings = $this->settingsMap();
         $employees = $this->employees();
+        $kpis = $this->kpiTemplate();
+        $kpiConfigWeight = $this->kpiWeightTotal($kpis);
+        $kpiConfigValid = ! empty($kpis) && abs($kpiConfigWeight - 1.0) <= 0.0001;
 
         if ($this->tableExists('technical_kpi_payrolls')) {
             $payrolls = DB::table('technical_kpi_payrolls')
@@ -634,18 +768,221 @@ class TechnicalPayrollController extends Controller
             ];
         }
 
-        return view('kythuat.luong', compact(
-            'settings',
+        return view('kythuat.luong', array_merge(
+            compact(
+                'settings',
+                'employees',
+                'payrolls',
+                'summary',
+                'kpis',
+                'kpiConfigWeight',
+                'kpiConfigValid'
+            ),
+            $this->pagePresenter->viewData($settings, $kpis, $payrolls),
+        ));
+    }
+
+    /**
+     * Trang KPIs kỹ thuật riêng: dashboard theo tháng, xếp hạng và 5 nhóm KPI Solar.
+     *
+     * Trang dashboard dùng chung bộ 5 KPI với màn hình chấm KPI và trang cấu hình.
+     */
+    public function kpis(Request $request)
+    {
+        $this->ensureDefaultSettings();
+
+        $selectedMonth = (string) $request->query('month', now()->format('Y-m'));
+        if (! preg_match('/^\d{4}-\d{2}$/', $selectedMonth)) {
+            $selectedMonth = now()->format('Y-m');
+        }
+
+        $selectedUserId = $request->filled('user_id') ? (int) $request->query('user_id') : null;
+        $selectedStatus = trim((string) $request->query('status', ''));
+        $employees = $this->employees();
+        $template = $this->kpiTemplate();
+        $kpiConfigWeight = $this->kpiWeightTotal($template);
+        $kpiConfigValid = ! empty($template) && abs($kpiConfigWeight - 1.0) <= 0.0001;
+
+        $icons = ['bi-stopwatch', 'bi-gem', 'bi-box-seam', 'bi-shield-check', 'bi-phone', 'bi-clipboard2-check', 'bi-graph-up-arrow', 'bi-stars', 'bi-tools'];
+        $kpiCriteria = collect($template)->values()->map(function ($kpi, $idx) use ($icons) {
+            $type = (string) ($kpi['type'] ?? 'actual_div_plan');
+            $icon = match ($type) {
+                'material_waste' => 'bi-box-seam',
+                'minus_safety' => 'bi-shield-check',
+                'minus_quality' => 'bi-patch-check',
+                default => $icons[$idx % count($icons)],
+            };
+
+            return [
+                'key' => (string) ($kpi['key'] ?? ('kpi_'.$idx)),
+                'definition_id' => $kpi['definition_id'] ?? null,
+                'name' => (string) ($kpi['name'] ?? 'KPI '.($idx + 1)),
+                'subject' => (string) ($kpi['subject'] ?? $kpi['name'] ?? 'KPI '.($idx + 1)),
+                'weight' => (float) ($kpi['weight'] ?? 0) * 100,
+                'icon' => $icon,
+                'standard' => (string) ($kpi['rule'] ?? ''),
+                'type' => $type,
+                'sort_order' => (int) ($kpi['sort_order'] ?? ($idx + 1)),
+            ];
+        })->all();
+
+        $payrolls = collect();
+
+        if ($this->tableExists('technical_kpi_payrolls')) {
+            $query = DB::table('technical_kpi_payrolls');
+
+            if ($this->hasColumn('technical_kpi_payrolls', 'payroll_month')) {
+                $query->where('payroll_month', $selectedMonth);
+            }
+            if ($selectedUserId && $this->hasColumn('technical_kpi_payrolls', 'user_id')) {
+                $query->where('user_id', $selectedUserId);
+            }
+            if (
+                $selectedStatus !== ''
+                && in_array($selectedStatus, ['draft', 'approved'], true)
+                && $this->hasColumn('technical_kpi_payrolls', 'status')
+            ) {
+                $query->where('status', $selectedStatus);
+            }
+
+            $query->orderByDesc($this->hasColumn('technical_kpi_payrolls', 'total_kpi_percent') ? 'total_kpi_percent' : 'id');
+            $payrolls = $query->limit(200)->get();
+        }
+
+        $itemsByPayroll = collect();
+        if ($payrolls->isNotEmpty() && $this->tableExists('technical_kpi_payroll_items')) {
+            $itemsByPayroll = DB::table('technical_kpi_payroll_items')
+                ->whereIn('payroll_id', $payrolls->pluck('id')->all())
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->groupBy('payroll_id');
+        }
+
+        $projectDashboard = app(ProjectKpiLinkService::class)->dashboardForPayrolls($payrolls, $selectedMonth);
+
+        foreach ($payrolls as $row) {
+            $savedItems = $itemsByPayroll->get($row->id, collect());
+            $breakdown = [];
+
+            foreach ($kpiCriteria as $criterion) {
+                $match = null;
+                $definitionId = (int) ($criterion['definition_id'] ?? 0);
+
+                if ($definitionId > 0 && $this->hasColumn('technical_kpi_payroll_items', 'kpi_definition_id')) {
+                    $match = $savedItems->first(fn ($item) => (int) ($item->kpi_definition_id ?? 0) === $definitionId);
+                }
+
+                if (! $match) {
+                    $criterionName = Str::lower(Str::ascii(trim((string) ($criterion['name'] ?? ''))));
+                    $match = $savedItems->first(function ($item) use ($criterionName) {
+                        return Str::lower(Str::ascii(trim((string) ($item->kpi_name ?? '')))) === $criterionName;
+                    });
+                }
+
+                if (! $match) {
+                    $sortOrder = (int) ($criterion['sort_order'] ?? 0);
+                    $match = $savedItems->first(fn ($item) => (int) ($item->sort_order ?? 0) === $sortOrder);
+                }
+
+                $breakdown[$criterion['key']] = $match ? [
+                    'name' => (string) ($match->kpi_name ?? $criterion['name']),
+                    'score' => (float) ($match->kpi_score ?? 0) * 100,
+                    'weight' => (float) ($match->weight ?? 0) * 100,
+                    'rate' => (float) ($match->achievement_rate ?? 0) * 100,
+                ] : null;
+            }
+
+            $row->kpi_breakdown = $breakdown;
+            $row->penalty_points = $this->hasColumn('technical_kpi_payrolls', 'penalty_points')
+                ? (float) ($row->penalty_points ?? 0)
+                : null;
+
+            $projectLink = $projectDashboard[(int) ($row->user_id ?? 0)] ?? [];
+            $row->kpi_project_count = (int) ($projectLink['project_count'] ?? 0);
+            $row->kpi_project_issue_count = (int) ($projectLink['issue_count'] ?? 0);
+            $row->kpi_projects = collect($projectLink['projects'] ?? [])->values();
+        }
+
+        // Dashboard luôn hiển thị kỹ sư đang hoạt động,
+        // kể cả khi chưa có hồ sơ KPI của tháng.
+        // Placeholder chỉ dùng cho UI, KHÔNG ghi dữ liệu giả vào DB.
+        $kpiRows = $payrolls->values();
+
+        if ($selectedStatus === '') {
+            $existingUserIds = $payrolls
+                ->pluck('user_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $displayEmployees = $selectedUserId
+                ? $employees->where('id', $selectedUserId)
+                : $employees;
+
+            foreach ($displayEmployees as $employee) {
+                if (in_array((int) $employee->id, $existingUserIds, true)) {
+                    continue;
+                }
+
+                $kpiRows->push((object) [
+                    'id' => null,
+                    'user_id' => (int) $employee->id,
+                    'employee_name' => (string) $employee->name,
+                    'position_name' => (string) ($employee->position_name ?? 'Kỹ thuật'),
+                    'payroll_month' => $selectedMonth,
+                    'total_kpi_percent' => null,
+                    'status' => 'not_scored',
+                    'kpi_breakdown' => [],
+                    'penalty_points' => null,
+                    'kpi_project_count' => 0,
+                    'kpi_project_issue_count' => 0,
+                    'kpi_projects' => collect(),
+                    '_is_placeholder' => true,
+                ]);
+            }
+        }
+
+        $avgKpi = $payrolls->isNotEmpty()
+            ? (float) $payrolls->avg(fn ($row) => (float) ($row->total_kpi_percent ?? 0))
+            : 0;
+
+        $summary = [
+            'avg_kpi' => $avgKpi,
+            'achieved' => $payrolls->filter(fn ($row) => (float) ($row->total_kpi_percent ?? 0) >= 0.90)->count(),
+            'excellent' => $payrolls->filter(fn ($row) => (float) ($row->total_kpi_percent ?? 0) >= 1.00)->count(),
+            'needs_improvement' => $payrolls->filter(fn ($row) => (float) ($row->total_kpi_percent ?? 0) < 0.75)->count(),
+            'pending' => $this->hasColumn('technical_kpi_payrolls', 'status')
+                ? $payrolls->filter(fn ($row) => (string) ($row->status ?? 'draft') !== 'approved')->count()
+                : 0,
+            'total_kpi_salary' => $payrolls->sum(fn ($row) => (float) ($row->real_kpi_salary ?? 0)),
+            'total_records' => $payrolls->count(),
+            'project_total' => $payrolls->sum(fn ($row) => (int) ($row->kpi_project_count ?? 0)),
+            'project_issues' => $payrolls->sum(fn ($row) => (int) ($row->kpi_project_issue_count ?? 0)),
+        ];
+
+        [$year, $month] = explode('-', $selectedMonth);
+        $monthLabel = 'Tháng '.ltrim($month, '0').'/'.$year;
+
+        return view('kythuat.kpis', compact(
             'employees',
             'payrolls',
-            'summary'
+            'kpiRows',
+            'summary',
+            'selectedMonth',
+            'selectedUserId',
+            'selectedStatus',
+            'monthLabel',
+            'kpiCriteria',
+            'kpiConfigWeight',
+            'kpiConfigValid'
         ));
     }
 
     /**
      * Trang cài đặt hệ số KPI kỹ thuật.
      */
-    public function settings()
+    public function settings(Request $request)
     {
         $this->ensureDefaultSettings();
 
@@ -653,7 +990,23 @@ class TechnicalPayrollController extends Controller
             ? DB::table('technical_kpi_settings')->orderBy('id')->get()
             : collect();
 
-        return view('kythuat.luong_settings', compact('settings'));
+        // Truy vấn này trước đây nằm trong khối @php của view, cùng guard bảng.
+        $kpiItems = $this->tableExists('technical_payroll_kpi_items')
+            ? DB::table('technical_payroll_kpi_items')->orderBy('sort_order')->orderBy('id')->get()
+            : collect();
+
+        // Quyền đọc ở đây chứ không đọc trong Blade: presenter phải thuần.
+        $canManageKpi = (bool) $request->user()?->hasRole('admin');
+
+        return view('kythuat.luong_settings', array_merge(
+            compact('settings'),
+            $this->settingsPresenter->viewData(
+                $settings,
+                $kpiItems,
+                $canManageKpi,
+                ProjectKpiLinkService::sourceOptions(),
+            ),
+        ));
     }
 
     /**
@@ -661,6 +1014,8 @@ class TechnicalPayrollController extends Controller
      */
     public function saveSettings(Request $request)
     {
+        abort_unless(auth()->user()->hasRole('admin'), 403);
+
         if (! $this->tableExists('technical_kpi_settings')) {
             return back()->with('error', 'Chưa có bảng technical_kpi_settings trong database.');
         }
@@ -768,6 +1123,7 @@ class TechnicalPayrollController extends Controller
             'feedback_good_count' => $calc['goodFeedback'],
             'customer_feedback_rate' => $calc['customerFeedbackRate'],
             'total_kpi_percent' => $calc['totalKpiPercent'],
+            'penalty_points' => $calc['penaltyPoints'],
             'base_salary' => $calc['baseSalary'],
             'kpi_base_salary' => $calc['kpiBaseSalary'],
             'real_kpi_salary' => $calc['realKpiSalary'],
@@ -819,7 +1175,7 @@ class TechnicalPayrollController extends Controller
             return back()->with('error', 'Không tìm thấy nhân viên kỹ thuật.');
         }
 
-        $calc = $this->calculate($request, $employee);
+        $calc = $this->calculate($request, $employee, $this->payrollKpiTemplate((int) $id));
 
         $payrollData = [
             'user_id' => $employee->id,
@@ -835,6 +1191,7 @@ class TechnicalPayrollController extends Controller
             'feedback_good_count' => $calc['goodFeedback'],
             'customer_feedback_rate' => $calc['customerFeedbackRate'],
             'total_kpi_percent' => $calc['totalKpiPercent'],
+            'penalty_points' => $calc['penaltyPoints'],
             'base_salary' => $calc['baseSalary'],
             'kpi_base_salary' => $calc['kpiBaseSalary'],
             'real_kpi_salary' => $calc['realKpiSalary'],
@@ -895,7 +1252,15 @@ class TechnicalPayrollController extends Controller
                 ->get()
             : collect();
 
-        return view('kythuat.luong_show', compact('payroll', 'items'));
+        [$slipFields, $slipValues, $slipTotals] = $this->buildSlipData($payroll);
+
+        return view('kythuat.luong_show', compact(
+            'payroll',
+            'items',
+            'slipFields',
+            'slipValues',
+            'slipTotals'
+        ));
     }
 
     /**
@@ -922,12 +1287,14 @@ class TechnicalPayrollController extends Controller
 
         $settings = $this->settingsMap();
         $employees = $this->employees();
+        $kpis = $this->payrollKpiTemplate((int) $id);
 
         return view('kythuat.luong_edit', compact(
             'payroll',
             'items',
             'settings',
-            'employees'
+            'employees',
+            'kpis'
         ));
     }
 
@@ -977,58 +1344,83 @@ class TechnicalPayrollController extends Controller
      */
     public function saveKpiItems(Request $request)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'accounting', 'manager']), 403);
+        abort_unless(auth()->user()->hasRole('admin'), 403);
 
-        if (! Schema::hasTable('technical_payroll_kpi_items')) {
+        if (! SchemaCache::hasTable('technical_payroll_kpi_items')) {
             return back()->with('error', 'Chưa có bảng technical_payroll_kpi_items. Hãy chạy migration trước.');
         }
 
-        $items = $request->input('kpi_items', []);
-        $now = now();
+        $items = collect($request->input('kpi_items', []));
+        $activeRows = $items->filter(function ($row) {
+            return (int) ($row['delete'] ?? 0) !== 1
+                && (int) ($row['is_enabled'] ?? 0) === 1
+                && trim((string) ($row['name'] ?? '')) !== '';
+        });
 
-        foreach ($items as $row) {
-            $id = isset($row['id']) ? (int) $row['id'] : null;
-            $delete = (int) ($row['delete'] ?? 0) === 1;
+        if ($activeRows->isEmpty()) {
+            return back()->withInput()->with('error', 'Phải có ít nhất 1 tiêu chí KPI đang hoạt động.');
+        }
 
-            if ($delete && $id) {
-                DB::table('technical_payroll_kpi_items')
-                    ->where('id', $id)
-                    ->delete();
+        $weightTotalPercent = (float) $activeRows->sum(fn ($row) => (float) ($row['weight_percent'] ?? 0));
+        if (abs($weightTotalPercent - 100.0) > 0.01) {
+            return back()->withInput()->with('error', 'Tổng trọng số đang là '.DisplayFormat::percent($weightTotalPercent, 2).'. Chỉ được lưu khi tổng trọng số bằng đúng 100%.');
+        }
 
-                continue;
+        $allowedTypes = ['actual_div_plan', 'plan_div_actual', 'material_waste', 'minus_quality', 'minus_safety'];
+        $allowedSources = array_keys(ProjectKpiLinkService::sourceOptions());
+        foreach ($activeRows as $row) {
+            $type = trim((string) ($row['calc_type'] ?? 'actual_div_plan'));
+            if (! in_array($type, $allowedTypes, true)) {
+                return back()->withInput()->with('error', 'Có tiêu chí KPI sử dụng cách tính không hợp lệ.');
             }
-
-            $name = trim((string) ($row['name'] ?? ''));
-
-            if ($name === '') {
-                continue;
-            }
-
-            $payload = [
-                'name' => $name,
-                'unit' => trim((string) ($row['unit'] ?? '')),
-                'plan_value' => (float) ($row['plan_value'] ?? 0),
-                'actual_value' => (float) ($row['actual_value'] ?? 0),
-                'weight' => max(0, (float) ($row['weight_percent'] ?? 0) / 100),
-                'calc_type' => trim((string) ($row['calc_type'] ?? 'actual_div_plan')),
-                'note' => trim((string) ($row['note'] ?? '')),
-                'sort_order' => max(1, (int) ($row['sort_order'] ?? 1)),
-                'is_enabled' => (int) ($row['is_enabled'] ?? 0) === 1,
-                'updated_at' => $now,
-            ];
-
-            if ($id) {
-                DB::table('technical_payroll_kpi_items')
-                    ->where('id', $id)
-                    ->update($payload);
-            } else {
-                $payload['created_at'] = $now;
-                DB::table('technical_payroll_kpi_items')
-                    ->insert($payload);
+            $sourceCode = trim((string) ($row['source_code'] ?? ProjectKpiLinkService::SOURCE_MANUAL));
+            if (! in_array($sourceCode, $allowedSources, true)) {
+                return back()->withInput()->with('error', 'Có tiêu chí KPI sử dụng nguồn dữ liệu không hợp lệ.');
             }
         }
 
-        return back()->with('success', 'Đã cập nhật danh sách dòng KPI chi tiết.');
+        DB::transaction(function () use ($items) {
+            $now = now();
+
+            foreach ($items as $row) {
+                $id = isset($row['id']) ? (int) $row['id'] : null;
+                $delete = (int) ($row['delete'] ?? 0) === 1;
+
+                if ($delete && $id) {
+                    DB::table('technical_payroll_kpi_items')->where('id', $id)->delete();
+
+                    continue;
+                }
+
+                $name = trim((string) ($row['name'] ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+
+                $payload = [
+                    'name' => $name,
+                    'unit' => trim((string) ($row['unit'] ?? '')),
+                    'plan_value' => (float) ($row['plan_value'] ?? 0),
+                    'actual_value' => (float) ($row['actual_value'] ?? 0),
+                    'weight' => max(0, (float) ($row['weight_percent'] ?? 0) / 100),
+                    'calc_type' => trim((string) ($row['calc_type'] ?? 'actual_div_plan')),
+                    'source_code' => trim((string) ($row['source_code'] ?? ProjectKpiLinkService::SOURCE_MANUAL)) ?: ProjectKpiLinkService::SOURCE_MANUAL,
+                    'note' => trim((string) ($row['note'] ?? '')),
+                    'sort_order' => max(1, (int) ($row['sort_order'] ?? 1)),
+                    'is_enabled' => (int) ($row['is_enabled'] ?? 0) === 1,
+                    'updated_at' => $now,
+                ];
+
+                if ($id) {
+                    DB::table('technical_payroll_kpi_items')->where('id', $id)->update($payload);
+                } else {
+                    $payload['created_at'] = $now;
+                    DB::table('technical_payroll_kpi_items')->insert($payload);
+                }
+            }
+        });
+
+        return back()->with('success', 'Đã đồng bộ cấu hình KPI. Dashboard và màn hình chấm KPI sẽ dùng đúng '.count($activeRows).' tiêu chí đang hoạt động.');
     }
 
     /**
@@ -1036,45 +1428,297 @@ class TechnicalPayrollController extends Controller
      */
     public function destroyKpiItem($id)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'accounting', 'manager']), 403);
+        abort_unless(auth()->user()->hasRole('admin'), 403);
 
-        if (! Schema::hasTable('technical_payroll_kpi_items')) {
-            if (request()->expectsJson()) {
-                return response()->json([
-                    'ok' => false,
-                    'message' => 'Chưa có bảng technical_payroll_kpi_items.',
-                ], 422);
+        if (! SchemaCache::hasTable('technical_payroll_kpi_items')) {
+            return request()->expectsJson()
+                ? response()->json(['message' => 'Chưa có bảng KPI.'], 404)
+                : back()->with('error', 'Chưa có bảng KPI.');
+        }
+
+        $row = DB::table('technical_payroll_kpi_items')->where('id', $id)->first();
+        if (! $row) {
+            return request()->expectsJson()
+                ? response()->json(['message' => 'Không tìm thấy tiêu chí KPI.'], 404)
+                : back()->with('error', 'Không tìm thấy tiêu chí KPI.');
+        }
+
+        if ((int) ($row->is_enabled ?? 0) === 1) {
+            $remainingWeight = (float) DB::table('technical_payroll_kpi_items')
+                ->where('is_enabled', 1)
+                ->where('id', '<>', $id)
+                ->sum('weight');
+
+            if (abs($remainingWeight - 1.0) > 0.0001) {
+                $message = 'Không thể xóa riêng dòng này vì tổng trọng số còn lại sẽ không bằng 100%. Hãy xóa dòng và phân bổ lại trọng số cùng lúc trên trang Cấu hình KPI rồi bấm Lưu.';
+
+                return request()->expectsJson()
+                    ? response()->json(['message' => $message], 422)
+                    : back()->with('error', $message);
+            }
+        }
+
+        DB::table('technical_payroll_kpi_items')->where('id', $id)->delete();
+
+        return request()->expectsJson()
+            ? response()->json(['ok' => true])
+            : back()->with('success', 'Đã xóa tiêu chí KPI.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Phiếu lương cấu hình động
+    |--------------------------------------------------------------------------
+    */
+
+    private function slipSourceColumns(): array
+    {
+        return [
+            '' => 'Nhập tay theo từng phiếu',
+            'employee_name' => 'Nhân viên',
+            'position_name' => 'Chức vụ',
+            'payroll_month' => 'Kỳ lương',
+            'gross_salary' => 'Lương thỏa thuận',
+            'base_salary' => 'Lương cố định',
+            'kpi_base_salary' => 'Quỹ KPI',
+            'real_kpi_salary' => 'Lương KPI thực nhận',
+            'kpi_difference' => 'Chênh lệch KPI',
+            'total_income' => 'Tổng thu nhập hệ thống',
+            'total_kpi_percent' => 'KPI tổng',
+            'feedback_bad_count' => 'Feedback xấu',
+            'feedback_neutral_count' => 'Feedback trung lập',
+            'feedback_good_count' => 'Feedback tốt',
+            'note' => 'Ghi chú',
+        ];
+    }
+
+    private function resolveSlipFieldValue(object $field, object $payroll, $override = null)
+    {
+        if ($override) {
+            if (($field->field_type ?? 'money') === 'text') {
+                return $override->text_value ?? '';
             }
 
-            return back()->with('error', 'Chưa có bảng technical_payroll_kpi_items.');
+            return $override->numeric_value !== null ? (float) $override->numeric_value : 0;
         }
 
-        $item = DB::table('technical_payroll_kpi_items')
-            ->where('id', (int) $id)
-            ->first();
+        $source = trim((string) ($field->source_column ?? ''));
+        if ($source !== '' && property_exists($payroll, $source)) {
+            $value = $payroll->{$source};
+            if (($field->field_type ?? '') === 'percent' && is_numeric($value)) {
+                $value = (float) $value;
 
-        if (! $item) {
-            if (request()->expectsJson()) {
-                return response()->json([
-                    'ok' => false,
-                    'message' => 'Dòng KPI không tồn tại hoặc đã bị xóa.',
-                ], 404);
+                return abs($value) <= 3 ? $value * 100 : $value;
             }
 
-            return back()->with('error', 'Dòng KPI không tồn tại hoặc đã bị xóa.');
+            return $value;
         }
 
-        DB::table('technical_payroll_kpi_items')
-            ->where('id', (int) $id)
-            ->delete();
+        return ($field->field_type ?? 'money') === 'text' ? '' : (float) ($field->default_value ?? 0);
+    }
 
-        if (request()->expectsJson()) {
-            return response()->json([
-                'ok' => true,
-                'message' => 'Đã xóa dòng KPI.',
-            ]);
+    private function buildSlipData(object $payroll): array
+    {
+        if (! $this->tableExists('technical_payroll_slip_fields')) {
+            $fallback = (float) ($payroll->total_income ?? 0);
+
+            return [collect(), collect(), ['income' => $fallback, 'deduction' => 0, 'net' => $fallback]];
         }
 
-        return back()->with('success', 'Đã xóa dòng KPI.');
+        $fields = DB::table('technical_payroll_slip_fields')
+            ->where('is_enabled', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        $overrides = $this->tableExists('technical_payroll_slip_values')
+            ? DB::table('technical_payroll_slip_values')->where('payroll_id', $payroll->id)->get()->keyBy('field_id')
+            : collect();
+
+        $values = collect();
+        $income = 0.0;
+        $deduction = 0.0;
+
+        foreach ($fields as $field) {
+            $override = $overrides->get($field->id);
+            $value = $this->resolveSlipFieldValue($field, $payroll, $override);
+            $values->put($field->id, (object) ['value' => $value, 'is_override' => (bool) $override]);
+
+            if ((int) ($field->is_in_total ?? 0) !== 1 || ! is_numeric($value)) {
+                continue;
+            }
+            if (($field->group_key ?? '') === 'income') {
+                $income += (float) $value;
+            } elseif (($field->group_key ?? '') === 'deduction') {
+                $deduction += abs((float) $value);
+            }
+        }
+
+        if ($fields->where('is_in_total', 1)->isEmpty()) {
+            $income = (float) ($payroll->total_income ?? 0);
+        }
+
+        return [$fields, $values, ['income' => $income, 'deduction' => $deduction, 'net' => $income - $deduction]];
+    }
+
+    public function slipSettings()
+    {
+        abort_unless(auth()->user()->hasRole('admin'), 403);
+        if (! $this->tableExists('technical_payroll_slip_fields')) {
+            return back()->with('error', 'Chưa có bảng cấu hình phiếu lương. Hãy chạy migration trước.');
+        }
+
+        $fields = DB::table('technical_payroll_slip_fields')->orderBy('sort_order')->orderBy('id')->get();
+        $sourceColumns = $this->slipSourceColumns();
+
+        return view('kythuat.luong_slip_settings', compact('fields', 'sourceColumns'));
+    }
+
+    public function saveSlipSettings(Request $request)
+    {
+        abort_unless(auth()->user()->hasRole('admin'), 403);
+        if (! $this->tableExists('technical_payroll_slip_fields')) {
+            return back()->with('error', 'Chưa có bảng technical_payroll_slip_fields.');
+        }
+
+        $allowedGroups = ['info', 'income', 'deduction', 'summary'];
+        $allowedTypes = ['money', 'number', 'percent', 'text'];
+        $allowedSources = array_keys($this->slipSourceColumns());
+        $now = now();
+
+        foreach ($request->input('fields', []) as $row) {
+            $id = isset($row['id']) ? (int) $row['id'] : null;
+            if ($id && (int) ($row['delete'] ?? 0) === 1) {
+                if ($this->tableExists('technical_payroll_slip_values')) {
+                    DB::table('technical_payroll_slip_values')->where('field_id', $id)->delete();
+                }
+                DB::table('technical_payroll_slip_fields')->where('id', $id)->delete();
+
+                continue;
+            }
+
+            $label = trim((string) ($row['label'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+
+            $key = Str::slug(trim((string) ($row['field_key'] ?? '')), '_');
+            if ($key === '') {
+                $key = Str::slug($label, '_');
+            }
+            if ($key === '') {
+                $key = 'field_'.time().'_'.($id ?: random_int(100, 999));
+            }
+
+            $group = in_array($row['group_key'] ?? '', $allowedGroups, true) ? $row['group_key'] : 'income';
+            $type = in_array($row['field_type'] ?? '', $allowedTypes, true) ? $row['field_type'] : 'money';
+            $source = trim((string) ($row['source_column'] ?? ''));
+            if (! in_array($source, $allowedSources, true)) {
+                $source = '';
+            }
+
+            $payload = [
+                'field_key' => $key,
+                'label' => $label,
+                'group_key' => $group,
+                'field_type' => $type,
+                'source_column' => $source !== '' ? $source : null,
+                'default_value' => in_array($type, ['money', 'number', 'percent'], true) ? (float) ($row['default_value'] ?? 0) : null,
+                'is_in_total' => (int) ($row['is_in_total'] ?? 0) === 1,
+                'is_enabled' => (int) ($row['is_enabled'] ?? 0) === 1,
+                'sort_order' => (int) ($row['sort_order'] ?? 0),
+                'note' => trim((string) ($row['note'] ?? '')),
+                'updated_at' => $now,
+            ];
+
+            if ($id) {
+                if (DB::table('technical_payroll_slip_fields')->where('field_key', $key)->where('id', '<>', $id)->exists()) {
+                    $payload['field_key'] = $key.'_'.substr(md5((string) $id), 0, 5);
+                }
+                DB::table('technical_payroll_slip_fields')->where('id', $id)->update($payload);
+            } else {
+                if (DB::table('technical_payroll_slip_fields')->where('field_key', $key)->exists()) {
+                    $payload['field_key'] = $key.'_'.time();
+                }
+                $payload['created_at'] = $now;
+                DB::table('technical_payroll_slip_fields')->insert($payload);
+            }
+        }
+
+        return back()->with('success', 'Đã cập nhật cấu hình phiếu lương.');
+    }
+
+    public function destroySlipField($id)
+    {
+        abort_unless(auth()->user()->hasRole('admin'), 403);
+        if ($this->tableExists('technical_payroll_slip_values')) {
+            DB::table('technical_payroll_slip_values')->where('field_id', (int) $id)->delete();
+        }
+        if ($this->tableExists('technical_payroll_slip_fields')) {
+            DB::table('technical_payroll_slip_fields')->where('id', (int) $id)->delete();
+        }
+
+        return back()->with('success', 'Đã xóa dòng khỏi cấu hình phiếu lương.');
+    }
+
+    public function saveSlipValues(Request $request, $id)
+    {
+        abort_unless(auth()->user()->hasRole('admin'), 403);
+        if (! $this->tableExists('technical_kpi_payrolls')) {
+            abort(404);
+        }
+        $payroll = DB::table('technical_kpi_payrolls')->where('id', $id)->first();
+        abort_if(! $payroll, 404);
+
+        if (! $this->tableExists('technical_payroll_slip_fields') || ! $this->tableExists('technical_payroll_slip_values')) {
+            return back()->with('error', 'Chưa có bảng cấu hình/giá trị phiếu lương.');
+        }
+
+        $fields = DB::table('technical_payroll_slip_fields')->get()->keyBy('id');
+        foreach ($request->input('values', []) as $fieldId => $raw) {
+            $fieldId = (int) $fieldId;
+            $field = $fields->get($fieldId);
+            if (! $field) {
+                continue;
+            }
+            $raw = is_string($raw) ? trim($raw) : $raw;
+
+            if ($raw === '' || $raw === null) {
+                DB::table('technical_payroll_slip_values')->where('payroll_id', $id)->where('field_id', $fieldId)->delete();
+
+                continue;
+            }
+
+            $payload = ['updated_by' => auth()->id(), 'updated_at' => now()];
+            if (($field->field_type ?? '') === 'text') {
+                $payload['text_value'] = (string) $raw;
+                $payload['numeric_value'] = null;
+            } else {
+                $clean = str_replace([',', ' '], ['', ''], (string) $raw);
+                $payload['numeric_value'] = is_numeric($clean) ? (float) $clean : 0;
+                $payload['text_value'] = null;
+            }
+
+            $existing = DB::table('technical_payroll_slip_values')->where('payroll_id', $id)->where('field_id', $fieldId)->exists();
+            if ($existing) {
+                DB::table('technical_payroll_slip_values')->where('payroll_id', $id)->where('field_id', $fieldId)->update($payload);
+            } else {
+                DB::table('technical_payroll_slip_values')->insert(array_merge($payload, [
+                    'payroll_id' => (int) $id,
+                    'field_id' => $fieldId,
+                    'created_at' => now(),
+                ]));
+            }
+        }
+
+        $payroll = DB::table('technical_kpi_payrolls')->where('id', $id)->first();
+        [, , $totals] = $this->buildSlipData($payroll);
+        DB::table('technical_kpi_payrolls')->where('id', $id)->update($this->filterColumns('technical_kpi_payrolls', [
+            'total_income' => $totals['net'],
+            'updated_by' => auth()->id(),
+            'updated_at' => now(),
+        ]));
+
+        return back()->with('success', 'Đã cập nhật phiếu lương.');
     }
 }

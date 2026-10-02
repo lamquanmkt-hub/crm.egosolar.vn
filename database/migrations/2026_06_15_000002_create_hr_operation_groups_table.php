@@ -2,14 +2,14 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('hr_operation_groups')) {
+        if (! Schema::hasTable('hr_operation_groups')) {
             Schema::create('hr_operation_groups', function (Blueprint $table) {
                 $table->id();
                 $table->string('group_key', 80)->unique();
@@ -29,7 +29,7 @@ return new class extends Migration
         foreach ($defaults as $row) {
             $exists = DB::table('hr_operation_groups')->where('group_key', $row['group_key'])->exists();
 
-            if (!$exists) {
+            if (! $exists) {
                 DB::table('hr_operation_groups')->insert([
                     'group_key' => $row['group_key'],
                     'name' => $row['name'],

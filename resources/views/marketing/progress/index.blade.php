@@ -91,7 +91,7 @@
 @endpush
 
 @section('content')
-<div class="container-fluid py-3">
+<div class="container-fluid tw:py-4">
   <div class="wrap">
 
     <div class="top">
@@ -100,59 +100,60 @@
         <div class="sub">Trang tổng quan. Bấm vào từng kênh để cập nhật chi tiết.</div>
       </div>
 
-      <div class="d-flex gap-2 align-items-center flex-wrap">
-        <form method="GET" class="d-flex gap-2 align-items-center">
-          <select name="plan_id" class="form-select" style="min-width:260px;border-radius:14px;font-weight:850;">
+      <div class="tw:flex tw:gap-2 tw:items-center flex-wrap">
+        <form method="GET" class="tw:flex tw:gap-2 tw:items-center">
+          <x-ui.select name="plan_id" style="min-width:260px;border-radius:14px;font-weight:850;">
             @foreach($plans as $p)
               <option value="{{ $p->id }}" {{ (int)$planId === (int)$p->id ? 'selected' : '' }}>
                 {{ \Carbon\Carbon::parse($p->month)->format('m/Y') }} — {{ $p->name }}
               </option>
             @endforeach
-          </select>
-          <button class="btn btnx">Xem</button>
+          </x-ui.select>
+          <x-ui.button variant="none" size="none" type="submit" class="btnx tw:text-[#212529]">Xem</x-ui.button>
         </form>
 
         @if(!empty($planId))
           <form method="POST" action="{{ route('marketing.progress.update') }}">
+          @method('PUT')
             @csrf
             <input type="hidden" name="plan_id" value="{{ $planId }}">
             <input type="hidden" name="action" value="generate">
-            <button class="btn btnx btnx-primary">⚡ Tạo task từ kế hoạch</button>
+            <x-ui.button variant="none" size="none" type="submit" class="btnx btnx-primary">⚡ Tạo task từ kế hoạch</x-ui.button>
           </form>
         @endif
       </div>
     </div>
 
     @if(session('success'))
-      <div class="alert alert-success">{{ session('success') }}</div>
+      <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
     @endif
 
     {{-- KPI overall --}}
-    <div class="cardx mb-3">
+    <div class="cardx tw:mb-4">
       <div class="kpis">
         <div class="kpi">
           <h6>Tiến độ tổng</h6>
           <div class="v">{{ $overall['progressPct'] ?? 0 }}%</div>
           <div class="bar"><div style="width: {{ $overall['progressPct'] ?? 0 }}%"></div></div>
-          <div class="mini mt-2">Tổng: <b>{{ $overall['count'] ?? 0 }}</b> task • Tổng weight: <b>{{ $overall['sumW'] ?? 0 }}</b></div>
+          <div class="mini tw:mt-2">Tổng: <b>{{ $overall['count'] ?? 0 }}</b> task • Tổng weight: <b>{{ $overall['sumW'] ?? 0 }}</b></div>
         </div>
 
         <div class="kpi">
           <h6>Todo</h6>
           <div class="v">{{ $overall['countByStatus']['todo'] ?? 0 }}</div>
-          <div class="mini mt-2">Chưa làm</div>
+          <div class="mini tw:mt-2">Chưa làm</div>
         </div>
 
         <div class="kpi">
           <h6>Doing</h6>
           <div class="v">{{ $overall['countByStatus']['doing'] ?? 0 }}</div>
-          <div class="mini mt-2">Đang làm</div>
+          <div class="mini tw:mt-2">Đang làm</div>
         </div>
 
         <div class="kpi">
           <h6>Done</h6>
           <div class="v">{{ $overall['countByStatus']['done'] ?? 0 }}</div>
-          <div class="mini mt-2">Hoàn thành</div>
+          <div class="mini tw:mt-2">Hoàn thành</div>
         </div>
       </div>
 
@@ -166,7 +167,7 @@
             <div>
               <div style="font-weight:950;font-size:20px;color:var(--txt);">{{ $s['progressPct'] ?? 0 }}%</div>
               <div class="bar"><div style="width: {{ $s['progressPct'] ?? 0 }}%"></div></div>
-              <div class="mini mt-2">Tổng: <b>{{ $s['count'] ?? 0 }}</b> task</div>
+              <div class="mini tw:mt-2">Tổng: <b>{{ $s['count'] ?? 0 }}</b> task</div>
             </div>
 
             <div class="split">
@@ -176,10 +177,9 @@
               <span class="chip">Done: {{ $s['countByStatus']['done'] ?? 0 }}</span>
             </div>
 
-            <a class="btn btnx mt-1"
-               href="{{ route('marketing.progress.monthly', ['plan_id'=>$planId, 'channel'=>$chKey]) }}">
+            <x-ui.button variant="none" size="none" class="btnx tw:mt-1 tw:text-[#212529]" href="{{ route('marketing.progress.monthly', ['plan_id'=>$planId, 'channel'=>$chKey]) }}">
               Xem chi tiết & cập nhật →
-            </a>
+            </x-ui.button>
           </div>
         @endforeach
       </div>

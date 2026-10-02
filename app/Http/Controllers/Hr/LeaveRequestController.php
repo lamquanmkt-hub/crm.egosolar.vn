@@ -9,11 +9,11 @@ use App\Models\LeaveRequestAttachment;
 use App\Models\User;
 use App\Services\Hr\AttendanceLeaveNoteService;
 use App\Services\Hr\LeaveApprovalAccessService;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -117,7 +117,7 @@ class LeaveRequestController extends Controller
         if ($canManageAll) {
             $employees = User::query()
                 ->when(
-                    Schema::hasColumn('users', 'is_active'),
+                    SchemaCache::hasColumn('users', 'is_active'),
                     fn (Builder $builder) => $builder->where('is_active', true)
                 )
                 ->orderBy('name')

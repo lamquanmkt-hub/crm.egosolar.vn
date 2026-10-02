@@ -47,9 +47,9 @@
     $previewPenalty = (int)($preview['penalty_amount'] ?? 0);
 @endphp
 
-<div class="container-fluid px-3 px-lg-4 py-3 kpi-command-center">
+<div class="container-fluid tw:px-4 tw:py-4 kpi-command-center">
 
-    <section class="kpi-hero mb-3">
+    <section class="kpi-hero tw:mb-4">
         <div class="hero-noise"></div>
         <div class="hero-orb hero-orb--one"></div>
         <div class="hero-orb hero-orb--two"></div>
@@ -68,19 +68,19 @@
             </p>
 
             <div class="hero-actions">
-                <a href="{{ route('sales.kpi.my', ['work_date' => $workDate, 'user_id' => $selectedUserId ?: $authUser->id]) }}" class="btn hero-btn hero-btn--light">
+                <x-ui.button variant="none" size="none" class="hero-btn hero-btn--light tw:text-[16px]/[24px]" href="{{ route('sales.kpi.my', ['work_date' => $workDate, 'user_id' => $selectedUserId ?: $authUser->id]) }}">
                     <i class="bi bi-pencil-square me-1"></i>
                     @if($selectedUserId)
                         Cập nhật KPI hôm nay
                     @else
                         Cập nhật KPI của tôi
                     @endif
-                </a>
+                </x-ui.button>
 
                 @if($isPrivileged)
-                    <a href="{{ route('sales.kpi.settings') }}" class="btn hero-btn hero-btn--ghost">
+                    <x-ui.button variant="none" size="none" class="hero-btn hero-btn--ghost tw:text-[16px]/[24px]" href="{{ route('sales.kpi.settings') }}">
                         <i class="bi bi-sliders me-1"></i>Cài đặt KPI
-                    </a>
+                    </x-ui.button>
                 @endif
             </div>
         </div>
@@ -117,7 +117,7 @@
         </div>
     </section>
 
-    <form method="GET" action="{{ route('sales.kpi.index') }}" class="filter-console mb-3">
+    <form method="GET" action="{{ route('sales.kpi.index') }}" class="filter-console tw:mb-4">
         <div class="filter-field">
             <label>Tháng tổng hợp</label>
             <div>
@@ -156,12 +156,12 @@
             </div>
         </div>
 
-        <button class="btn btn-filter">
+        <x-ui.button variant="none" size="none" type="submit" class="btn-filter tw:py-[6px] tw:px-3">
             <i class="bi bi-funnel me-1"></i>Lọc dashboard
-        </button>
+        </x-ui.button>
     </form>
 
-    <div class="quick-entry-card mb-3">
+    <div class="quick-entry-card tw:mb-4">
         <div class="quick-entry-card__left">
             <div class="quick-entry-icon">
                 <i class="bi bi-pencil-square"></i>
@@ -186,17 +186,17 @@
             </div>
         </div>
 
-        <a href="{{ route('sales.kpi.my', ['work_date' => $workDate, 'user_id' => $selectedUserId ?: $authUser->id]) }}" class="btn quick-entry-btn">
+        <x-ui.button variant="none" size="none" class="quick-entry-btn" href="{{ route('sales.kpi.my', ['work_date' => $workDate, 'user_id' => $selectedUserId ?: $authUser->id]) }}">
             <i class="bi bi-lightning-charge-fill me-1"></i>
             @if($isPrivileged && $selectedUserId)
                 Mở form nhập KPI nhân sự này
             @else
                 Cập nhật KPI của tôi
             @endif
-        </a>
+        </x-ui.button>
     </div>
 
-    <div class="metric-grid mb-3">
+    <div class="metric-grid tw:mb-4">
         <div class="metric-card metric-card--blue">
             <div class="metric-card__top">
                 <span>Nhân sự có dữ liệu</span>
@@ -252,9 +252,9 @@
         </div>
     </div>
 
-    <div class="row g-3">
-        <div class="col-xxl-8">
-            <div class="panel-pro h-100">
+    <div class="tw:row tw:g-3">
+        <div class="tw:min-[87.5rem]:col12-8">
+            <div class="panel-pro tw:h-full">
                 <div class="panel-pro__head">
                     <div>
                         <div class="section-chip">MONTHLY RANKING</div>
@@ -269,7 +269,7 @@
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table table-sm align-middle table-pro mb-0">
+                    <table class="table table-sm align-middle table-pro tw:mb-0">
                         <thead>
                             <tr>
                                 <th>#</th>
@@ -316,8 +316,8 @@
                                             <strong class="{{ $rowPercent >= 75 ? 'text-success' : 'text-danger' }}">{{ $rowPercent }}%</strong>
                                         </div>
                                     </td>
-                                    <td class="fw-bold text-danger">{{ number_format((int)($row->total_missing_kpi ?? 0), 0, ',', '.') }}</td>
-                                    <td class="fw-bold text-danger">{{ number_format((int)($row->total_penalty ?? 0), 0, ',', '.') }}đ</td>
+                                    <td class="tw:font-bold tw:text-[#dc3545]!">{{ number_format((int)($row->total_missing_kpi ?? 0), 0, ',', '.') }}</td>
+                                    <td class="tw:font-bold tw:text-[#dc3545]!">{{ number_format((int)($row->total_penalty ?? 0), 0, ',', '.') }}đ</td>
                                 </tr>
                             @empty
                                 <tr>
@@ -336,7 +336,7 @@
             </div>
         </div>
 
-        <div class="col-xxl-4">
+        <div class="tw:min-[87.5rem]:col12-4">
             <div class="side-stack">
                 <div class="panel-pro panel-pro--dark">
                     <div class="panel-pro__head panel-pro__head--dark">
@@ -417,14 +417,14 @@
                             </div>
                         </div>
 
-                        <a href="{{ route('sales.kpi.my', ['work_date' => $workDate, 'user_id' => $selectedUserId ?: $authUser->id]) }}" class="btn btn-open-user w-100">
+                        <x-ui.button variant="none" size="none" class="btn-open-user tw:w-full tw:text-[16px]/[24px] tw:py-[6px] tw:px-3" href="{{ route('sales.kpi.my', ['work_date' => $workDate, 'user_id' => $selectedUserId ?: $authUser->id]) }}">
                             <i class="bi bi-pencil-square me-1"></i>
                             @if($selectedUserId)
                                 Mở form nhập KPI user này
                             @else
                                 Cập nhật KPI của tôi
                             @endif
-                        </a>
+                        </x-ui.button>
                     </div>
                 </div>
 
@@ -469,7 +469,7 @@
         </div>
     </div>
 
-    <div class="panel-pro mt-3">
+    <div class="panel-pro tw:mt-4">
         <div class="panel-pro__head">
             <div>
                 <div class="section-chip">DAILY TEAM</div>
@@ -480,7 +480,7 @@
         </div>
 
         <div class="table-responsive">
-            <table class="table table-sm align-middle table-pro mb-0">
+            <table class="table table-sm align-middle table-pro tw:mb-0">
                 <thead>
                     <tr>
                         <th>Nhân viên</th>
@@ -521,8 +521,8 @@
                                     <strong>{{ (int)($row->completion_percent ?? 0) }}%</strong>
                                 </div>
                             </td>
-                            <td class="text-danger fw-bold">{{ (int)($row->missing_kpi_count ?? 0) }}</td>
-                            <td class="text-danger fw-bold">{{ number_format((int)($row->penalty_amount ?? 0), 0, ',', '.') }}đ</td>
+                            <td class="tw:text-[#dc3545]! tw:font-bold">{{ (int)($row->missing_kpi_count ?? 0) }}</td>
+                            <td class="tw:text-[#dc3545]! tw:font-bold">{{ number_format((int)($row->penalty_amount ?? 0), 0, ',', '.') }}đ</td>
                             <td>
                                 @if($row->status === 'completed')
                                     <span class="status-pill ok">Đạt KPI</span>
@@ -548,14 +548,14 @@
             </table>
         </div>
 
-        <div class="p-3">
+        <div class="tw:p-4">
             {{ $dailyRows->links() }}
         </div>
     </div>
 
-    <div class="row g-3 mt-0">
-        <div class="col-xl-4">
-            <div class="panel-pro h-100">
+    <div class="tw:row tw:g-3 tw:mt-0">
+        <div class="tw:min-[75rem]:col12-4">
+            <div class="panel-pro tw:h-full">
                 <div class="panel-pro__head compact">
                     <div>
                         <div class="section-chip">TREND</div>
@@ -583,8 +583,8 @@
             </div>
         </div>
 
-        <div class="col-xl-8">
-            <div class="panel-pro h-100">
+        <div class="tw:min-[75rem]:col12-8">
+            <div class="panel-pro tw:h-full">
                 <div class="panel-pro__head compact">
                     <div>
                         <div class="section-chip">HISTORY</div>
@@ -594,7 +594,7 @@
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table table-sm align-middle table-pro mb-0">
+                    <table class="table table-sm align-middle table-pro tw:mb-0">
                         <thead>
                             <tr>
                                 <th>Ngày</th>
@@ -616,8 +616,8 @@
                                     <td>{{ (int)($row->calls_answered ?? 0) }}</td>
                                     <td>{{ (int)($row->company_data_called ?? 0) }}</td>
                                     <td>{{ (int)($row->completion_percent ?? 0) }}%</td>
-                                    <td class="text-danger fw-bold">{{ (int)($row->missing_kpi_count ?? 0) }}</td>
-                                    <td class="text-danger fw-bold">{{ number_format((int)($row->penalty_amount ?? 0), 0, ',', '.') }}đ</td>
+                                    <td class="tw:text-[#dc3545]! tw:font-bold">{{ (int)($row->missing_kpi_count ?? 0) }}</td>
+                                    <td class="tw:text-[#dc3545]! tw:font-bold">{{ number_format((int)($row->penalty_amount ?? 0), 0, ',', '.') }}đ</td>
                                 </tr>
                             @empty
                                 <tr>
@@ -634,7 +634,7 @@
                     </table>
                 </div>
 
-                <div class="p-3">
+                <div class="tw:p-4">
                     {{ $history->appends(request()->except('history_page'))->links() }}
                 </div>
             </div>

@@ -1,51 +1,50 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-3">
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+<div class="container tw:py-4">
+    <div class="tw:flex tw:justify-between tw:items-start flex-wrap tw:gap-2 tw:mb-4">
         <div>
-            <h2 class="mb-1 fw-bold">Thêm phòng ban</h2>
-            <div class="text-muted">Tạo danh mục phòng ban mới</div>
+            <h2 class="tw:mb-1 tw:font-bold">Thêm phòng ban</h2>
+            <div class="tw:text-[rgba(33,37,41,0.75)]">Tạo danh mục phòng ban mới</div>
         </div>
 
-        <a href="{{ route('hr.departments.index') }}" class="btn btn-outline-secondary">
+        <x-ui.button href="{{ route('hr.departments.index') }}" variant="outline-secondary">
             <i class="bi bi-arrow-left me-1"></i> Quay lại
-        </a>
+        </x-ui.button>
     </div>
 
-    <div class="card border-0 shadow-sm">
-        <div class="card-body">
+    <x-ui.card class="border-0 shadow-sm">
+        <x-ui.card-body>
             <form method="POST" action="{{ route('hr.departments.store') }}">
                 @csrf
 
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Tên phòng ban</label>
-                        <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
-                               value="{{ old('name') }}">
+                <div class="tw:row tw:g-3">
+                    <div class="tw:md:col12-6">
+                        <x-ui.label>Tên phòng ban</x-ui.label>
+                        <x-ui.input type="text" name="name" class="@error('name') is-invalid @enderror"
+                               value="{{ old('name') }}" />
                         @error('name') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label">Mã phòng ban</label>
-                        <input type="text" name="code" class="form-control"
-                               value="{{ old('code') }}">
+                    <div class="tw:md:col12-6">
+                        <x-ui.label>Mã phòng ban</x-ui.label>
+                        <x-ui.input type="text" name="code" value="{{ old('code') }}" />
                     </div>
 
-                    <div class="col-12">
-                        <label class="form-label">Mô tả</label>
-                        <textarea name="description" rows="4" class="form-control">{{ old('description') }}</textarea>
+                    <div class="tw:col12-12">
+                        <x-ui.label>Mô tả</x-ui.label>
+                        <x-ui.input as="textarea" name="description" rows="4">{{ old('description') }}</x-ui.input>
                     </div>
                 </div>
 
-                <div class="mt-4 d-flex gap-2">
-                    <button class="btn btn-primary">
+                <div class="tw:mt-6 tw:flex tw:gap-2">
+                    <x-ui.button variant="primary" type="submit">
                         <i class="bi bi-save me-1"></i> Lưu phòng ban
-                    </button>
-                    <a href="{{ route('hr.departments.index') }}" class="btn btn-light border">Huỷ</a>
+                    </x-ui.button>
+                    <x-ui.button href="{{ route('hr.departments.index') }}" variant="light" class="border">Huỷ</x-ui.button>
                 </div>
             </form>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 </div>
 @endsection

@@ -6,8 +6,9 @@ namespace App\Services\Inventory;
 
 use App\Models\Core\Warehouse;
 use App\Models\Inventory\Catalog\ProductCategory;
+use App\Support\ProbeFailureLog;
+use App\Support\SchemaCache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Nạp dữ liệu tra cứu cho form/màn sản phẩm: bảng giá (tier), giá theo tier
@@ -36,18 +37,18 @@ class ProductCatalogOptionsService
         ];
 
         foreach ($candidates as $t) {
-            if ($this->tableExists($t) && Schema::hasColumn($t, 'name')) {
+            if ($this->tableExists($t) && SchemaCache::hasColumn($t, 'name')) {
                 $q = DB::table($t);
 
-                if (Schema::hasColumn($t, 'is_active')) {
+                if (SchemaCache::hasColumn($t, 'is_active')) {
                     $q->where(function ($x) {
                         $x->where('is_active', 1)->orWhereNull('is_active');
                     });
                 }
 
-                if (Schema::hasColumn($t, 'priority')) {
+                if (SchemaCache::hasColumn($t, 'priority')) {
                     $q->orderBy('priority');
-                } elseif (Schema::hasColumn($t, 'sort')) {
+                } elseif (SchemaCache::hasColumn($t, 'sort')) {
                     $q->orderBy('sort');
                 }
 
@@ -81,9 +82,9 @@ class ProductCatalogOptionsService
             foreach ($candidateTables as $t) {
                 if (
                     $this->tableExists($t)
-                    && Schema::hasColumn($t, 'product_id')
-                    && (Schema::hasColumn($t, 'price_tier_id') || Schema::hasColumn($t, 'tier_id'))
-                    && (Schema::hasColumn($t, 'price') || Schema::hasColumn($t, 'value'))
+                    && SchemaCache::hasColumn($t, 'product_id')
+                    && (SchemaCache::hasColumn($t, 'price_tier_id') || SchemaCache::hasColumn($t, 'tier_id'))
+                    && (SchemaCache::hasColumn($t, 'price') || SchemaCache::hasColumn($t, 'value'))
                 ) {
                     $table = $t;
                     break;
@@ -101,11 +102,11 @@ class ProductCatalogOptionsService
                 return;
             }
 
-            $tierCol = Schema::hasColumn($table, 'price_tier_id') ? 'price_tier_id' : 'tier_id';
-            $priceCol = Schema::hasColumn($table, 'price') ? 'price' : 'value';
-            $hasVatCol = Schema::hasColumn($table, 'vat_percent');
-            $hasAfterVatCol = Schema::hasColumn($table, 'price_after_vat');
-            $hasEffectiveTo = Schema::hasColumn($table, 'effective_to');
+            $tierCol = SchemaCache::hasColumn($table, 'price_tier_id') ? 'price_tier_id' : 'tier_id';
+            $priceCol = SchemaCache::hasColumn($table, 'price') ? 'price' : 'value';
+            $hasVatCol = SchemaCache::hasColumn($table, 'vat_percent');
+            $hasAfterVatCol = SchemaCache::hasColumn($table, 'price_after_vat');
+            $hasEffectiveTo = SchemaCache::hasColumn($table, 'effective_to');
 
             $rowsQuery = DB::table($table)
                 ->whereIn('product_id', $ids->all());
@@ -171,9 +172,9 @@ class ProductCatalogOptionsService
         foreach ($candidateTables as $t) {
             if (
                 $this->tableExists($t)
-                && Schema::hasColumn($t, 'product_id')
-                && (Schema::hasColumn($t, 'price_tier_id') || Schema::hasColumn($t, 'tier_id'))
-                && (Schema::hasColumn($t, 'price') || Schema::hasColumn($t, 'value'))
+                && SchemaCache::hasColumn($t, 'product_id')
+                && (SchemaCache::hasColumn($t, 'price_tier_id') || SchemaCache::hasColumn($t, 'tier_id'))
+                && (SchemaCache::hasColumn($t, 'price') || SchemaCache::hasColumn($t, 'value'))
             ) {
                 $table = $t;
                 break;
@@ -184,12 +185,12 @@ class ProductCatalogOptionsService
             return [];
         }
 
-        $tierCol = Schema::hasColumn($table, 'price_tier_id') ? 'price_tier_id' : 'tier_id';
-        $priceCol = Schema::hasColumn($table, 'price') ? 'price' : 'value';
+        $tierCol = SchemaCache::hasColumn($table, 'price_tier_id') ? 'price_tier_id' : 'tier_id';
+        $priceCol = SchemaCache::hasColumn($table, 'price') ? 'price' : 'value';
 
-        $hasVatCol = Schema::hasColumn($table, 'vat_percent');
-        $hasAfterVatCol = Schema::hasColumn($table, 'price_after_vat');
-        $hasEffectiveTo = Schema::hasColumn($table, 'effective_to');
+        $hasVatCol = SchemaCache::hasColumn($table, 'vat_percent');
+        $hasAfterVatCol = SchemaCache::hasColumn($table, 'price_after_vat');
+        $hasEffectiveTo = SchemaCache::hasColumn($table, 'effective_to');
 
         $q = DB::table($table)->where('product_id', $productId);
 
@@ -313,6 +314,8 @@ class ProductCatalogOptionsService
         try {
             return DB::getSchemaBuilder()->hasTable($table);
         } catch (\Throwable $e) {
+            ProbeFailureLog::warn('ProductCatalogOptionsService::tableExists', $e);
+
             return false;
         }
     }

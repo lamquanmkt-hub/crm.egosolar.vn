@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Controller vận hành hành chính (HC): chi phí, tài sản, nhà cung cấp, công việc phát sinh và bảo trì thiết bị.
@@ -24,33 +25,33 @@ class HcOperationController extends Controller
      */
     public function index(Request $request)
     {
-        $allowedTabs = ['overview', 'expenses', 'assets', 'suppliers', 'tasks', 'maintenance'];
+        $allowedTabs = ['overview', 'expenses', 'assets', 'suppliers', 'tasks', 'maintenance', 'incidents'];
         $tab = $request->get('tab', 'overview');
 
         if (! in_array($tab, $allowedTabs, true)) {
             $tab = 'overview';
         }
 
-        $expenses = Schema::hasTable('hr_operation_expenses')
+        $expenses = SchemaCache::hasTable('hr_operation_expenses')
             ? DB::table('hr_operation_expenses')->orderByDesc('id')->get()
             : collect();
 
-        $assets = Schema::hasTable('hr_operation_assets')
+        $assets = SchemaCache::hasTable('hr_operation_assets')
             ? DB::table('hr_operation_assets')->orderByDesc('id')->get()
             : collect();
 
-        $suppliers = Schema::hasTable('hr_operation_suppliers')
+        $suppliers = SchemaCache::hasTable('hr_operation_suppliers')
             ? DB::table('hr_operation_suppliers')->orderByDesc('id')->get()
             : collect();
 
-        $maintenanceTasks = Schema::hasTable('hr_operation_tasks')
+        $maintenanceTasks = SchemaCache::hasTable('hr_operation_tasks')
             ? DB::table('hr_operation_tasks')
                 ->whereIn('task_type', $this->maintenanceTypes)
                 ->orderByDesc('id')
                 ->get()
             : collect();
 
-        $tasks = Schema::hasTable('hr_operation_tasks')
+        $tasks = SchemaCache::hasTable('hr_operation_tasks')
             ? DB::table('hr_operation_tasks')
                 ->where(function ($query) {
                     $query->whereNull('task_type')
@@ -60,11 +61,15 @@ class HcOperationController extends Controller
                 ->get()
             : collect();
 
+        $incidents = SchemaCache::hasTable('hr_office_incidents')
+            ? DB::table('hr_office_incidents')->orderByDesc('reported_at')->orderByDesc('id')->get()
+            : collect();
+
         $documentHandovers = collect();
-        if (Schema::hasTable('hr_document_handovers')) {
+        if (SchemaCache::hasTable('hr_document_handovers')) {
             $handoverQuery = DB::table('hr_document_handovers as h');
 
-            if (Schema::hasTable('users')) {
+            if (SchemaCache::hasTable('users')) {
                 $handoverQuery
                     ->leftJoin('users as creator', 'creator.id', '=', 'h.created_by')
                     ->leftJoin('users as assignee', 'assignee.id', '=', 'h.assigned_to')
@@ -76,14 +81,14 @@ class HcOperationController extends Controller
             $documentHandovers = $handoverQuery->orderByDesc('h.id')->limit(8)->get();
         }
 
-        $monthExpense = Schema::hasTable('hr_operation_expenses')
+        $monthExpense = SchemaCache::hasTable('hr_operation_expenses')
             ? DB::table('hr_operation_expenses')
                 ->whereMonth('expense_date', now()->month)
                 ->whereYear('expense_date', now()->year)
                 ->sum('amount')
             : 0;
 
-        $fixedExpense = Schema::hasTable('hr_operation_expenses')
+        $fixedExpense = SchemaCache::hasTable('hr_operation_expenses')
             ? DB::table('hr_operation_expenses')
                 ->whereMonth('expense_date', now()->month)
                 ->whereYear('expense_date', now()->year)
@@ -91,7 +96,7 @@ class HcOperationController extends Controller
                 ->sum('amount')
             : 0;
 
-        $arisingExpense = Schema::hasTable('hr_operation_expenses')
+        $arisingExpense = SchemaCache::hasTable('hr_operation_expenses')
             ? DB::table('hr_operation_expenses')
                 ->whereMonth('expense_date', now()->month)
                 ->whereYear('expense_date', now()->year)
@@ -114,7 +119,7 @@ class HcOperationController extends Controller
             })->count();
 
         $stats = [
-            'total_rows' => $expenses->count() + $assets->count() + $suppliers->count() + $tasks->count() + $maintenanceTasks->count() + $documentHandovers->count(),
+            'total_rows' => $expenses->count() + $assets->count() + $suppliers->count() + $tasks->count() + $maintenanceTasks->count() + $documentHandovers->count() + $incidents->count(),
             'month_expense' => $monthExpense,
             'fixed_expense' => $fixedExpense,
             'arising_expense' => $arisingExpense,
@@ -123,6 +128,8 @@ class HcOperationController extends Controller
             'overdue_tasks' => $overdueTasks,
             'handovers' => $documentHandovers->count(),
             'maintenance' => $maintenanceTasks->count(),
+            'open_incidents' => $incidents->whereNotIn('status', ['completed', 'cancelled'])->count(),
+            'overdue_incidents' => $incidents->filter(fn ($row) => ! empty($row->sla_due_at) && $row->sla_due_at < now()->toDateTimeString() && ! in_array($row->status, ['completed', 'cancelled'], true))->count(),
         ];
 
         $expenseCategories = ['Chi phí cố định', 'Chi phí phát sinh', 'Nước', 'Internet', 'Văn phòng phẩm', 'Sửa chữa', 'Dịch vụ', 'Khác'];
@@ -152,6 +159,7 @@ class HcOperationController extends Controller
             'tasks',
             'maintenanceTasks',
             'documentHandovers',
+            'incidents',
             'stats',
             'conditions',
             'maintenanceConditions',
@@ -481,6 +489,115 @@ class HcOperationController extends Controller
         DB::table('hr_operation_tasks')->where('id', (int) $id)->delete();
 
         return $this->backTo('maintenance', 'Đã xoá yêu cầu bảo trì thiết bị.');
+    }
+
+    /**
+     * Tiếp nhận sự cố văn phòng và tự tính SLA theo mức độ.
+     */
+    public function storeIncident(Request $request)
+    {
+        $data = $request->validate([
+            'reported_by' => ['required', 'string', 'max:255'],
+            'department' => ['nullable', 'string', 'max:255'],
+            'location' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string'],
+            'severity' => ['required', 'integer', 'between:1,3'],
+            'estimated_cost' => ['nullable', 'numeric', 'min:0'],
+            'assignee' => ['nullable', 'string', 'max:255'],
+            'note' => ['nullable', 'string'],
+            'evidence' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf,mp4,mov', 'max:20480'],
+        ]);
+
+        $reportedAt = now();
+        $severity = (int) $data['severity'];
+        $slaHours = [1 => 2, 2 => 8, 3 => 48][$severity];
+        $estimatedCost = (float) ($data['estimated_cost'] ?? 0);
+
+        $data['incident_code'] = 'SC-'.$reportedAt->format('Ymd-His');
+        $data['reported_at'] = $reportedAt;
+        $data['sla_due_at'] = $reportedAt->copy()->addHours($slaHours);
+        $data['estimated_cost'] = $estimatedCost;
+        $data['approval_status'] = $estimatedCost > 500000 ? 'pending' : 'not_required';
+        $data['status'] = 'received';
+        $data['created_by'] = auth()->id();
+        $data['created_at'] = now();
+        $data['updated_at'] = now();
+
+        if ($request->hasFile('evidence')) {
+            $data['evidence_path'] = $request->file('evidence')->store('hr/office-incidents/evidence', 'public');
+        }
+        unset($data['evidence']);
+
+        DB::table('hr_office_incidents')->insert($data);
+
+        return $this->backTo('incidents', 'Đã tiếp nhận sự cố văn phòng và tạo thời hạn SLA.');
+    }
+
+    /**
+     * Cập nhật xử lý, phê duyệt chi phí và nghiệm thu sự cố.
+     */
+    public function updateIncident(Request $request, $id)
+    {
+        $incident = DB::table('hr_office_incidents')->where('id', (int) $id)->first();
+        abort_unless($incident, 404);
+
+        $data = $request->validate([
+            'assignee' => ['nullable', 'string', 'max:255'],
+            'status' => ['required', 'in:received,approved,processing,waiting_vendor,completed,cancelled'],
+            'approval_status' => ['nullable', 'in:not_required,pending,approved,rejected'],
+            'estimated_cost' => ['nullable', 'numeric', 'min:0'],
+            'actual_cost' => ['nullable', 'numeric', 'min:0'],
+            'resolution' => ['nullable', 'string'],
+            'rating' => ['nullable', 'integer', 'between:1,5'],
+            'note' => ['nullable', 'string'],
+            'completion_evidence' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf,mp4,mov', 'max:20480'],
+        ]);
+
+        $estimatedCost = (float) ($data['estimated_cost'] ?? $incident->estimated_cost ?? 0);
+        $data['estimated_cost'] = $estimatedCost;
+        if ($estimatedCost <= 500000) {
+            $data['approval_status'] = 'not_required';
+        } elseif (empty($data['approval_status'])) {
+            $data['approval_status'] = $incident->approval_status ?: 'pending';
+        }
+
+        if ($request->hasFile('completion_evidence')) {
+            if (! empty($incident->completion_evidence_path)) {
+                Storage::disk('public')->delete($incident->completion_evidence_path);
+            }
+            $data['completion_evidence_path'] = $request->file('completion_evidence')->store('hr/office-incidents/completed', 'public');
+        }
+        unset($data['completion_evidence']);
+
+        if ($data['status'] === 'completed') {
+            $data['completed_at'] = $incident->completed_at ?: now();
+        } else {
+            $data['completed_at'] = null;
+        }
+
+        $data['updated_at'] = now();
+        DB::table('hr_office_incidents')->where('id', (int) $id)->update($data);
+
+        return $this->backTo('incidents', 'Đã cập nhật xử lý sự cố.');
+    }
+
+    /**
+     * Xoá bản ghi sự cố và file minh chứng đi kèm.
+     */
+    public function destroyIncident($id)
+    {
+        $incident = DB::table('hr_office_incidents')->where('id', (int) $id)->first();
+        abort_unless($incident, 404);
+
+        foreach (['evidence_path', 'completion_evidence_path'] as $field) {
+            if (! empty($incident->{$field})) {
+                Storage::disk('public')->delete($incident->{$field});
+            }
+        }
+
+        DB::table('hr_office_incidents')->where('id', (int) $id)->delete();
+
+        return $this->backTo('incidents', 'Đã xoá sự cố văn phòng.');
     }
 
     /**

@@ -1,8 +1,13 @@
 /.phpunit.cache
 /node_modules
-/public/build
+# /public/build  — CỐ Ý KHÔNG ignore (từ 2026-09-02).
+# Server không có node/npm nên không build được tại chỗ; deploy bằng `git pull` nhánh main,
+# nên asset đã build PHẢI đi kèm repo. Quy trình: pnpm run build -> commit public/build -> push.
+# Xem DEPLOY_RUNBOOK.md mục 2c.
 /public/hot
 /public/storage
+/storage/backups/
+/storage/framework
 /storage/*.key
 /storage/pail
 /vendor
@@ -10,11 +15,12 @@
 .env.backup
 .env.production
 # Dump schema production dùng dựng DB test local — KHÔNG commit:
-# repo này công khai, và Laravel tự nạp file này khi migrate trên DB rỗng.
+# repo này private, và Laravel tự nạp file này khi migrate trên DB rỗng.
 # Cách tạo lại: xem README mục "Dựng DB test".
 /database/schema
 .phpactor.json
 .phpunit.result.cache
+
 Homestead.json
 Homestead.yaml
 npm-debug.log
@@ -25,44 +31,38 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-.env.*
-!.env.example
-/vendor/
-/node_modules/
-/storage/ego_backups/
-/routes/*.bak*
-/routes/*.broken*
-/routes/web.phpbk*
+.DS_Store
 
-# Local backup files
-**/*backup*/
-**/*.bak*
-**/*.phpbk*
-**/*.broken*
-**/*.current_*
-/storage/ego_backups/
+error_log
+# Dump DB production dùng đối chiếu local — TUYỆT ĐỐI không commit (repo công khai).
+/crmegoso_lam25_crm_shop.sql
 
-**/*backup*
-
-# Backup files sinh ra khi vá nóng (đuôi dán ngày/mục đích vào tên file).
-# Bổ sung sau đợt dọn P0 — trước đây các file này bị commit nhầm vào repo.
-*.save
-*.save.*
-*_bk
-*_bk[0-9]
-*.php_bk
-*.jsbk
-*.jsbk[0-9]
-*.cssbk
-*.before-*
+# File backup sinh khi sửa nóng trên server — không được lẫn vào repo.
+*.bak
+*.bak-*
+*.backup
+*.backup-*
+*.backup_*
 *.before_*
-*_before_*
-*.disabled_*
-.ea-php-cli.cache
+*.broken_*
 
-# Temporary repair scripts
-/tools/
-/patch_*.php
-/repair_*.php
-/rollback_*.php
-/install_*.php
+# Ảnh chụp HTML tạm khi đối chiếu giao diện — KHÔNG commit
+/public/__snap/
+
+# Trang dump tạm để đo giao diện bằng CDP (serve.sh chép vào public/) — KHÔNG commit
+/public/__tw*_*.html
+
+# Ảnh chụp của browser test (Pest 4 + Playwright) — tài liệu Pest khuyên không commit
+/tests/Browser/Screenshots/
+
+# Cache của Pint (CI khôi phục qua actions/cache; máy dev tự sinh)
+/.pint.cache
+
+# Cấu hình Claude Code riêng từng máy
+.claude/settings.local.json
+
+# Môi trường giả lập production trên máy dev (staging cục bộ) — KHÔNG commit:
+# .env.staging chứa credential DB cục bộ; thư mục runtime chứa dữ liệu đã ẩn danh
+# nhưng vẫn dựng từ dump production, không có lý do gì để nằm trong git.
+.env.staging
+/docker/staging/runtime/

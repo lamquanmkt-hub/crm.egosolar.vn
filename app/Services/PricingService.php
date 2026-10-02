@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Services\PricingServiceInterface;
+use App\Support\SchemaCache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Service tính giá sản phẩm (ưu tiên bảng giá tier, fallback theo loại khách hàng).
@@ -128,39 +128,137 @@ class PricingService implements PricingServiceInterface
      */
     public function resolveVatPercentForOrderItem(int $productId, ?int $priceTierId = null): float
     {
-        if ($productId > 0 && $priceTierId && Schema::hasTable('crm_product_prices')) {
-            $priceCols = Schema::getColumnListing('crm_product_prices');
+        $key = $productId.':'.($priceTierId ?? '');
 
-            if (in_array('product_id', $priceCols, true) && in_array('price_tier_id', $priceCols, true)) {
-                foreach (['vat_percent', 'vat', 'tax_percent'] as $vatCol) {
-                    if (in_array($vatCol, $priceCols, true)) {
-                        $vat = (float) DB::table('crm_product_prices')
-                            ->where('product_id', $productId)
-                            ->where('price_tier_id', $priceTierId)
-                            ->value($vatCol);
+        return $this->resolveVatPercentsForOrderItems([[$productId, $priceTierId]])[$key] ?? 0.0;
+    }
 
-                        if ($vat > 0) {
-                            return min(100, max(0, $vat));
-                        }
-                    }
+    /**
+     * Bản gộp của resolveVatPercentForOrderItem: cùng thứ tự ưu tiên nhưng chỉ
+     * tốn 2 truy vấn cho cả danh sách thay vì 2 truy vấn cho MỖI dòng hàng.
+     *
+     * @param  list<array{0: int, 1: int|null}>  $pairs
+     * @return array<string, float>
+     */
+    public function resolveVatPercentsForOrderItems(array $pairs): array
+    {
+        $productIds = [];
+
+        foreach ($pairs as [$productId, $priceTierId]) {
+            if ((int) $productId > 0) {
+                $productIds[(int) $productId] = true;
+            }
+        }
+
+        if ($productIds === []) {
+            return [];
+        }
+
+        $productIds = array_keys($productIds);
+        $tierVat = $this->tierVatPercents($productIds);
+        $catalogVat = $this->catalogVatPercents($productIds);
+
+        $result = [];
+
+        foreach ($pairs as [$productId, $priceTierId]) {
+            $productId = (int) $productId;
+            $key = $productId.':'.($priceTierId ?? '');
+
+            if ($productId <= 0) {
+                $result[$key] = 0.0;
+
+                continue;
+            }
+
+            $vat = $priceTierId !== null
+                ? ($tierVat[$productId.':'.(int) $priceTierId] ?? 0.0)
+                : 0.0;
+
+            if ($vat <= 0) {
+                $vat = $catalogVat[$productId] ?? 0.0;
+            }
+
+            $result[$key] = min(100, max(0, $vat));
+        }
+
+        return $result;
+    }
+
+    /**
+     * % VAT theo cặp (sản phẩm, tầng giá) từ bảng giá — MỘT truy vấn.
+     *
+     * @param  list<int>  $productIds
+     * @return array<string, float> "productId:tierId" => % VAT
+     */
+    private function tierVatPercents(array $productIds): array
+    {
+        if (! SchemaCache::hasColumns('crm_product_prices', ['product_id', 'price_tier_id'])) {
+            return [];
+        }
+
+        $vatColumns = array_values(array_filter(
+            ['vat_percent', 'vat', 'tax_percent'],
+            static fn (string $column): bool => SchemaCache::hasColumn('crm_product_prices', $column),
+        ));
+
+        if ($vatColumns === []) {
+            return [];
+        }
+
+        $rows = DB::table('crm_product_prices')
+            ->whereIn('product_id', $productIds)
+            ->get(array_merge(['product_id', 'price_tier_id'], $vatColumns));
+
+        $map = [];
+
+        foreach ($rows as $row) {
+            foreach ($vatColumns as $column) {
+                $vat = (float) ($row->{$column} ?? 0);
+
+                if ($vat > 0) {
+                    $map[(int) $row->product_id.':'.(int) $row->price_tier_id] = $vat;
+                    break;
                 }
             }
         }
 
-        if ($productId > 0 && Schema::hasTable('crm_product_catalog')) {
-            foreach (['vat_percent', 'cost_vat_percent'] as $vatCol) {
-                if (Schema::hasColumn('crm_product_catalog', $vatCol)) {
-                    $vat = (float) DB::table('crm_product_catalog')
-                        ->where('id', $productId)
-                        ->value($vatCol);
+        return $map;
+    }
 
-                    if ($vat > 0) {
-                        return min(100, max(0, $vat));
-                    }
+    /**
+     * % VAT dự phòng lấy từ catalog sản phẩm — MỘT truy vấn.
+     *
+     * @param  list<int>  $productIds
+     * @return array<int, float>
+     */
+    private function catalogVatPercents(array $productIds): array
+    {
+        $vatColumns = array_values(array_filter(
+            ['vat_percent', 'cost_vat_percent'],
+            static fn (string $column): bool => SchemaCache::hasColumn('crm_product_catalog', $column),
+        ));
+
+        if ($vatColumns === []) {
+            return [];
+        }
+
+        $rows = DB::table('crm_product_catalog')
+            ->whereIn('id', $productIds)
+            ->get(array_merge(['id'], $vatColumns));
+
+        $map = [];
+
+        foreach ($rows as $row) {
+            foreach ($vatColumns as $column) {
+                $vat = (float) ($row->{$column} ?? 0);
+
+                if ($vat > 0) {
+                    $map[(int) $row->id] = $vat;
+                    break;
                 }
             }
         }
 
-        return 0.0;
+        return $map;
     }
 }

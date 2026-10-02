@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('material_requests', function (Blueprint $table) {
-    $table->id();
-    $table->unsignedBigInteger('site_id');       // công trình
-    $table->unsignedBigInteger('created_by');    // user tạo
-    $table->string('status')->default('DRAFT');  // DRAFT/SUBMITTED/...
-    $table->text('note')->nullable();
-    $table->timestamps();
-});
+        if (! Schema::hasTable('material_requests')) {
+            Schema::create('material_requests', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('site_id');       // công trình
+                $table->unsignedBigInteger('created_by');    // user tạo
+                $table->string('status')->default('DRAFT');  // DRAFT/SUBMITTED/...
+                $table->text('note')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**

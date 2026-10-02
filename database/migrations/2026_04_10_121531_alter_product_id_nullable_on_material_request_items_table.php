@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -11,9 +11,11 @@ return new class extends Migration
     {
         // Gỡ foreign key cũ nếu có
         try {
-            Schema::table('material_request_items', function (Blueprint $table) {
-                $table->dropForeign(['product_id']);
-            });
+            if (Schema::hasTable('material_request_items')) {
+                Schema::table('material_request_items', function (Blueprint $table) {
+                    $table->dropForeign(['product_id']);
+                });
+            }
         } catch (\Throwable $e) {
             // bỏ qua nếu không có foreign key
         }
@@ -23,12 +25,14 @@ return new class extends Migration
 
         // Gắn lại foreign key
         try {
-            Schema::table('material_request_items', function (Blueprint $table) {
-                $table->foreign('product_id')
-                    ->references('id')
-                    ->on('products')
-                    ->nullOnDelete();
-            });
+            if (Schema::hasTable('material_request_items')) {
+                Schema::table('material_request_items', function (Blueprint $table) {
+                    $table->foreign('product_id')
+                        ->references('id')
+                        ->on('products')
+                        ->nullOnDelete();
+                });
+            }
         } catch (\Throwable $e) {
             // nếu bảng products không đúng tên thì tự sửa lại
         }
@@ -37,9 +41,11 @@ return new class extends Migration
     public function down(): void
     {
         try {
-            Schema::table('material_request_items', function (Blueprint $table) {
-                $table->dropForeign(['product_id']);
-            });
+            if (Schema::hasTable('material_request_items')) {
+                Schema::table('material_request_items', function (Blueprint $table) {
+                    $table->dropForeign(['product_id']);
+                });
+            }
         } catch (\Throwable $e) {
             //
         }
@@ -47,12 +53,14 @@ return new class extends Migration
         DB::statement('ALTER TABLE material_request_items MODIFY product_id BIGINT UNSIGNED NOT NULL');
 
         try {
-            Schema::table('material_request_items', function (Blueprint $table) {
-                $table->foreign('product_id')
-                    ->references('id')
-                    ->on('products')
-                    ->cascadeOnDelete();
-            });
+            if (Schema::hasTable('material_request_items')) {
+                Schema::table('material_request_items', function (Blueprint $table) {
+                    $table->foreign('product_id')
+                        ->references('id')
+                        ->on('products')
+                        ->cascadeOnDelete();
+                });
+            }
         } catch (\Throwable $e) {
             //
         }

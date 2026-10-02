@@ -21,32 +21,32 @@
     if (!is_array($attachments)) $attachments = [];
 @endphp
 
-<div class="container-fluid px-4 mt-3 weekly-task-create">
+<div class="container-fluid tw:px-6 tw:mt-4 weekly-task-create">
 
     {{-- Header --}}
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="tw:flex flex-wrap tw:justify-between tw:items-center tw:gap-2 tw:mb-4">
         <div>
-            <h3 class="fw-bold mb-1">Sửa công việc</h3>
+            <h3 class="tw:font-bold tw:mb-1">Sửa công việc</h3>
             <div class="text-muted">Cập nhật công việc hàng tuần #{{ $task->id }}</div>
         </div>
 
-        <a href="{{ route('marketing.reports.weekly-tasks') }}" class="btn btn-ego-soft wt-btn">
+        <x-ui.button variant="none" size="none" class="btn-ego-soft wt-btn" href="{{ route('marketing.reports.weekly-tasks') }}">
             <i class="bi bi-arrow-left"></i> Quay lại
-        </a>
+        </x-ui.button>
     </div>
 
-    <div class="card wt-card">
-        <div class="card-body p-0">
+    <x-ui.card class="wt-card">
+        <x-ui.card-body class="tw:p-0">
 
             <form method="POST"
                   action="{{ route('marketing.reports.weekly-tasks.update', $task->id) }}"
                   enctype="multipart/form-data"
-                  class="p-3 p-md-4">
+                  class="tw:p-4">
                 @csrf
                 @method('PUT')
 
                 {{-- ====== Thông tin task ====== --}}
-                <div class="wt-section mb-3">
+                <div class="wt-section tw:mb-4">
                     <div class="wt-section-head">
                         <div class="wt-section-title">
                             <i class="bi bi-clipboard-check"></i>
@@ -55,73 +55,73 @@
                         <div class="wt-section-sub text-muted">Chỉnh nội dung và mốc thời gian</div>
                     </div>
 
-                    <div class="row g-3 mt-1">
-                        <div class="col-md-6">
-                            <label class="form-label">Tên công việc <span class="text-danger">*</span></label>
-                            <input name="title"
-                                   class="form-control wt-control @error('title') is-invalid @enderror"
+                    <div class="tw:row tw:g-3 tw:mt-1">
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Tên công việc <span class="tw:text-[#dc3545]">*</span></x-ui.label>
+                            <x-ui.input name="title"
+                                   class="wt-control @error('title') is-invalid @enderror"
                                    value="{{ old('title', $task->title) }}"
-                                   required>
+                                   required />
                             @error('title') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label">Priority <span class="text-danger">*</span></label>
-                            <select name="priority"
-                                    class="form-select wt-control @error('priority') is-invalid @enderror"
+                        <div class="tw:md:col12-3">
+                            <x-ui.label>Priority <span class="tw:text-[#dc3545]">*</span></x-ui.label>
+                            <x-ui.select name="priority"
+                                    class="wt-control @error('priority') is-invalid @enderror"
                                     required>
                                 <option value="high" {{ old('priority', $task->priority)==='high'?'selected':'' }}>High</option>
                                 <option value="medium" {{ old('priority', $task->priority)==='medium'?'selected':'' }}>Medium</option>
                                 <option value="low" {{ old('priority', $task->priority)==='low'?'selected':'' }}>Low</option>
-                            </select>
+                            </x-ui.select>
                             @error('priority') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label">Hạng mục</label>
-                            <input name="category"
-                                   class="form-control wt-control @error('category') is-invalid @enderror"
-                                   value="{{ old('category', $task->category) }}">
+                        <div class="tw:md:col12-3">
+                            <x-ui.label>Hạng mục</x-ui.label>
+                            <x-ui.input name="category"
+                                   class="wt-control @error('category') is-invalid @enderror"
+                                   value="{{ old('category', $task->category) }}" />
                             @error('category') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label">Ngày bắt đầu</label>
-                            <input type="date"
+                        <div class="tw:md:col12-3">
+                            <x-ui.label>Ngày bắt đầu</x-ui.label>
+                            <x-ui.input type="date"
                                    name="start_date"
-                                   class="form-control wt-control @error('start_date') is-invalid @enderror"
-                                   value="{{ old('start_date', optional($task->start_date)->format('Y-m-d')) }}">
+                                   class="wt-control @error('start_date') is-invalid @enderror"
+                                   value="{{ old('start_date', optional($task->start_date)->format('Y-m-d')) }}" />
                             @error('start_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label">Hạn</label>
-                            <input type="date"
+                        <div class="tw:md:col12-3">
+                            <x-ui.label>Hạn</x-ui.label>
+                            <x-ui.input type="date"
                                    name="due_date"
-                                   class="form-control wt-control @error('due_date') is-invalid @enderror"
-                                   value="{{ old('due_date', optional($task->due_date)->format('Y-m-d')) }}">
+                                   class="wt-control @error('due_date') is-invalid @enderror"
+                                   value="{{ old('due_date', optional($task->due_date)->format('Y-m-d')) }}" />
                             @error('due_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label">Trạng thái <span class="text-danger">*</span></label>
-                            <select name="status"
-                                    class="form-select wt-control @error('status') is-invalid @enderror"
+                        <div class="tw:md:col12-3">
+                            <x-ui.label>Trạng thái <span class="tw:text-[#dc3545]">*</span></x-ui.label>
+                            <x-ui.select name="status"
+                                    class="wt-control @error('status') is-invalid @enderror"
                                     required>
                                 <option value="pending" {{ old('status', $task->status)==='pending'?'selected':'' }}>Todo</option>
                                 <option value="doing" {{ old('status', $task->status)==='doing'?'selected':'' }}>Doing</option>
                                 <option value="done" {{ old('status', $task->status)==='done'?'selected':'' }}>Done</option>
-                            </select>
+                            </x-ui.select>
                             @error('status') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label">Tiến độ (%)</label>
-                            <input type="number"
+                        <div class="tw:md:col12-3">
+                            <x-ui.label>Tiến độ (%)</x-ui.label>
+                            <x-ui.input type="number"
                                    name="progress"
-                                   class="form-control wt-control @error('progress') is-invalid @enderror"
+                                   class="wt-control @error('progress') is-invalid @enderror"
                                    min="0" max="100"
-                                   value="{{ old('progress', $task->progress ?? 0) }}">
+                                   value="{{ old('progress', $task->progress ?? 0) }}" />
                             @error('progress') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             <div class="form-text">0–100</div>
                         </div>
@@ -129,11 +129,11 @@
                 </div>
 
                 {{-- ====== Người + Link ====== --}}
-                <div class="row g-3">
+                <div class="tw:row tw:g-3">
 
                     {{-- Assignees --}}
-                    <div class="col-lg-6">
-                        <div class="wt-section h-100">
+                    <div class="tw:min-[62rem]:col12-6">
+                        <div class="wt-section tw:h-full">
                             <div class="wt-section-head">
                                 <div class="wt-section-title">
                                     <i class="bi bi-people"></i>
@@ -142,19 +142,19 @@
                                 <div class="wt-section-sub text-muted">Thêm 2–3 người (hoặc nhiều hơn)</div>
                             </div>
 
-                            <label class="form-label mt-2">Danh sách người phụ trách</label>
+                            <x-ui.label class="tw:mt-2">Danh sách người phụ trách</x-ui.label>
 
                             <div class="input-group">
-                                <input type="text"
+                                <x-ui.input type="text"
                                        id="assigneeInput"
-                                       class="form-control wt-control"
-                                       placeholder="Nhập tên... (Enter để thêm)">
-                                <button type="button" id="addAssigneeBtn" class="btn btn-ego-soft wt-btn">
+                                       class="wt-control"
+                                       placeholder="Nhập tên... (Enter để thêm)" />
+                                <x-ui.button variant="none" size="none" class="btn-ego-soft wt-btn tw:relative tw:z-[2] tw:focus:z-[5]" type="button" id="addAssigneeBtn">
                                     <i class="bi bi-plus-lg"></i> Thêm người
-                                </button>
+                                </x-ui.button>
                             </div>
 
-                            <div id="assigneeChips" class="wt-chips mt-3"></div>
+                            <div id="assigneeChips" class="wt-chips tw:mt-4"></div>
 
                             <div id="assigneeHidden"></div>
                             <input type="hidden" name="assignee" id="assigneeJoined" value="{{ old('assignee', $task->assignee) }}">
@@ -162,8 +162,8 @@
                     </div>
 
                     {{-- Links --}}
-                    <div class="col-lg-6">
-                        <div class="wt-section h-100">
+                    <div class="tw:min-[62rem]:col12-6">
+                        <div class="wt-section tw:h-full">
                             <div class="wt-section-head">
                                 <div class="wt-section-title">
                                     <i class="bi bi-link-45deg"></i>
@@ -172,25 +172,25 @@
                                 <div class="wt-section-sub text-muted">Nhiều link, xoá dễ dàng</div>
                             </div>
 
-                            <label class="form-label mt-2">Thêm link</label>
+                            <x-ui.label class="tw:mt-2">Thêm link</x-ui.label>
 
                             <div class="input-group">
-                                <input type="url"
+                                <x-ui.input type="url"
                                        id="linkInput"
-                                       class="form-control wt-control"
-                                       placeholder="https://... (Enter để thêm)">
-                                <button type="button" id="addLinkBtn" class="btn btn-ego-soft wt-btn">
+                                       class="wt-control"
+                                       placeholder="https://... (Enter để thêm)" />
+                                <x-ui.button variant="none" size="none" class="btn-ego-soft wt-btn tw:relative tw:z-[2] tw:focus:z-[5]" type="button" id="addLinkBtn">
                                     <i class="bi bi-plus-lg"></i> Thêm link
-                                </button>
+                                </x-ui.button>
                             </div>
 
-                            <div id="linkChips" class="wt-chips mt-3"></div>
+                            <div id="linkChips" class="wt-chips tw:mt-4"></div>
                             <div id="linkHidden"></div>
                         </div>
                     </div>
 
                     {{-- Existing attachments --}}
-                    <div class="col-12">
+                    <div class="tw:col12-12">
                         <div class="wt-section">
                             <div class="wt-section-head">
                                 <div class="wt-section-title">
@@ -200,29 +200,29 @@
                                 <div class="wt-section-sub text-muted">Hiện file cũ + upload thêm file mới</div>
                             </div>
 
-                            <div class="row g-3 mt-1">
-                                <div class="col-lg-6">
-                                    <label class="form-label">Upload thêm file</label>
-                                    <input type="file"
+                            <div class="tw:row tw:g-3 tw:mt-1">
+                                <div class="tw:min-[62rem]:col12-6">
+                                    <x-ui.label>Upload thêm file</x-ui.label>
+                                    <x-ui.input type="file"
                                            name="attachments[]"
                                            id="attachments"
-                                           class="form-control wt-control"
+                                           class="wt-control"
                                            multiple
-                                           accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt">
+                                           accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt" />
                                     <div class="form-text">
                                         File mới sẽ được thêm vào danh sách (không xoá file cũ).
                                     </div>
                                 </div>
 
-                                <div class="col-lg-6">
-                                    <label class="form-label">Danh sách file mới đã chọn</label>
+                                <div class="tw:min-[62rem]:col12-6">
+                                    <x-ui.label>Danh sách file mới đã chọn</x-ui.label>
                                     <div id="fileList" class="wt-filelist">
                                         <div class="text-muted small">Chưa chọn file nào.</div>
                                     </div>
                                 </div>
 
-                                <div class="col-12">
-                                    <label class="form-label">File đang có</label>
+                                <div class="tw:col12-12">
+                                    <x-ui.label>File đang có</x-ui.label>
 
                                     @if(count($attachments) === 0)
                                         <div class="text-muted small">Chưa có file đính kèm.</div>
@@ -243,11 +243,10 @@
                                                     </div>
 
                                                     @if($path)
-                                                        <a class="btn btn-ego-soft wt-mini"
-                                                           target="_blank"
+                                                        <x-ui.button variant="none" size="none" class="btn-ego-soft wt-mini" target="_blank"
                                                            href="{{ asset('storage/'.$path) }}">
                                                             <i class="bi bi-box-arrow-up-right"></i> Mở
-                                                        </a>
+                                                        </x-ui.button>
                                                     @endif
                                                 </div>
                                             @endforeach
@@ -255,8 +254,8 @@
                                     @endif
                                 </div>
 
-                                <div class="col-12">
-                                    <label class="form-label">Preview ảnh mới</label>
+                                <div class="tw:col12-12">
+                                    <x-ui.label>Preview ảnh mới</x-ui.label>
                                     <div id="imagePreview" class="wt-preview"></div>
                                 </div>
                             </div>
@@ -266,7 +265,7 @@
                 </div>
 
                 {{-- Note --}}
-                <div class="wt-section mt-3">
+                <div class="wt-section tw:mt-4">
                     <div class="wt-section-head">
                         <div class="wt-section-title">
                             <i class="bi bi-journal-text"></i>
@@ -275,28 +274,28 @@
                         <div class="wt-section-sub text-muted">Thông tin thêm (nếu có)</div>
                     </div>
 
-                    <div class="mt-2">
-                        <textarea name="note"
-                                  class="form-control wt-control"
+                    <div class="tw:mt-2">
+                        <x-ui.input as="textarea" name="note"
+                                  class="wt-control"
                                   rows="4"
-                                  placeholder="Ghi chú...">{{ old('note', $task->note) }}</textarea>
+                                  placeholder="Ghi chú...">{{ old('note', $task->note) }}</x-ui.input>
                     </div>
                 </div>
 
                 {{-- Actions --}}
-                <div class="d-flex flex-wrap gap-2 mt-4">
-                    <button class="btn btn-ego wt-btn">
+                <div class="tw:flex flex-wrap tw:gap-2 tw:mt-6">
+                    <x-ui.button variant="none" size="none" type="submit" class="btn-ego wt-btn">
                         <i class="bi bi-check2-circle"></i> Lưu thay đổi
-                    </button>
+                    </x-ui.button>
 
-                    <a href="{{ route('marketing.reports.weekly-tasks') }}" class="btn btn-ego-soft wt-btn">
+                    <x-ui.button variant="none" size="none" class="btn-ego-soft wt-btn" href="{{ route('marketing.reports.weekly-tasks') }}">
                         Hủy
-                    </a>
+                    </x-ui.button>
                 </div>
 
             </form>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 
 </div>
 @endsection

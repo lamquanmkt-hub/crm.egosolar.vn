@@ -9,22 +9,23 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-   public function up(): void
-{
-    Schema::create('site_planned_materials', function (Blueprint $table) {
-        $table->id();
-        $table->unsignedBigInteger('site_id');
-        $table->unsignedBigInteger('product_id')->nullable(); // vật tư (sản phẩm)
-        $table->string('name')->nullable();   // fallback nếu không chọn product
-        $table->string('unit')->nullable();   // đơn vị
-        $table->integer('qty')->default(0);   // số lượng dự kiến
-        $table->timestamps();
+    public function up(): void
+    {
+        if (! Schema::hasTable('site_planned_materials')) {
+            Schema::create('site_planned_materials', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('site_id');
+                $table->unsignedBigInteger('product_id')->nullable(); // vật tư (sản phẩm)
+                $table->string('name')->nullable();   // fallback nếu không chọn product
+                $table->string('unit')->nullable();   // đơn vị
+                $table->integer('qty')->default(0);   // số lượng dự kiến
+                $table->timestamps();
 
-        $table->index(['site_id']);
-        $table->foreign('site_id')->references('id')->on('sites')->onDelete('cascade');
-    });
-}
-
+                $table->index(['site_id']);
+                $table->foreign('site_id')->references('id')->on('sites')->onDelete('cascade');
+            });
+        }
+    }
 
     /**
      * Reverse the migrations.

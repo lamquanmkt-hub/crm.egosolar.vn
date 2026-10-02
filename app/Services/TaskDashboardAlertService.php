@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Support\SchemaCache;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 final class TaskDashboardAlertService
@@ -17,6 +17,35 @@ final class TaskDashboardAlertService
      * @return array<string, mixed>
      */
     public function snapshot(?int $userId): array
+    {
+        if (! $userId) {
+            return $this->buildSnapshot($userId);
+        }
+
+        /*
+         * EGO_TASK_ALERT_CACHE_V1
+         * Tránh chạy 3-6 query task/notification nhiều lần
+         * trong cùng khoảng thời gian ngắn.
+         */
+        $companyId = 0;
+
+        try {
+            $companyId = (int) \App\Support\EgoCompanyScope::currentId();
+        } catch (\Throwable) {
+            $companyId = 0;
+        }
+
+        $cacheKey = 'ego:task-dashboard-alert:v1:'
+            .$companyId.':'.(int) $userId;
+
+        return Cache::remember(
+            $cacheKey,
+            now()->addSeconds(20),
+            fn (): array => $this->buildSnapshot($userId)
+        );
+    }
+
+    private function buildSnapshot(?int $userId): array
     {
         $result = [
             'display_count' => 0,
@@ -201,7 +230,7 @@ final class TaskDashboardAlertService
         int $limit
     ): array {
         if (
-            ! Schema::hasTable(
+            ! SchemaCache::hasTable(
                 'task_notifications'
             )
         ) {
@@ -209,7 +238,7 @@ final class TaskDashboardAlertService
         }
 
         $columns =
-            Schema::getColumnListing(
+            SchemaCache::columns(
                 'task_notifications'
             );
 
@@ -330,8 +359,7 @@ final class TaskDashboardAlertService
                             ?? 0
                         ),
 
-                        'task_id' =>
-                            $taskId > 0
+                        'task_id' => $taskId > 0
                                 ? $taskId
                                 : null,
 
@@ -351,14 +379,12 @@ final class TaskDashboardAlertService
 
                         'link' => $link,
 
-                        'time_label' =>
-                            $this->formatDateTime(
-                                $row->created_at
-                                ?? null
-                            ),
+                        'time_label' => $this->formatDateTime(
+                            $row->created_at
+                            ?? null
+                        ),
 
-                        'source' =>
-                            'notification',
+                        'source' => 'notification',
                     ];
                 }
             )
@@ -370,7 +396,7 @@ final class TaskDashboardAlertService
         int $userId
     ): int {
         if (
-            ! Schema::hasTable(
+            ! SchemaCache::hasTable(
                 'task_notifications'
             )
         ) {
@@ -378,7 +404,7 @@ final class TaskDashboardAlertService
         }
 
         $columns =
-            Schema::getColumnListing(
+            SchemaCache::columns(
                 'task_notifications'
             );
 
@@ -450,7 +476,7 @@ final class TaskDashboardAlertService
         int $limit
     ): array {
         if (
-            ! Schema::hasTable('tasks')
+            ! SchemaCache::hasTable('tasks')
         ) {
             return [
                 'count' => 0,
@@ -459,7 +485,7 @@ final class TaskDashboardAlertService
         }
 
         $columns =
-            Schema::getColumnListing(
+            SchemaCache::columns(
                 'tasks'
             );
 
@@ -510,7 +536,7 @@ final class TaskDashboardAlertService
                 : 'assignee_id';
 
         $hasActor =
-            Schema::hasTable('users')
+            SchemaCache::hasTable('users')
             && in_array(
                 $actorColumn,
                 $columns,
@@ -664,11 +690,9 @@ final class TaskDashboardAlertService
                     }
 
                     return [
-                        'id' =>
-                            (int) $row->id,
+                        'id' => (int) $row->id,
 
-                        'task_id' =>
-                            (int) $row->id,
+                        'task_id' => (int) $row->id,
 
                         'title' => trim(
                             (string) (
@@ -677,21 +701,18 @@ final class TaskDashboardAlertService
                             )
                         ),
 
-                        'message' =>
-                            implode(
-                                ' · ',
-                                $messageParts
-                            ),
+                        'message' => implode(
+                            ' · ',
+                            $messageParts
+                        ),
 
-                        'link' =>
-                            $this->taskUrl(
-                                (int) $row->id
-                            ),
+                        'link' => $this->taskUrl(
+                            (int) $row->id
+                        ),
 
-                        'time_label' =>
-                            ! empty(
-                                $row->due_at
-                            )
+                        'time_label' => ! empty(
+                            $row->due_at
+                        )
                                 ? 'Hạn '
                                     .$this->formatDateTime(
                                         $row->due_at
@@ -784,8 +805,7 @@ final class TaskDashboardAlertService
             'rejected' => 'Bị từ chối',
             'approved' => 'Đã duyệt',
 
-            default =>
-                $status !== ''
+            default => $status !== ''
                     ? $status
                     : 'Chưa xác định',
         };

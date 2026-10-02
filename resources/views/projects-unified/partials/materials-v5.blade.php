@@ -29,7 +29,7 @@
 
             <div class="ego-material-table" data-material-rows>
                 <div class="head"><span>Tên vật tư</span><span>Model / Quy cách</span><span>Số lượng</span><span>Đơn vị</span><span>Ghi chú</span><span></span></div>
-                <div class="row" data-material-row>
+                <div class="tw:row" data-material-row>
                     <input name="items[0][name]" required placeholder="Tên vật tư">
                     <input name="items[0][spec]" placeholder="Model / quy cách">
                     <input type="number" step="0.01" min="0.01" name="items[0][qty]" required placeholder="SL">

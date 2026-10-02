@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Khách hàng - Chăm sóc & Pipeline')
+@section('title', 'Báo cáo dữ liệu khách hàng')
 
 @section('content')
 @php
@@ -1628,8 +1628,8 @@ body.ego-modal-open {
 <div class="ego-sales-page">
     <div class="ego-header">
         <div>
-            <h1 class="ego-title">Khách hàng</h1>
-            <div class="ego-subtitle">Chăm sóc, follow-up và theo dõi pipeline khách hàng</div>
+            <h1 class="ego-title">Báo cáo dữ liệu khách hàng</h1>
+            <div class="ego-subtitle">Theo dõi, quản lý và báo cáo dữ liệu khách hàng của bạn</div>
         </div>
 
         <div class="ego-actions">
@@ -1637,34 +1637,32 @@ body.ego-modal-open {
                 <i class="bi bi-download"></i> Xuất CSV
             </a>
             <a class="ego-btn ego-btn-primary" href="{{ route('sales.work-reports.create') }}">
-                <i class="bi bi-plus-lg"></i> Thêm data chăm sóc
+                <i class="bi bi-plus-lg"></i> Thêm khách hàng
             </a>
         </div>
     </div>
 
-    @include('customers._module_nav')
-
     <div class="ego-toolbar">
         <div class="ego-tabs">
-            <a class="ego-tab {{ !request('customer_type') && !request('status') && !request('quick') && !request('period') ? 'active' : '' }}" href="{{ route('customers.pipeline') }}">
+            <a class="ego-tab {{ !request('quick') && !request('period') ? 'active' : '' }}" href="{{ route('sales.work-reports.index') }}">
                 Tất cả <span class="ego-count">{{ $reports->total() }}</span>
             </a>
-            <a class="ego-tab {{ request('customer_type') === 'turnkey' ? 'active' : '' }}" href="{{ route('customers.pipeline', ['customer_type' => 'turnkey']) }}">
+            <a class="ego-tab {{ request('quick') === 'turnkey' ? 'active' : '' }}" href="{{ route('sales.work-reports.index', ['customer_type' => 'turnkey']) }}">
                 Khách lắp đặt trọn gói
             </a>
-            <a class="ego-tab {{ request('customer_type') === 'dealer' ? 'active' : '' }}" href="{{ route('customers.pipeline', ['customer_type' => 'dealer']) }}">
+            <a class="ego-tab {{ request('quick') === 'dealer' ? 'active' : '' }}" href="{{ route('sales.work-reports.index', ['customer_type' => 'dealer']) }}">
                 Đại lý sản phẩm
             </a>
-            <a class="ego-tab {{ request('status') === 'consulting' ? 'active' : '' }}" href="{{ route('customers.pipeline', ['status' => 'consulting']) }}">
+            <a class="ego-tab {{ request('quick') === 'consulting' ? 'active' : '' }}" href="{{ route('sales.work-reports.index', ['status' => 'consulting']) }}">
                 Đang chăm sóc
             </a>
-            <a class="ego-tab {{ request('quick') === 'quote_sent' ? 'active' : '' }}" href="{{ route('customers.pipeline', ['quick' => 'quote_sent']) }}">
+            <a class="ego-tab {{ request('quick') === 'quote_sent' ? 'active' : '' }}" href="{{ route('sales.work-reports.index', ['quick' => 'quote_sent']) }}">
                 Đã gửi báo giá <span class="ego-count">{{ $stats['quote_sent'] ?? 0 }}</span>
             </a>
-            <a class="ego-tab {{ request('status') === 'won' ? 'active' : '' }}" href="{{ route('customers.pipeline', ['status' => 'won']) }}">
+            <a class="ego-tab {{ request('quick') === 'won' ? 'active' : '' }}" href="{{ route('sales.work-reports.index', ['status' => 'won']) }}">
                 Đã chốt
             </a>
-            <a class="ego-tab {{ request('status') === 'new' ? 'active' : '' }}" href="{{ route('customers.pipeline', ['status' => 'new']) }}">
+            <a class="ego-tab {{ request('quick') === 'new' ? 'active' : '' }}" href="{{ route('sales.work-reports.index', ['status' => 'new']) }}">
                 Khách hàng cũ
             </a>
         </div>
@@ -1712,7 +1710,7 @@ body.ego-modal-open {
                 <div class="ego-list-head">
                     <div>
                         <h2 class="ego-list-title">
-                            <i class="bi bi-people text-success"></i> Danh sách khách hàng
+                            <i class="bi bi-people tw:text-[#198754]!"></i> Danh sách khách hàng
                         </h2>
                         <div class="ego-list-note">Bấm tên nhân viên để ẩn/hiện danh sách khách hàng phụ trách.</div>
                     </div>
@@ -1745,7 +1743,7 @@ body.ego-modal-open {
                                                 <span class="ego-staff-toggle-icon">{{ $firstInitial }}</span>
                                                 <span>
                                                     <span class="ego-staff-toggle-name">{{ $salesName }}</span>
-                                                    <span class="ego-list-note d-block">Tên nhân viên phụ trách</span>
+                                                    <span class="ego-list-note tw:block">Tên nhân viên phụ trách</span>
                                                 </span>
                                             </span>
                                             <span class="ego-staff-toggle-count">
@@ -1792,7 +1790,7 @@ body.ego-modal-open {
                                 <tr>
                                     <td colspan="6">
                                         <div class="empty-state">
-                                            <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                                            <i class="bi bi-inbox fs-3 tw:block tw:mb-2"></i>
                                             Chưa có dữ liệu phù hợp.
                                         </div>
                                     </td>
@@ -1810,7 +1808,7 @@ body.ego-modal-open {
             <aside class="ego-right">
                 <div class="detail-shell" id="customerDetail">
                     <div class="empty-state">
-                        <div class="spinner-border text-success mb-3" role="status"></div>
+                        <div class="spinner-border tw:text-[#198754] tw:mb-4" role="status"></div>
                         <div class="fw-bold">Đang tải chi tiết khách hàng...</div>
                     </div>
                 </div>
@@ -2234,7 +2232,7 @@ body.ego-modal-open {
                     <div class="timeline-title">${esc(item.title || item.action_type)}</div>
                     <div class="timeline-text">${esc(item.created_at_text)} · ${esc(item.creator_name)}</div>
                     <div class="timeline-text">${nl(item.content)}</div>
-                    <div class="timeline-text text-success fw-bold">Hẹn xử lý: ${esc(item.followup_at_text)}</div>
+                    <div class="timeline-text tw:text-[#198754]! fw-bold">Hẹn xử lý: ${esc(item.followup_at_text)}</div>
                 </div>
             </div>
         `).join('');
@@ -2268,7 +2266,7 @@ body.ego-modal-open {
                         <div>
                             <h2 class="detail-name">${esc(r.customer_name)}</h2>
                             <div class="detail-code">${esc(code)}</div>
-                            <div class="d-flex flex-wrap gap-1 mt-2">
+                            <div class="d-flex flex-wrap tw:gap-1 tw:mt-2">
                                 <span class="ego-badge green">${esc(r.customer_type_label)}</span>
                                 <span class="ego-badge blue">${esc(r.status_label)}</span>
                                 <span class="ego-badge orange">${esc(r.priority_label)}</span>
@@ -2278,9 +2276,9 @@ body.ego-modal-open {
                 </div>
 
                 <div class="detail-contact">
-                    <div><i class="bi bi-telephone text-success"></i> <b>${esc(r.customer_phone)}</b></div>
-                    <div><i class="bi bi-envelope text-primary"></i> ${esc(r.customer_email)}</div>
-                    <div><i class="bi bi-geo-alt text-danger"></i> ${esc(r.customer_address || r.region_text)}</div>
+                    <div><i class="bi bi-telephone tw:text-[#198754]!"></i> <b>${esc(r.customer_phone)}</b></div>
+                    <div><i class="bi bi-envelope tw:text-[#0d6efd]!"></i> ${esc(r.customer_email)}</div>
+                    <div><i class="bi bi-geo-alt tw:text-[#dc3545]!"></i> ${esc(r.customer_address || r.region_text)}</div>
                 </div>
             </div>
 
@@ -2328,7 +2326,7 @@ body.ego-modal-open {
             <div class="detail-body">
                 <div class="customer-summary-box">
                     <div class="customer-summary-title">
-                        <i class="bi bi-stars text-success"></i> Tóm tắt chăm sóc
+                        <i class="bi bi-stars tw:text-[#198754]!"></i> Tóm tắt chăm sóc
                     </div>
                     <div class="customer-summary-text">
                         <b>${esc(r.customer_name)}</b> - ${esc(r.customer_type_label)}.
@@ -2343,7 +2341,7 @@ body.ego-modal-open {
                     <div>
                         <div class="info-card">
                             <div class="info-title">
-                                <span><i class="bi bi-person-vcard text-success"></i> Thông tin nhanh</span>
+                                <span><i class="bi bi-person-vcard tw:text-[#198754]!"></i> Thông tin nhanh</span>
                                 <a class="edit-mini" href="${editUrl}">
                                     <i class="bi bi-pencil"></i> Sửa
                                 </a>
@@ -2357,7 +2355,7 @@ body.ego-modal-open {
 
                         <div class="info-card">
                             <div class="info-title">
-                                <span><i class="bi bi-lightning-charge text-warning"></i> Nhu cầu & tư vấn</span>
+                                <span><i class="bi bi-lightning-charge tw:text-[#ffc107]!"></i> Nhu cầu & tư vấn</span>
                                 <a class="edit-mini" href="${editUrl}">
                                     <i class="bi bi-pencil"></i> Sửa
                                 </a>
@@ -2372,7 +2370,7 @@ body.ego-modal-open {
 
                         <div class="info-card">
                             <div class="info-title">
-                                <span><i class="bi bi-house-gear text-primary"></i> Dự án liên quan</span>
+                                <span><i class="bi bi-house-gear tw:text-[#0d6efd]!"></i> Dự án liên quan</span>
                                 <a class="edit-mini" href="${showUrl}">
                                     <i class="bi bi-eye"></i> Xem
                                 </a>
@@ -2395,7 +2393,7 @@ body.ego-modal-open {
                     <div>
                         <div class="info-card">
                             <div class="info-title">
-                                <span><i class="bi bi-gear text-primary"></i> Thông tin xử lý</span>
+                                <span><i class="bi bi-gear tw:text-[#0d6efd]!"></i> Thông tin xử lý</span>
                                 <a class="edit-mini" href="${editUrl}">
                                     <i class="bi bi-pencil"></i> Sửa
                                 </a>
@@ -2411,7 +2409,7 @@ body.ego-modal-open {
 
                         <div class="info-card">
                             <div class="info-title">
-                                <span><i class="bi bi-telephone text-success"></i> Liên hệ & báo giá</span>
+                                <span><i class="bi bi-telephone tw:text-[#198754]!"></i> Liên hệ & báo giá</span>
                             </div>
                             ${item('Gọi lần 1', `${r.call_1_result_label || '—'} - ${r.call_1_at_text || '—'}`)}
                             ${item('Gọi lần 2', `${r.call_2_result_label || '—'} - ${r.call_2_at_text || '—'}`)}
@@ -2424,14 +2422,14 @@ body.ego-modal-open {
 
                         <div class="info-card">
                             <div class="info-title">
-                                <span><i class="bi bi-clock-history text-success"></i> Lịch sử liên hệ</span>
+                                <span><i class="bi bi-clock-history tw:text-[#198754]!"></i> Lịch sử liên hệ</span>
                             </div>
                             ${timelineHtml(history)}
                         </div>
 
                         <div class="info-card">
                             <div class="info-title">
-                                <span><i class="bi bi-chat-left-dots text-info"></i> Ghi chú DB</span>
+                                <span><i class="bi bi-chat-left-dots tw:text-[#0dcaf0]!"></i> Ghi chú DB</span>
                             </div>
                             ${followupHtml(followups)}
                         </div>
@@ -2452,7 +2450,7 @@ body.ego-modal-open {
 
         detailBox.innerHTML = `
             <div class="empty-state">
-                <div class="spinner-border text-success mb-3" role="status"></div>
+                <div class="spinner-border tw:text-[#198754] tw:mb-4" role="status"></div>
                 <div class="fw-bold">Đang tải chi tiết khách hàng...</div>
             </div>
         `;
@@ -2469,10 +2467,10 @@ body.ego-modal-open {
             render(await res.json());
         } catch (err) {
             detailBox.innerHTML = `
-                <div class="empty-state text-danger">
-                    <i class="bi bi-exclamation-triangle fs-2 d-block mb-2"></i>
+                <div class="empty-state tw:text-[#dc3545]!">
+                    <i class="bi bi-exclamation-triangle fs-2 tw:block tw:mb-2"></i>
                     Không tải được chi tiết khách hàng.
-                    <div class="small text-muted mt-1">${esc(err.message)}</div>
+                    <div class="small tw:text-[rgba(33,37,41,0.75)] tw:mt-1">${esc(err.message)}</div>
                 </div>
             `;
         }
@@ -2490,7 +2488,7 @@ body.ego-modal-open {
     } else {
         detailBox.innerHTML = `
             <div class="empty-state">
-                <i class="bi bi-person-lines-fill fs-2 d-block mb-2"></i>
+                <i class="bi bi-person-lines-fill fs-2 tw:block tw:mb-2"></i>
                 Chọn một khách hàng để xem chi tiết.
             </div>
         `;
@@ -2891,7 +2889,7 @@ body.ego-modal-open {
                 const data = await res.json();
                 const errors = data.errors || {};
                 const list = Object.values(errors).flat().map(msg => `<li>${msg}</li>`).join('');
-                showError(`<b>Vui lòng kiểm tra lại thông tin:</b><ul class="mb-0 mt-1">${list}</ul>`);
+                showError(`<b>Vui lòng kiểm tra lại thông tin:</b><ul class="mb-0 tw:mt-1">${list}</ul>`);
                 return;
             }
 
@@ -2986,7 +2984,7 @@ body.ego-modal-open {
                     <div class="timeline-title">${esc(item.title || item.action_type)}</div>
                     <div class="timeline-text">${esc(item.created_at_text)} · ${esc(item.creator_name)}</div>
                     <div class="timeline-text">${nl(item.content)}</div>
-                    <div class="timeline-text text-success fw-bold">Hẹn xử lý: ${esc(item.followup_at_text)}</div>
+                    <div class="timeline-text tw:text-[#198754]! fw-bold">Hẹn xử lý: ${esc(item.followup_at_text)}</div>
                 </div>
             </div>
         `).join('');
@@ -3021,7 +3019,7 @@ body.ego-modal-open {
             <div class="note-line">
                 <div class="note-label">${esc(note.label)}</div>
                 <div class="note-content">${nl(note.content)}</div>
-                ${note.meta ? `<div class="timeline-text mt-1">${esc(note.meta)}</div>` : ''}
+                ${note.meta ? `<div class="timeline-text tw:mt-1">${esc(note.meta)}</div>` : ''}
             </div>
         `).join('');
     }
@@ -3055,7 +3053,7 @@ body.ego-modal-open {
                         <div>
                             <h2 class="detail-name">${esc(r.customer_name)}</h2>
                             <div class="detail-code">${esc(code)}</div>
-                            <div class="d-flex flex-wrap gap-1 mt-2">
+                            <div class="d-flex flex-wrap tw:gap-1 tw:mt-2">
                                 <span class="ego-badge green">${esc(r.customer_type_label)}</span>
                                 <span class="ego-badge blue">${esc(r.status_label)}</span>
                                 <span class="ego-badge orange">${esc(r.priority_label)}</span>
@@ -3065,9 +3063,9 @@ body.ego-modal-open {
                 </div>
 
                 <div class="detail-contact">
-                    <div><i class="bi bi-telephone text-success"></i> <b>${esc(r.customer_phone)}</b></div>
-                    <div><i class="bi bi-envelope text-primary"></i> ${esc(r.customer_email)}</div>
-                    <div><i class="bi bi-geo-alt text-danger"></i> ${esc(r.customer_address || r.region_text)}</div>
+                    <div><i class="bi bi-telephone tw:text-[#198754]!"></i> <b>${esc(r.customer_phone)}</b></div>
+                    <div><i class="bi bi-envelope tw:text-[#0d6efd]!"></i> ${esc(r.customer_email)}</div>
+                    <div><i class="bi bi-geo-alt tw:text-[#dc3545]!"></i> ${esc(r.customer_address || r.region_text)}</div>
                 </div>
             </div>
 
@@ -3135,12 +3133,12 @@ body.ego-modal-open {
 
                 <div class="info-card important-note-card" data-detail-panel="info">
                     <div class="info-title">
-                        <span><i class="bi bi-journal-text text-success"></i> Ghi chú sales</span>
+                        <span><i class="bi bi-journal-text tw:text-[#198754]!"></i> Ghi chú sales</span>
                         <a class="edit-mini" href="${editUrl}">
                             <i class="bi bi-pencil"></i> Cập nhật
                         </a>
                     </div>
-                    <div class="timeline-text mb-2">Sales cập nhật nhu cầu thực tế, nội dung tư vấn và phản hồi của khách tại đây.</div>
+                    <div class="timeline-text tw:mb-2">Sales cập nhật nhu cầu thực tế, nội dung tư vấn và phản hồi của khách tại đây.</div>
                     ${importantNotesHtml(r, followups)}
                 </div>
 
@@ -3149,7 +3147,7 @@ body.ego-modal-open {
                     <div>
                         <div class="info-card" data-detail-panel="info">
                             <div class="info-title">
-                                <span><i class="bi bi-person-vcard text-success"></i> Thông tin nhanh</span>
+                                <span><i class="bi bi-person-vcard tw:text-[#198754]!"></i> Thông tin nhanh</span>
                                 <a class="edit-mini" href="${editUrl}">
                                     <i class="bi bi-pencil"></i> Sửa
                                 </a>
@@ -3163,7 +3161,7 @@ body.ego-modal-open {
 
                         <div class="info-card" data-detail-panel="need">
                             <div class="info-title">
-                                <span><i class="bi bi-lightning-charge text-warning"></i> Nhu cầu & tư vấn</span>
+                                <span><i class="bi bi-lightning-charge tw:text-[#ffc107]!"></i> Nhu cầu & tư vấn</span>
                                 <a class="edit-mini" href="${editUrl}">
                                     <i class="bi bi-pencil"></i> Sửa
                                 </a>
@@ -3178,7 +3176,7 @@ body.ego-modal-open {
 
                         <div class="info-card" data-detail-panel="system">
                             <div class="info-title">
-                                <span><i class="bi bi-house-gear text-primary"></i> Dự án liên quan</span>
+                                <span><i class="bi bi-house-gear tw:text-[#0d6efd]!"></i> Dự án liên quan</span>
                                 <a class="edit-mini" href="${showUrl}">
                                     <i class="bi bi-eye"></i> Xem
                                 </a>
@@ -3201,7 +3199,7 @@ body.ego-modal-open {
                     <div>
                         <div class="info-card" data-detail-panel="system">
                             <div class="info-title">
-                                <span><i class="bi bi-gear text-primary"></i> Thông tin xử lý</span>
+                                <span><i class="bi bi-gear tw:text-[#0d6efd]!"></i> Thông tin xử lý</span>
                                 <a class="edit-mini" href="${editUrl}">
                                     <i class="bi bi-pencil"></i> Sửa
                                 </a>
@@ -3217,7 +3215,7 @@ body.ego-modal-open {
 
                         <div class="info-card" data-detail-panel="contact">
                             <div class="info-title">
-                                <span><i class="bi bi-telephone text-success"></i> Liên hệ & báo giá</span>
+                                <span><i class="bi bi-telephone tw:text-[#198754]!"></i> Liên hệ & báo giá</span>
                             </div>
                             ${item('Gọi lần 1', `${r.call_1_result_label || '—'} - ${r.call_1_at_text || '—'}`)}
                             ${item('Gọi lần 2', `${r.call_2_result_label || '—'} - ${r.call_2_at_text || '—'}`)}
@@ -3230,14 +3228,14 @@ body.ego-modal-open {
 
                         <div class="info-card" data-detail-panel="contact">
                             <div class="info-title">
-                                <span><i class="bi bi-clock-history text-success"></i> Lịch sử liên hệ</span>
+                                <span><i class="bi bi-clock-history tw:text-[#198754]!"></i> Lịch sử liên hệ</span>
                             </div>
                             ${timelineHtml(history)}
                         </div>
 
                         <div class="info-card important-note-card" data-detail-panel="note">
                             <div class="info-title">
-                                <span><i class="bi bi-chat-left-dots text-info"></i> Nhật ký chăm sóc</span>
+                                <span><i class="bi bi-chat-left-dots tw:text-[#0dcaf0]!"></i> Nhật ký chăm sóc</span>
                                 <a class="edit-mini" href="${editUrl}">
                                     <i class="bi bi-pencil"></i> Thêm ghi chú
                                 </a>
@@ -3286,7 +3284,7 @@ body.ego-modal-open {
 
         detailBox.innerHTML = `
             <div class="empty-state">
-                <div class="spinner-border text-success mb-3" role="status"></div>
+                <div class="spinner-border tw:text-[#198754] tw:mb-4" role="status"></div>
                 <div class="fw-bold">Đang tải chi tiết khách hàng...</div>
             </div>
         `;
@@ -3305,10 +3303,10 @@ body.ego-modal-open {
             renderCustomerDetail(await res.json());
         } catch (err) {
             detailBox.innerHTML = `
-                <div class="empty-state text-danger">
-                    <i class="bi bi-exclamation-triangle fs-2 d-block mb-2"></i>
+                <div class="empty-state tw:text-[#dc3545]!">
+                    <i class="bi bi-exclamation-triangle fs-2 tw:block tw:mb-2"></i>
                     Không tải được chi tiết khách hàng.
-                    <div class="small text-muted mt-1">${esc(err.message)}</div>
+                    <div class="small tw:text-[rgba(33,37,41,0.75)] tw:mt-1">${esc(err.message)}</div>
                 </div>
             `;
         }
@@ -3353,9 +3351,9 @@ body.ego-modal-open {
 
     detailBox.innerHTML = `
         <div class="empty-state">
-            <i class="bi bi-person-lines-fill fs-2 d-block mb-2"></i>
+            <i class="bi bi-person-lines-fill fs-2 tw:block tw:mb-2"></i>
             <div class="fw-bold">Chọn nhân viên để mở danh sách khách hàng</div>
-            <div class="small text-muted mt-1">Sau đó bấm vào khách hàng để xem chi tiết.</div>
+            <div class="small tw:text-[rgba(33,37,41,0.75)] tw:mt-1">Sau đó bấm vào khách hàng để xem chi tiết.</div>
         </div>
     `;
 })();

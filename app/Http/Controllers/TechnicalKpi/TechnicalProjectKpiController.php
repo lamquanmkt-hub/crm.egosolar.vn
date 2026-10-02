@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Projects\Site;
 use App\Services\TechnicalKpi\ProjectKpiLinkService;
 use App\Support\SchemaCache;
+use App\View\Presenters\Technical\TechnicalProjectKpiPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,20 +14,32 @@ class TechnicalProjectKpiController extends Controller
 {
     public function __construct(private readonly ProjectKpiLinkService $projectKpi) {}
 
-    public function show(Request $request, Site $site)
+    public function show(Request $request, Site $site, TechnicalProjectKpiPresenter $presenter)
     {
         $month = $this->month($request);
         $users = $this->projectKpi->projectUsers((int) $site->id);
         $evidence = $this->projectKpi->evidenceForProject((int) $site->id, $month);
         $canManage = auth()->check() && auth()->user()->hasAnyRole(['admin', 'manager', 'management', 'technical_manager']);
 
-        $signals = [];
-        foreach ($users as $user) {
-            $projects = $this->projectKpi->projectsForUserMonth((int) $user->id, $month);
-            $signals[$user->id] = $projects->firstWhere('site_id', (int) $site->id);
-        }
+        // Trước đây: một lượt `projectsForUserMonth()` cho MỖI kỹ sư rồi `firstWhere('site_id')`
+        // — đo được `13 + 3·E + E·K` truy vấn (Θ(E·K)), phần lớn dữ liệu lấy về rồi bỏ.
+        // Nay lọc theo công trình ngay trong SQL: số truy vấn không đổi theo E và K.
+        $signals = $this->projectKpi->signalsForProjectUsers(
+            (int) $site->id,
+            $users->pluck('id')->map(fn ($id) => (int) $id)->all(),
+            $month
+        );
 
-        return view('kythuat.kpi_project', compact('site', 'month', 'users', 'evidence', 'signals', 'canManage'));
+        return view('kythuat.kpi_project', array_merge(
+            compact('site', 'month', 'users', 'evidence', 'signals', 'canManage'),
+            $presenter->viewData(
+                site: $site,
+                users: $users,
+                evidence: $evidence,
+                signals: $signals,
+                engineerCount: $users->count(),
+            )
+        ));
     }
 
     public function save(Request $request, Site $site)
@@ -48,13 +61,14 @@ class TechnicalProjectKpiController extends Controller
             'evidence.*.note' => ['nullable', 'string', 'max:3000'],
         ]);
 
-        $allowedIds = $this->projectKpi->projectUsers((int) $site->id)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        // `array_flip` để tra bằng KHOÁ (O(1)) thay vì `in_array` quét tuyến tính trong vòng lặp.
+        $allowedIds = array_flip($this->projectKpi->projectUsers((int) $site->id)->pluck('id')->map(fn ($id) => (int) $id)->all());
         $now = now();
 
         DB::transaction(function () use ($data, $allowedIds, $site, $month, $now) {
             foreach (($data['evidence'] ?? []) as $userId => $row) {
                 $userId = (int) $userId;
-                if (! in_array($userId, $allowedIds, true)) {
+                if (! isset($allowedIds[$userId])) {
                     continue;
                 }
 

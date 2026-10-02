@@ -7,18 +7,26 @@ use App\Models\User;
 class AttendanceCorrectionAccessService
 {
     /**
-     * Chỉ tài khoản có role HR mới được xem hàng chờ và xử lý yêu cầu sửa công.
-     *
-     * Lưu ý: quyền này cố ý KHÔNG kế thừa từ admin hay permission rời.
-     * Nhân viên thuộc mọi role vẫn có thể gửi yêu cầu sửa công của chính mình
-     * thông qua route store (route đó chỉ yêu cầu đăng nhập).
+     * Chỉ HR, admin hoặc người được cấp quyền riêng mới xử lý sửa công.
      */
     public function canReview(?User $user): bool
     {
-        if (! $user || ! method_exists($user, 'hasRole')) {
+        if (! $user) {
             return false;
         }
 
-        return $user->hasRole('hr');
+        if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'hr'])) {
+            return true;
+        }
+
+        if (method_exists($user, 'hasPermissionTo')) {
+            try {
+                return $user->hasPermissionTo('hr.attendance_correction.manage');
+            } catch (\Throwable $e) {
+                // Permission có thể chưa được đồng bộ trong lần deploy đầu tiên.
+            }
+        }
+
+        return false;
     }
 }

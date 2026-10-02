@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\CRM\Orders\Order;
+use App\Models\Projects\Site;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -44,7 +44,6 @@ class SolarWarrantyClaim extends Model
 
     public const TYPES = [
         'warranty' => 'Bảo hành thiết bị',
-        'replacement' => 'Đề xuất đổi hàng bảo hành',
         'incident' => 'Sự cố hệ thống',
         'paid_repair' => 'Sửa chữa tính phí',
         'inspection' => 'Kiểm tra kỹ thuật',
@@ -89,12 +88,7 @@ class SolarWarrantyClaim extends Model
 
     public function site(): BelongsTo
     {
-        return $this->belongsTo(Site::class, 'site_id')->withoutGlobalScopes();
-    }
-
-    public function order(): BelongsTo
-    {
-        return $this->belongsTo(Order::class, 'order_id')->withoutGlobalScopes();
+        return $this->belongsTo(Site::class, 'site_id');
     }
 
     public function schedule(): BelongsTo

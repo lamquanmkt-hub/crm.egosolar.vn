@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller quản lý quy trình phỏng vấn ứng viên (các đợt và ứng viên trong từng đợt).
@@ -170,7 +170,7 @@ class CandidateProcessController extends Controller
      */
     private function ensureDefaultRounds()
     {
-        if (! Schema::hasTable('hr_candidate_process_rounds')) {
+        if (! SchemaCache::hasTable('hr_candidate_process_rounds')) {
             return;
         }
 

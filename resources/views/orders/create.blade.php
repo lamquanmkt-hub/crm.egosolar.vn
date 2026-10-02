@@ -1,20 +1,10 @@
+{{-- Hai con số badge (đơn chờ duyệt, phiếu vật tư chờ duyệt) do
+     App\Services\System\SidebarStatusService cấp cho partials.sidebar qua view
+     composer. Trước đây đúng chỗ này có một khối 16 dòng CHÉP QUA 9 VIEW tự chạy
+     lại hai câu COUNT rồi nuốt lỗi bằng catch(Throwable). Giá trị nó tính ra bị
+     composer ghi đè nên không hiển thị ở đâu — chỉ tốn 2 câu truy vấn mỗi lần
+     dựng trang. --}}
 @php
-    $egoPendingOrdersCount = $egoPendingOrdersCount ?? 0;
-    $egoPendingMaterialRequestsCount = $egoPendingMaterialRequestsCount ?? 0;
-
-    try {
-        $egoPendingOrdersCount = (int) \Illuminate\Support\Facades\DB::table('crm_order_approvals')
-            ->where('status', 'pending')
-            ->distinct()
-            ->count('order_id');
-
-        $egoPendingMaterialRequestsCount = (int) \Illuminate\Support\Facades\DB::table('material_requests')
-            ->whereIn('status', ['SUBMITTED', 'ADMIN_APPROVED'])
-            ->count();
-    } catch (\Throwable $e) {
-        $egoPendingOrdersCount = 0;
-        $egoPendingMaterialRequestsCount = 0;
-    }
 
     $orderCreatePriceTiersJs = collect($priceTiers ?? [])
         ->map(function ($tier) {
@@ -36,11 +26,24 @@
     <link rel="stylesheet" href="{{ asset('css/order-create-pro-v4.css') }}?v={{ filemtime(public_path('css/order-create-pro-v4.css')) }}">
 
     @once
+        {{-- Đã bỏ thẻ <script> tom-select@2.3.1 ở đây, GIỮ LẠI thẻ CSS. Lý do tách đôi:
+
+             - JS: layout nạp bản 2.6.1 (URL không ghim phiên bản) SAU thẻ này, mà
+               mọi chỗ dùng TomSelect trên trang đều chạy trong DOMContentLoaded.
+               Nên bản 2.6.1 vẫn là bản thực thi; thẻ 2.3.1 chỉ tải thừa một tệp.
+
+             - CSS thì KHÔNG bỏ được: layout nạp tom-select.css ở đầu <head>, còn thẻ
+               này nằm trong <body> nên đang thắng cascade trước CSS của ứng dụng.
+               Bỏ đi thì luật của app thắng và ô chọn khách hàng đổi padding-top
+               0px -> 9px (đã đo bằng getComputedStyle). Muốn bỏ hẳn thì phải sửa
+               CSS ứng dụng trước, không phải việc của đợt này. --}}
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
-        <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     @endonce
 
-    <div class="container-fluid ego-order oc-shell">
+    {{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+         thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+         quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+    <div class="container-fluid ego-order oc-shell tw:py-4">
         <header class="oc-header">
             <div class="oc-header-copy">
                 <span class="oc-eyebrow">Đơn hàng mới</span>

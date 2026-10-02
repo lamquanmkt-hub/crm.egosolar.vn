@@ -9,17 +9,23 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
- public function up(): void
-{
-    Schema::table('crm_payments', function (Blueprint $table) {
-        $table->string('note', 500)->nullable()->after('method_id');
-    });
-}
+    public function up(): void
+    {
+        if (Schema::hasTable('crm_payments')) {
+            Schema::table('crm_payments', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_payments', 'note')) {
+                    $table->string('note', 500)->nullable()->after('method_id');
+                }
+            });
+        }
+    }
 
-public function down(): void
-{
-    Schema::table('crm_payments', function (Blueprint $table) {
-        $table->dropColumn('note');
-    });
-}
+    public function down(): void
+    {
+        if (Schema::hasTable('crm_payments')) {
+            Schema::table('crm_payments', function (Blueprint $table) {
+                $table->dropColumn('note');
+            });
+        }
+    }
 };

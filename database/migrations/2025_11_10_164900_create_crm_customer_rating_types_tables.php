@@ -11,26 +11,30 @@ return new class extends Migration
      */
     public function up(): void
     {
-	    // Bảng định nghĩa các loại đánh giá
-	    Schema::create('crm_customer_rating_types', function (Blueprint $table) {
-		    $table->id();
-		    $table->string('name', 100)->unique(); // Xịn / Tiềm năng / Không tiềm năng
-		    $table->string('color_code', 10)->nullable();
-		    $table->integer('priority')->default(0); // Độ ưu tiên
-	    });
+        // Bảng định nghĩa các loại đánh giá
+        if (! Schema::hasTable('crm_customer_rating_types')) {
+            Schema::create('crm_customer_rating_types', function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 100)->unique(); // Xịn / Tiềm năng / Không tiềm năng
+                $table->string('color_code', 10)->nullable();
+                $table->integer('priority')->default(0); // Độ ưu tiên
+            });
+        }
 
-	    // Bảng lưu lịch sử đánh giá khách hàng
-	    Schema::create('crm_customer_ratings', function (Blueprint $table) {
-		    $table->id();
-		    $table->foreignId('customer_id')->constrained('crm_customers')->cascadeOnDelete();
-		    $table->foreignId('rating_type_id')->constrained('crm_customer_rating_types')->cascadeOnDelete();
-		    $table->text('note')->nullable();
-		    $table->foreignId('rated_by')->nullable()->constrained('users')->nullOnDelete();
-		    $table->timestamps();
+        // Bảng lưu lịch sử đánh giá khách hàng
+        if (! Schema::hasTable('crm_customer_ratings')) {
+            Schema::create('crm_customer_ratings', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('customer_id')->constrained('crm_customers')->cascadeOnDelete();
+                $table->foreignId('rating_type_id')->constrained('crm_customer_rating_types')->cascadeOnDelete();
+                $table->text('note')->nullable();
+                $table->foreignId('rated_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->timestamps();
 
-		    // Index để truy vấn nhanh đánh giá mới nhất của khách
-		    $table->index(['customer_id', 'created_at']);
-	    });
+                // Index để truy vấn nhanh đánh giá mới nhất của khách
+                $table->index(['customer_id', 'created_at']);
+            });
+        }
     }
 
     /**
@@ -38,7 +42,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-	    Schema::dropIfExists('crm_customer_ratings');
-	    Schema::dropIfExists('crm_customer_rating_types');
+        Schema::dropIfExists('crm_customer_ratings');
+        Schema::dropIfExists('crm_customer_rating_types');
     }
 };

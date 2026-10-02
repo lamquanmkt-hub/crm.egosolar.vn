@@ -3,11 +3,11 @@
 namespace App\Services\Technical;
 
 use App\Models\Core\Warehouse;
-use App\Models\Site;
+use App\Models\Projects\Site;
 use App\Models\SolarWarrantyClaim;
 use App\Models\SolarWarrantyStockMovement;
 use App\Models\User;
-use App\Support\Synced\EgoCompanyScope;
+use App\Support\EgoCompanyScope;
 use App\Support\SchemaCache;
 use App\Support\SolarMaintenanceAccess;
 use Illuminate\Database\Eloquent\Builder;
@@ -154,7 +154,7 @@ class SolarWarrantyQueryService
     public function documentSites(User $user)
     {
         $companyId = EgoCompanyScope::currentId();
-        $query = Site::withoutGlobalScopes()
+        $query = Site::query()
             ->select(['sites.id', 'sites.name', 'sites.contact_name', 'sites.address', 'sites.company_id']);
 
         if (SchemaCache::hasTable('solar_site_documents')) {

@@ -13,23 +13,100 @@ return [
     | Các quyền nhạy cảm luôn được kiểm tra từ backend,
     | kể cả role chưa bật toàn bộ ma trận quyền truy cập trang.
     */
+    /*
+    | User KHÔNG được gán role nào thì luôn bị kiểm soát quyền trang (mặc định).
+    |
+    | Đặt false để quay lại hành vi cũ — nhưng nhớ rằng hành vi cũ mở gần như
+    | toàn bộ hệ thống cho tài khoản không role, kể cả trang Cài đặt.
+    */
+    'enforce_users_without_role' => env('EGO_ENFORCE_USERS_WITHOUT_ROLE', true),
+
+    /*
+    | Chặn đăng nhập với tài khoản is_active = 0.
+    |
+    | MẶC ĐỊNH TẮT vì dữ liệu is_active trên production chưa đáng tin: rà ngày
+    | 2026-08-05 có 4 tài khoản mang role nhưng is_active = 0, trong đó một tài
+    | khoản admin VẪN ĐANG dùng hệ thống. Bật lên là khoá người đang làm việc.
+    | Dọn dữ liệu bằng `php artisan permissions:audit-users` rồi mới bật.
+    */
+    'enforce_active_account_on_login' => env('EGO_ENFORCE_ACTIVE_LOGIN', false),
+
+    /*
+    | Quyền trang LUÔN được kiểm, kể cả khi pageControlEnabled() trả false.
+    |
+    | Vì sao cần: canAccess() có nhánh "chưa bật kiểm soát thì cho qua" dành cho
+    | role chưa được gán quyền trang nào (legacy_compatibility). Nhánh đó là cửa
+    | mở: một role tạo mới mà quên gán quyền trang sẽ vào được MỌI trang.
+    |
+    | Đo trên production 2026-09-02:
+    |  - `page.finance` chỉ được cấp cho admin, accounting, management. Các role
+    |    khác hiện đã bị chặn khỏi /finance rồi, nên đưa vào đây KHÔNG đổi quyền
+    |    của ai hôm nay — nó chặn trước cho role tạo sau này mà quên gán quyền.
+    |  - `page.payment_requests` thì CỐ Ý KHÔNG đưa vào: cả 13 role đều đã được
+    |    cấp quyền này nên nó không lọc ai cả; lớp chặn thật của module ĐNTT nằm
+    |    trong controller (`canEditPaymentRequest`, lọc `created_by` ở
+    |    `applyCommonFilters`). Thử đưa vào thì 6 test đặc tả của
+    |    PrivilegedPaymentRequestCharacterizationTest đổi 404 -> 403 — đổi hành vi
+    |    thật để đối lấy gần như không thêm an toàn nào.
+    |
+    | Ai đọc mục này khi thêm mới: chỉ đưa vào đây quyền của module nhạy cảm
+    | (tiền, nhân sự, cài đặt), và phải ĐO trên production xem có role thật nào
+    | mất quyền không, rồi chạy full test để xem có đổi hành vi ở đâu.
+    */
     'always_enforce_permissions' => [
         'page.orders',
-        'page.consignments',
+        'page.finance',
     ],
 
-    'protected_roles' => [
-        'admin',
-        'management',
-        'accounting',
-        'warehouse',
-        'sales',
-        'sales_manager',
-        'marketing',
-        'marketing_manager',
-        'ky_thuat',
-        'technical_manager',
-        'hr',
+    /*
+    | Vai trò hệ thống — KHÔNG viết tay ở đây nữa.
+    |
+    | Nguồn sự thật là App\Enums\Role. Trước đây danh sách này chép tay và đã
+    | trôi khỏi thực tế; nay lấy thẳng từ enum để không thể lệch.
+    */
+    'protected_roles' => App\Enums\Role::names(),
+
+    /*
+    |---------------------------------------------------------------------------
+    | Tên role cũ còn nằm trong middleware nhưng KHÔNG tồn tại trong DB
+    |---------------------------------------------------------------------------
+    |
+    | 12 tên dưới đây xuất hiện trong `role:a|b|c` ở 108 route nhưng không có
+    | role nào mang tên đó. Spatie KHÔNG báo lỗi với tên lạ — nó chỉ lặng lẽ
+    | không khớp ai. Vì vậy chúng vô hại về bảo mật nhưng gây hiểu nhầm khi đọc
+    | code: thấy `role:technical|technical|technician` dễ tưởng ba nhóm vào được,
+    | thực tế chỉ `technical`.
+    |
+    | CỐ Ý GIỮ LẠI (chủ hệ thống quyết 2026-08-06) thay vì rà xoá ở 108 route:
+    | rủi ro sửa nhầm cao hơn lợi ích, và có thể sau này tạo thật các role đó.
+    |
+    | Vai trò của danh sách này là làm HÀNG RÀO: mọi tên trong middleware phải
+    | hoặc là role thật (`protected_roles`), hoặc nằm ở đây. Thêm một tên lạ thứ
+    | 13 — thường là lỗi chính tả — sẽ làm test đỏ ngay.
+    | Xem tests/Feature/Auth/RoleNameContractTest.php và `php artisan authz:audit`.
+    |
+    | Ghi chú bên dưới là ĐO THẬT chứ không suy đoán: với mỗi tên, đã đối chiếu
+    | xem trên chính những route dùng nó có role thật nào cùng đứng. Nhờ vậy trả
+    | lời được câu "tên này có role thay thế sẵn chưa".
+    |
+    | 8/12 tên đã có role thật tương đương đứng cùng trên 100% route của nó, tức
+    | xoá đi không đổi ai vào được. 4 tên còn lại (manager, cskh, assistant,
+    | tro_ly) KHÔNG có role tương đương — nếu sau này công ty có nhân sự đúng
+    | những vai đó thì phải tạo role thật, chứ tên trong middleware không tự sinh
+    | ra quyền.
+    |
+    */
+    'legacy_role_aliases' => [
+        /*
+        | 2026-08-06 đã DỌN 10 trong 12 tên: 8 tên có role thật tương đương đứng
+        | cùng trên 100% route của nó nên gỡ thẳng khỏi middleware; 2 tên `cskh`
+        | và `assistant` nay đã thành role thật (xem App\Enums\Role).
+        |
+        | `technical` được ĐỔI TÊN thành `technical` chứ không gỡ, nhờ vậy bốn tên
+        | tiếng Anh vốn không tồn tại (technical, technician, technical_staff,
+        | technical_leader) bỏ đi được mà không mất nhóm nào.
+        */
+        'manager' => 'Quản lý chung — role `management` KHÔNG đứng cùng trên 45 route dùng tên này. Muốn dùng thật phải tạo role `manager` hoặc thêm `management` vào middleware.',
     ],
 
     /*
@@ -40,12 +117,11 @@ return [
     'legacy_role_fallbacks' => [
         'marketing|marketing_manager|admin',
         'marketing|marketing_manager|admin|accounting',
-        'ky_thuat|accounting|admin|warehouse|kho|sales',
-        'ky_thuat|accounting|admin|warehouse|kho|sales|sales',
+        'technical|accounting|admin|warehouse|sales',
         'admin|accounting',
         'admin|accounting|manager',
-        'ky_thuat|accounting|admin|manager',
-        'ky_thuat|technical|technician|technical_staff|technical_leader|technical_manager|accounting|admin|manager|warehouse|kho|sales|sales_manager|cskh',
+        'technical|accounting|admin|manager',
+        'technical|technical_manager|accounting|admin|manager|warehouse|sales|sales_manager|cskh',
     ],
 
     'page_permissions' => [
@@ -76,15 +152,7 @@ return [
             'exact_paths' => [],
             'path_prefixes' => ['/customers', '/customer-profiles'],
         ],
-        'page.consignments' => [
-            'label' => 'Ký gửi hàng hóa',
-            'description' => 'Truy cập hồ sơ giữ hàng cho khách và các đợt giao hàng ký gửi.',
-            'icon' => 'bi-box-seam',
-            'group' => 'Truy cập trang',
-            'routes' => ['customer-consignments.*'],
-            'exact_paths' => [],
-            'path_prefixes' => ['/ky-gui-hang-hoa'],
-        ],        'page.orders' => [
+        'page.orders' => [
             'label' => 'Đơn hàng & Báo giá',
             'description' => 'Truy cập đơn hàng, báo giá, đổi trả và hoàn tiền.',
             'icon' => 'bi-receipt',
@@ -98,9 +166,18 @@ return [
             'description' => 'Truy cập công trình, lắp ráp và quy trình đơn vật tư.',
             'icon' => 'bi-building-gear',
             'group' => 'Truy cập trang',
-            'routes' => ['sites.*', 'sites-v2.*', 'project-test.*', 'projects-unified.*', 'material-requests.*', 'site-assemblies.*'],
+            'routes' => ['sites.*', 'sites-v2.*', 'project-test.*', 'material-requests.*', 'site-assemblies.*'],
             'exact_paths' => ['/theo-doi-trang-thai'],
-            'path_prefixes' => ['/du-an', '/cong-trinh', '/cong-trinh-moi', '/cong-trinh-test-new', '/don-vat-tu'],
+            'path_prefixes' => ['/cong-trinh', '/cong-trinh-moi', '/cong-trinh-test-new', '/don-vat-tu'],
+        ],
+        'page.projects' => [
+            'label' => 'Dự án',
+            'description' => 'Truy cập màn hình dự án hợp nhất, bảo trì - bảo hành và kho bảo hành.',
+            'icon' => 'bi-kanban',
+            'group' => 'Truy cập trang',
+            'routes' => ['projects-unified.*', 'projects.factory.*', 'projects.residential.*'],
+            'exact_paths' => [],
+            'path_prefixes' => ['/du-an'],
         ],
         'page.payment_requests' => [
             'label' => 'Đề nghị thanh toán',
@@ -191,6 +268,14 @@ return [
             'routes' => ['hr.*'],
             'exact_paths' => [],
             'path_prefixes' => ['/nhan-su', '/hr'],
+            'exclude_prefixes' => [
+                // Nhân viên nào đăng nhập cũng được sử dụng chấm công cá nhân
+                '/nhan-su/cham-cong-cua-toi',
+                '/nhan-su/cham-cong/check-in',
+                '/nhan-su/cham-cong/check-out',
+                '/nhan-su/cham-cong/yeu-cau-sua',
+                '/nhan-su/huong-dan-cham-cong',
+            ],
         ],
         'page.chat' => [
             'label' => 'Tin nhắn',
@@ -240,7 +325,6 @@ return [
         ],
     ],
 
-
     /*
     |--------------------------------------------------------------------------
     | Quyền hiển thị menu
@@ -267,12 +351,7 @@ return [
             'icon' => 'bi-people',
             'page_permission' => 'page.customers',
         ],
-        'menu.consignments' => [
-            'label' => 'Ký gửi hàng hóa',
-            'description' => 'Hiển thị module ký gửi hàng hóa trên sidebar.',
-            'icon' => 'bi-box-seam',
-            'page_permission' => 'page.consignments',
-        ],        'menu.orders' => [
+        'menu.orders' => [
             'label' => 'Đơn hàng',
             'description' => 'Hiển thị nhóm menu đơn hàng và báo giá.',
             'icon' => 'bi-receipt',
@@ -362,7 +441,6 @@ return [
         'lead' => ['label' => 'Lead', 'icon' => 'bi-person-plus'],
         'customer' => ['label' => 'Khách hàng', 'icon' => 'bi-people'],
         'order' => ['label' => 'Đơn hàng', 'icon' => 'bi-receipt'],
-        'consignments' => ['label' => 'Ký gửi hàng hóa', 'icon' => 'bi-box-seam'],
         'orders' => ['label' => 'Đổi trả & Hoàn tiền', 'icon' => 'bi-arrow-left-right'],
         'payment' => ['label' => 'Thanh toán', 'icon' => 'bi-cash-stack'],
         'product' => ['label' => 'Sản phẩm', 'icon' => 'bi-box-seam'],
@@ -376,8 +454,12 @@ return [
         'report' => ['label' => 'Báo cáo', 'icon' => 'bi-bar-chart'],
         'user' => ['label' => 'Người dùng', 'icon' => 'bi-person-gear'],
         'maintenance' => ['label' => 'Bảo trì/Bảo hành', 'icon' => 'bi-tools'],
-        'ai' => ['label' => 'EGO AI Copilot', 'icon' => 'bi-stars'],
         'settings' => ['label' => 'Quản trị hệ thống', 'icon' => 'bi-gear'],
+        'hr' => ['label' => 'Nhân sự', 'icon' => 'bi-person-workspace'],
+        'tasks' => ['label' => 'Công việc', 'icon' => 'bi-check2-square'],
+        'project-test' => ['label' => 'Dự án thử nghiệm', 'icon' => 'bi-kanban'],
+        'system' => ['label' => 'Hệ thống', 'icon' => 'bi-hdd-stack'],
+        'setting' => ['label' => 'Cấu hình', 'icon' => 'bi-sliders'],
     ],
 
     'action_labels' => [
@@ -402,8 +484,6 @@ return [
         'export' => 'Xuất dữ liệu',
         'stock_check' => 'Kiểm kho',
         'stock_update' => 'Cập nhật tồn kho',
-        'warehouse_confirm' => 'Kho xác nhận',
-        'release' => 'Giao hàng',
         'mark_paid' => 'Đánh dấu đã thanh toán',
         'force_approve' => 'Duyệt cưỡng bức',
         'approve_level1' => 'Duyệt cấp 1',
@@ -421,20 +501,47 @@ return [
         'rate' => 'Đánh giá',
         'convert' => 'Chuyển đổi',
         'check_debt' => 'Kiểm tra công nợ',
-        'search_orders' => 'AI tra cứu đơn hàng & công nợ',
-        'search_customers' => 'AI tra cứu khách hàng',
-        'search_inventory' => 'AI tra cứu sản phẩm & tồn kho',
-        'search_tasks' => 'AI tra cứu công việc',
-        'search_sites' => 'AI tra cứu công trình & bảo hành',
-        'search_payment_requests' => 'AI tra cứu đề nghị thanh toán',
-        'search_attendance' => 'AI tra cứu chấm công',
-        'search_marketing' => 'AI tra cứu Marketing & lead',
-        'search_hr' => 'AI tra cứu nhân sự & tuyển dụng',
-        'draft_orders' => 'AI soạn nháp đơn hàng',
-        'draft_customers' => 'AI soạn nháp khách hàng',
-        'draft_tasks' => 'AI soạn nháp công việc',
-        'draft_payment_requests' => 'AI soạn nháp đề nghị thanh toán',
-        'providers_manage' => 'Quản lý API & model AI',
-        'audit_view' => 'Xem nhật ký truy cập AI',
+        'handover' => 'Bàn giao',
+        'revenue' => 'Doanh thu',
+        'view_basic' => 'Xem cơ bản',
+        'view_logs' => 'Xem nhật ký',
+        'view_staff' => 'Xem nhân sự',
+        'manage_sales' => 'Quản lý Sales',
+        'leave_approve_department' => 'Duyệt nghỉ phép trong phòng',
+        'leave_manage_all' => 'Quản lý toàn bộ nghỉ phép',
+        'leave_transfer' => 'Chuyển người duyệt nghỉ phép',
+        'assign_department' => 'Giao việc trong phòng',
+        'manage_all' => 'Quản lý toàn bộ',
+        'files_view' => 'Xem tệp đính kèm',
+        'files_upload' => 'Tải tệp lên',
+        'files_delete' => 'Xoá tệp đính kèm',
+        'materials_manage' => 'Quản lý vật tư',
+        'reports_view' => 'Xem báo cáo',
+        'settings_manage' => 'Quản lý cấu hình',
+        'refund_create' => 'Tạo phiếu hoàn tiền',
+        'refund_approve' => 'Duyệt hoàn tiền',
+        'refund_process' => 'Xử lý hoàn tiền',
+        'return_view' => 'Xem phiếu trả hàng',
+        'return_create' => 'Tạo phiếu trả hàng',
+        'return_update' => 'Sửa phiếu trả hàng',
+        'return_approve' => 'Duyệt trả hàng',
+        'return_receive' => 'Nhận hàng trả',
+        'return_inspect' => 'Kiểm tra hàng trả',
+        'return_stock_in' => 'Nhập kho hàng trả',
+        'return_reports_view' => 'Xem báo cáo trả hàng',
+        'audit_view' => 'Xem nhật ký phân quyền',
+        'menus_manage' => 'Quản lý quyền menu',
+        'pages_manage' => 'Quản lý quyền trang',
+        'roles_view' => 'Xem vai trò',
+        'roles_manage' => 'Quản lý vai trò',
+        'users_manage' => 'Quản lý người dùng',
+        'access' => 'Truy cập',
+        'acceptance' => 'Nghiệm thu',
+        'admin' => 'Quản trị',
+        'sales' => 'Vai trò Sales',
+        'technical' => 'Vai trò Kỹ thuật',
+        'technical-manager' => 'Vai trò Quản lý kỹ thuật',
+        'warehouse' => 'Vai trò Kho',
+        'system' => 'Cấu hình hệ thống',
     ],
 ];

@@ -2,14 +2,14 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('crm_serial_warranties')) {
+        if (! Schema::hasTable('crm_serial_warranties')) {
             Schema::create('crm_serial_warranties', function (Blueprint $table) {
                 $table->bigIncrements('id');
                 $table->unsignedBigInteger('serial_unit_id')->unique();
@@ -26,7 +26,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('crm_serial_warranty_events')) {
+        if (! Schema::hasTable('crm_serial_warranty_events')) {
             Schema::create('crm_serial_warranty_events', function (Blueprint $table) {
                 $table->bigIncrements('id');
                 $table->unsignedBigInteger('serial_unit_id')->index();
@@ -44,7 +44,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('crm_serial_warranty_claims')) {
+        if (! Schema::hasTable('crm_serial_warranty_claims')) {
             Schema::create('crm_serial_warranty_claims', function (Blueprint $table) {
                 $table->bigIncrements('id');
                 $table->unsignedBigInteger('serial_unit_id')->index();
@@ -65,7 +65,8 @@ return new class extends Migration
         if (Schema::hasTable('crm_serial_identifiers')) {
             try {
                 DB::statement('ALTER TABLE crm_serial_identifiers ADD UNIQUE ego_serial_code_unique (code)');
-            } catch (Throwable $e) {}
+            } catch (Throwable $e) {
+            }
         }
     }
 

@@ -6,6 +6,7 @@ namespace App\Http\Requests;
 
 use App\Models\Inventory\Catalog\Product;
 use App\Models\Inventory\Stock\ProductStock;
+use App\Support\MoneyParser;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
@@ -111,8 +112,9 @@ class OrderRequest extends FormRequest
 
             $this->validateDuplicateProductsByWarehouse($validator);
 
-            // Cho phép tạo đơn dù tồn = 0 hoặc số lượng lớn hơn tồn.
-            // Chỉ chặn tồn tại bước Kho duyệt / Xuất kho.
+            if ($this->isMethod('post')) {
+                $this->validateCreateStockAvailability($validator);
+            }
         });
     }
 
@@ -184,19 +186,15 @@ class OrderRequest extends FormRequest
     }
 
     /**
-     * Parse chuỗi tiền tệ (VD: "2.000.000" → 2000000).
+     * Parse chuỗi tiền tệ (VD: "2.000.000 đ" → 2000000).
      *
-     * @param  mixed  $value
+     * Dùng chung App\Support\MoneyParser với luồng ghi dòng hàng. Bản cũ chỉ
+     * bỏ `.`, `,`, khoảng trắng nên chuỗi có đơn vị ("1.234.567 đ" — đúng thứ
+     * form đang hiển thị) rơi về 0 và dòng hàng bị bỏ qua khi lưu.
      */
-    private function parseMoney($value): float
+    private function parseMoney(mixed $value): float
     {
-        if ($value === null || $value === '') {
-            return 0;
-        }
-
-        $value = str_replace(['.', ',', ' '], '', (string) $value);
-
-        return is_numeric($value) ? (float) $value : 0;
+        return MoneyParser::parse($value);
     }
 
     /**

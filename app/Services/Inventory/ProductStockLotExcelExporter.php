@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Inventory;
 
 use App\Models\Inventory\Catalog\Product;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -47,7 +47,7 @@ class ProductStockLotExcelExporter
             ->leftJoin('crm_brands as b', 'b.id', '=', 'p.brand_id')
             ->where('l.qty_remaining', '>', 0);
 
-        if (Schema::hasColumn($productTable, 'is_active')) {
+        if (SchemaCache::hasColumn($productTable, 'is_active')) {
             $q->where(function ($activeQuery) {
                 $activeQuery->where('p.is_active', 1)->orWhereNull('p.is_active');
             });

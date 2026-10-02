@@ -9,6 +9,20 @@
 
     root.dataset.promaxMotionReady = '1';
 
+    /*
+     * EGO_EXECUTIVE_LITE_PERFORMANCE_V1
+     *
+     * Dashboard Giám đốc từng chạy:
+     * - pointermove toàn dashboard
+     * - tilt từng KPI
+     * - requestAnimationFrame counter
+     * - reveal/ripple/chart animation
+     *
+     * Tắt motion để laptop/PC văn phòng chạy mượt.
+     * Không ảnh hưởng dữ liệu, chart hay chức năng.
+     */
+    return;
+
     const reduceMotion = window.matchMedia(
         '(prefers-reduced-motion: reduce)'
     ).matches;

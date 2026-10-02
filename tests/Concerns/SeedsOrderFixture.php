@@ -36,6 +36,11 @@ trait SeedsOrderFixture
             'updated_at' => $now,
         ]);
 
+        // Module Kho/Sản phẩm lọc cứng theo công ty vận hành mặc định
+        // (config ego.default_company_id). Trỏ nó vào công ty vừa seed để
+        // test không phụ thuộc id công ty thật trên production.
+        config(['ego.default_company_id' => $companyId]);
+
         $warehouseId = (int) DB::table('crm_warehouses')->insertGetId([
             'company_id' => $companyId,
             'name' => 'Kho Test',

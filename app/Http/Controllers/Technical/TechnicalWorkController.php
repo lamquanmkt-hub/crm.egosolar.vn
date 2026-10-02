@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Technical;
 
 use App\Http\Controllers\Controller;
-use App\Services\Synced\Technical\SolarMaintenanceQueryService;
-use App\Support\Synced\EgoCompanyScope;
+use App\Services\Technical\SolarMaintenanceQueryService;
+use App\Support\EgoCompanyScope;
 use App\Support\SolarMaintenanceAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

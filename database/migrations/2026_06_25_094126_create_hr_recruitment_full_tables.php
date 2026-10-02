@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('hr_recruitment_requests')) {
+        if (! Schema::hasTable('hr_recruitment_requests')) {
             Schema::create('hr_recruitment_requests', function (Blueprint $table) {
                 $table->id();
                 $table->string('department')->nullable();
@@ -25,7 +25,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_recruitment_candidates')) {
+        if (! Schema::hasTable('hr_recruitment_candidates')) {
             Schema::create('hr_recruitment_candidates', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('recruitment_request_id')->nullable();
@@ -44,7 +44,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_recruitment_interviews')) {
+        if (! Schema::hasTable('hr_recruitment_interviews')) {
             Schema::create('hr_recruitment_interviews', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('candidate_id');
@@ -61,7 +61,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_recruitment_offers')) {
+        if (! Schema::hasTable('hr_recruitment_offers')) {
             Schema::create('hr_recruitment_offers', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('candidate_id');

@@ -1,3 +1,17 @@
+{{-- EGO_VIEW_CHET (đánh dấu 2026-09-05)
+
+     KHÔNG controller nào render view này: tìm view('marketing.report...') trong
+     app/ ra 0 kết quả. Route `marketing.report.ads` (đường dẫn marketing/report/ads)
+     do MarketingReportController phục vụ, và controller đó render view SỐ NHIỀU
+     `marketing.reports.ads` (580 dòng) chứ không phải tệp này (424 dòng).
+
+     Tên route trùng dạng chấm với tên view nên rất dễ tưởng là còn sống — chính
+     DeadViewsMarkedTest cũng phải sửa để bỏ qua các lượt route(...) mới nhìn ra.
+
+     Ghi chú: đợt chuyển sang <x-ui.*> (6c0e9a9) đã tốn công sửa tệp này. Rà view
+     chết trước khi chuyển hàng loạt thì đỡ được phần đó.
+
+     Giữ lại, chưa xoá — xoá code là quyết định của chủ dự án. --}}
 @extends('layouts.app')
 
 {{-- DEBUG_NEW_VERSION_999 --}}
@@ -18,8 +32,7 @@
 @endphp
 
 @push('styles')
-<style>
-  :root{
+<style> :root{
     --mr-bg:#f6f8fc;
     --mr-card:#ffffff;
     --mr-text:#0f172a;
@@ -28,53 +41,32 @@
     --mr-shadow:0 18px 50px rgba(15,23,42,.10);
     --mr-shadow2:0 8px 24px rgba(15,23,42,.08);
     --mr-radius:18px;
-  }
-
-  .mr-ads-wrap{ background:var(--mr-bg); border-radius:24px; padding:18px; }
-
-  .mr-title{ font-weight:900; letter-spacing:.2px; color:var(--mr-text); margin:0; }
-  .mr-sub{ color:var(--mr-muted); font-size:13px; margin-top:4px; }
-
-  .mr-topbar{
+  }.mr-ads-wrap{ background:var(--mr-bg); border-radius:24px; padding:18px; }.mr-title{ font-weight:900; letter-spacing:.2px; color:var(--mr-text); margin:0; }.mr-sub{ color:var(--mr-muted); font-size:13px; margin-top:4px; }.mr-topbar{
     display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     padding:14px 14px;
     background:linear-gradient(135deg, rgba(99,102,241,.12), rgba(16,185,129,.10), rgba(56,189,248,.12));
     border:1px solid rgba(15,23,42,.08);
     border-radius:22px;
     box-shadow:var(--mr-shadow2);
-  }
-
-  .mr-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  .mr-btn{
+  }.mr-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }.mr-btn{
     border-radius:14px; padding:10px 14px; font-weight:700;
     display:inline-flex; gap:8px; align-items:center;
-  }
-
-  .mr-card{
+  }.mr-card{
     background:var(--mr-card);
     border:1px solid var(--mr-line);
     border-radius:var(--mr-radius);
     box-shadow:var(--mr-shadow2);
     overflow:hidden;
-  }
-  .mr-card-hd{
+  }.mr-card-hd{
     padding:12px 14px;
     display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
     background:linear-gradient(180deg, rgba(15,23,42,.02), rgba(15,23,42,0));
     border-bottom:1px solid var(--mr-line);
-  }
-  .mr-card-hd .t{ font-weight:800; color:var(--mr-text); }
-  .mr-card-hd .s{ color:var(--mr-muted); font-size:12px; }
-
-  .mr-filter-grid{ padding:14px; }
-  .mr-filter-grid .form-label{ font-size:12px; color:var(--mr-muted); margin-bottom:6px; font-weight:700; }
-  .mr-filter-grid .form-control,.mr-filter-grid .form-select{
+  }.mr-card-hd .t{ font-weight:800; color:var(--mr-text); }.mr-card-hd .s{ color:var(--mr-muted); font-size:12px; }.mr-filter-grid{ padding:14px; }.mr-filter-grid .ads-label{ font-size:12px; color:var(--mr-muted); margin-bottom:6px; font-weight:700; }.mr-filter-grid .ads-input{
     border-radius:14px;
     border:1px solid rgba(15,23,42,.10);
     padding:11px 12px;
-  }
-
-  .mr-pill{
+  }.mr-pill{
     display:inline-flex; gap:8px; align-items:center;
     padding:8px 12px;
     border-radius:999px;
@@ -83,14 +75,7 @@
     color:var(--mr-text);
     font-weight:800;
     font-size:12px;
-  }
-
-  .mr-kpi{ padding:14px; height:100%; }
-  .mr-kpi .k{ color:var(--mr-muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; }
-  .mr-kpi .v{ font-size:28px; font-weight:900; color:var(--mr-text); margin-top:4px; line-height:1.1; }
-  .mr-kpi .sub{ margin-top:8px; color:var(--mr-muted); font-size:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-
-  .mr-badge{
+  }.mr-kpi{ padding:14px; height:100%; }.mr-kpi .k{ color:var(--mr-muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; }.mr-kpi .v{ font-size:28px; font-weight:900; color:var(--mr-text); margin-top:4px; line-height:1.1; }.mr-kpi .sub{ margin-top:8px; color:var(--mr-muted); font-size:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }.mr-badge{
     display:inline-flex; gap:6px; align-items:center;
     padding:6px 10px;
     border-radius:999px;
@@ -99,31 +84,15 @@
     font-weight:800;
     font-size:12px;
     color:var(--mr-text);
-  }
-  .mr-badge.good{ background:rgba(16,185,129,.10); border-color:rgba(16,185,129,.25); }
-  .mr-badge.bad{ background:rgba(239,68,68,.10); border-color:rgba(239,68,68,.25); }
-
-  .mr-charts{ padding:14px; }
-  .mr-chart-box{ height:320px; }
-
-  .table thead th{
+  }.mr-badge.good{ background:rgba(16,185,129,.10); border-color:rgba(16,185,129,.25); }.mr-badge.bad{ background:rgba(239,68,68,.10); border-color:rgba(239,68,68,.25); }.mr-charts{ padding:14px; }.mr-chart-box{ height:320px; }.table thead th{
     font-size:12px; color:var(--mr-muted); font-weight:900;
     border-bottom:1px solid var(--mr-line)!important;
     text-transform:uppercase; letter-spacing:.35px;
     background:rgba(15,23,42,.02);
-  }
-  .table tbody td{
+  }.table tbody td{
     border-top:1px solid rgba(15,23,42,.06)!important;
     vertical-align:middle;
-  }
-  .mr-td-title{ font-weight:800; color:var(--mr-text); }
-  .mr-td-sub{ color:var(--mr-muted); font-size:12px; margin-top:2px; }
-
-  .mr-empty{ padding:22px; color:var(--mr-muted); text-align:center; }
-
-  @media (max-width: 576px){
-    .mr-kpi .v{ font-size:24px; }
-    .mr-chart-box{ height:260px; }
+  }.mr-td-title{ font-weight:800; color:var(--mr-text); }.mr-td-sub{ color:var(--mr-muted); font-size:12px; margin-top:2px; }.mr-empty{ padding:22px; color:var(--mr-muted); text-align:center; }@media (max-width: 576px){.mr-kpi .v{ font-size:24px; }.mr-chart-box{ height:260px; }
   }
 </style>
 @endpush
@@ -150,12 +119,12 @@
   $rangeText = \Carbon\Carbon::parse($from)->format('d/m/Y') . ' đến ' . \Carbon\Carbon::parse($to)->format('d/m/Y');
 @endphp
 
-<div class="container-fluid py-3">
+<div class="container-fluid tw:py-4">
   <div class="mr-ads-wrap">
 
-    <div class="mr-topbar mb-3">
+    <div class="mr-topbar tw:mb-4">
       <div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="tw:flex tw:items-center tw:gap-2 flex-wrap">
           <h4 class="mr-title">Báo cáo quảng cáo</h4>
           <span class="mr-pill">📅 {{ $rangeText }}</span>
           <span class="mr-pill">Nguồn: mkt_actual_kpi_daily</span>
@@ -164,72 +133,72 @@
       </div>
 
       <div class="mr-actions">
-        <a class="btn btn-outline-secondary mr-btn" href="{{ url()->current() . '?' . http_build_query(array_merge(request()->all(), ['export'=>'pdf'])) }}">
+        <x-ui.button variant="outline-secondary" size="none" class="mr-btn tw:text-[16px]/[24px]" href="{{ url()->current() . '?' . http_build_query(array_merge(request()->all(), ['export'=>'pdf'])) }}">
           <i class="bi bi-file-earmark-pdf"></i> Xuất PDF
-        </a>
-        <button type="submit" form="mrFilterForm" class="btn btn-success mr-btn">
+        </x-ui.button>
+        <x-ui.button variant="success" type="submit" form="mrFilterForm" size="none" class="mr-btn tw:text-[16px]/[24px]">
           <i class="bi bi-funnel"></i> Lọc dữ liệu
-        </button>
+        </x-ui.button>
       </div>
     </div>
 
     {{-- FILTERS --}}
-    <div class="mr-card mb-3">
+    <div class="mr-card tw:mb-4">
       <div class="mr-card-hd">
         <div>
           <div class="t">Bộ lọc</div>
           <div class="s">Chọn khoảng ngày + kênh + chiến dịch (campaign_name)</div>
         </div>
-        <div class="d-flex gap-2 flex-wrap align-items-center">
+        <div class="tw:flex tw:gap-2 flex-wrap tw:items-center">
           <span class="mr-badge">So sánh kỳ trước: {{ $compare==='1' ? 'Bật' : 'Tắt' }}</span>
         </div>
       </div>
 
       <div class="mr-filter-grid">
-        <form id="mrFilterForm" method="GET" class="row g-2">
-          <div class="col-12 col-md-3">
-            <label class="form-label">Từ ngày</label>
-            <input type="date" name="from" class="form-control" value="{{ $from }}">
+        <form id="mrFilterForm" method="GET" class="tw:row tw:g-2">
+          <div class="tw:col12-12 tw:md:col12-3">
+            <x-ui.label class="ads-label">Từ ngày</x-ui.label>
+            <x-ui.input type="date" name="from" class="ads-input" value="{{ $from }}" />
           </div>
 
-          <div class="col-12 col-md-3">
-            <label class="form-label">Đến ngày</label>
-            <input type="date" name="to" class="form-control" value="{{ $to }}">
+          <div class="tw:col12-12 tw:md:col12-3">
+            <x-ui.label class="ads-label">Đến ngày</x-ui.label>
+            <x-ui.input type="date" name="to" class="ads-input" value="{{ $to }}" />
           </div>
 
-          <div class="col-12 col-md-3">
-            <label class="form-label">Kênh</label>
-            <select name="channel" class="form-select">
+          <div class="tw:col12-12 tw:md:col12-3">
+            <x-ui.label class="ads-label">Kênh</x-ui.label>
+            <x-ui.select name="channel" class="ads-input">
               <option value="">Tất cả kênh</option>
               @foreach(($channels ?? []) as $ch)
                 <option value="{{ $ch }}" {{ $channel===(string)$ch ? 'selected' : '' }}>{{ $ch }}</option>
               @endforeach
-            </select>
+            </x-ui.select>
           </div>
 
-          <div class="col-12 col-md-3">
-            <label class="form-label">Chiến dịch</label>
-            <select name="campaign" class="form-select">
+          <div class="tw:col12-12 tw:md:col12-3">
+            <x-ui.label class="ads-label">Chiến dịch</x-ui.label>
+            <x-ui.select name="campaign" class="ads-input">
               <option value="">Tất cả chiến dịch</option>
               @foreach(($campaigns ?? []) as $cp)
                 <option value="{{ $cp }}" {{ $campaign===(string)$cp ? 'selected' : '' }}>{{ $cp }}</option>
               @endforeach
-            </select>
+            </x-ui.select>
           </div>
 
-          <div class="col-12 col-md-3">
-            <label class="form-label">So sánh</label>
-            <select name="compare" class="form-select">
+          <div class="tw:col12-12 tw:md:col12-3">
+            <x-ui.label class="ads-label">So sánh</x-ui.label>
+            <x-ui.select name="compare" class="ads-input">
               <option value="0" {{ $compare==='0' ? 'selected' : '' }}>Không</option>
               <option value="1" {{ $compare==='1' ? 'selected' : '' }}>So với kỳ trước (cùng số ngày)</option>
-            </select>
+            </x-ui.select>
           </div>
 
-          <div class="col-12 col-md-9 d-flex align-items-end gap-2 flex-wrap">
-            <a class="btn btn-outline-secondary mr-btn" href="{{ url()->current() }}">
+          <div class="tw:col12-12 tw:md:col12-9 tw:flex tw:items-end tw:gap-2 flex-wrap">
+            <x-ui.button variant="outline-secondary" size="none" class="mr-btn tw:text-[16px]/[24px]" href="{{ url()->current() }}">
               <i class="bi bi-arrow-counterclockwise"></i> Reset
-            </a>
-            <div class="text-muted small">
+            </x-ui.button>
+            <div class="tw:text-[rgba(33,37,41,0.75)] small">
               Tip: nếu “Chiến dịch” không thấy dữ liệu → kiểm tra cột <b>campaign_name</b> trong bảng actual.
             </div>
           </div>
@@ -238,8 +207,8 @@
     </div>
 
     {{-- KPI --}}
-    <div class="row g-3 mb-3">
-      <div class="col-12 col-md-4 col-xl-3">
+    <div class="tw:row tw:g-3 tw:mb-4">
+      <div class="tw:col12-12 tw:md:col12-4 tw:min-[75rem]:col12-3">
         <div class="mr-card mr-kpi">
           <div class="k">Chi tiêu</div>
           <div class="v">{{ $fmtMoney($kpi->spend ?? 0) }}</div>
@@ -255,7 +224,7 @@
         </div>
       </div>
 
-      <div class="col-12 col-md-4 col-xl-3">
+      <div class="tw:col12-12 tw:md:col12-4 tw:min-[75rem]:col12-3">
         <div class="mr-card mr-kpi">
           <div class="k">Impressions</div>
           <div class="v">{{ $fmtInt($kpi->impressions ?? 0) }}</div>
@@ -271,7 +240,7 @@
         </div>
       </div>
 
-      <div class="col-12 col-md-4 col-xl-2">
+      <div class="tw:col12-12 tw:md:col12-4 tw:min-[75rem]:col12-2">
         <div class="mr-card mr-kpi">
           <div class="k">Clicks</div>
           <div class="v">{{ $fmtInt($kpi->clicks ?? 0) }}</div>
@@ -287,7 +256,7 @@
         </div>
       </div>
 
-      <div class="col-12 col-md-6 col-xl-2">
+      <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-2">
         <div class="mr-card mr-kpi">
           <div class="k">Leads</div>
           <div class="v">{{ $fmtInt($kpi->leads ?? 0) }}</div>
@@ -303,7 +272,7 @@
         </div>
       </div>
 
-      <div class="col-12 col-md-6 col-xl-2">
+      <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-2">
         <div class="mr-card mr-kpi">
           <div class="k">ROAS</div>
           <div class="v">{{ number_format((float)($kpi->roas ?? 0),2) }}</div>
@@ -318,8 +287,8 @@
     </div>
 
     {{-- Charts --}}
-    <div class="row g-3 mb-3">
-      <div class="col-12 col-lg-6">
+    <div class="tw:row tw:g-3 tw:mb-4">
+      <div class="tw:col12-12 tw:min-[62rem]:col12-6">
         <div class="mr-card">
           <div class="mr-card-hd">
             <div>
@@ -336,7 +305,7 @@
         </div>
       </div>
 
-      <div class="col-12 col-lg-6">
+      <div class="tw:col12-12 tw:min-[62rem]:col12-6">
         <div class="mr-card">
           <div class="mr-card-hd">
             <div>
@@ -365,17 +334,17 @@
       </div>
 
       <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
+        <table class="table table-hover tw:mb-0 align-middle">
           <thead>
             <tr>
               <th>Chiến dịch</th>
               <th>Kênh</th>
-              <th class="text-end">Chi tiêu</th>
-              <th class="text-end">Impressions</th>
-              <th class="text-end">Clicks</th>
-              <th class="text-end">Leads</th>
-              <th class="text-end">CPL</th>
-              <th class="text-end">ROAS</th>
+              <th class="tw:text-right">Chi tiêu</th>
+              <th class="tw:text-right">Impressions</th>
+              <th class="tw:text-right">Clicks</th>
+              <th class="tw:text-right">Leads</th>
+              <th class="tw:text-right">CPL</th>
+              <th class="tw:text-right">ROAS</th>
             </tr>
           </thead>
           <tbody>
@@ -392,13 +361,13 @@
                   <div class="mr-td-title">{{ $r->campaign_name ?? '—' }}</div>
                   <div class="mr-td-sub">external: {{ $r->campaign_external_id ?? '—' }}</div>
                 </td>
-                <td class="fw-semibold">{{ $r->channel ?? '—' }}</td>
-                <td class="text-end fw-semibold">{{ $fmtMoney($sp) }}</td>
-                <td class="text-end">{{ $fmtInt($r->impressions ?? 0) }}</td>
-                <td class="text-end">{{ $fmtInt($r->clicks ?? 0) }}</td>
-                <td class="text-end fw-semibold">{{ $fmtInt($ld) }}</td>
-                <td class="text-end">{{ $fmtMoney($cpl) }}</td>
-                <td class="text-end">{{ number_format($roas,2) }}</td>
+                <td class="tw:font-semibold">{{ $r->channel ?? '—' }}</td>
+                <td class="tw:text-right tw:font-semibold">{{ $fmtMoney($sp) }}</td>
+                <td class="tw:text-right">{{ $fmtInt($r->impressions ?? 0) }}</td>
+                <td class="tw:text-right">{{ $fmtInt($r->clicks ?? 0) }}</td>
+                <td class="tw:text-right tw:font-semibold">{{ $fmtInt($ld) }}</td>
+                <td class="tw:text-right">{{ $fmtMoney($cpl) }}</td>
+                <td class="tw:text-right">{{ number_format($roas,2) }}</td>
               </tr>
             @empty
               <tr>

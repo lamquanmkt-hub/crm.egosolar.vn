@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('crm_orders', function (Blueprint $table) {
-	        $table->dropColumn('status');
-        });
+        if (Schema::hasTable('crm_orders')) {
+            Schema::table('crm_orders', function (Blueprint $table) {
+                $table->dropColumn('status');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('crm_orders', function (Blueprint $table) {
-	        $table->string('status', 100)->default('PENDING_APPROVAL'); // tạo lại cột khi rollback
-        });
+        if (Schema::hasTable('crm_orders')) {
+            Schema::table('crm_orders', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_orders', 'status')) {
+                    $table->string('status', 100)->default('PENDING_APPROVAL');
+                } // tạo lại cột khi rollback
+            });
+        }
     }
 };

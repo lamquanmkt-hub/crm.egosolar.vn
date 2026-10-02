@@ -5,21 +5,26 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\DisplayFormat;
 use App\Support\EgoCompanyScope;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Service dashboard điều hành: doanh thu, tiền thu, công nợ, cảnh báo, tồn kho, hậu mãi.
  */
 final class ExecutiveDashboardService
 {
-    private const CACHE_SECONDS = 300;
+    /*
+     * EGO_EXECUTIVE_CACHE_LITE_V1
+     * Dashboard có nhiều aggregate/query.
+     */
+    private const CACHE_SECONDS = 120;
 
     /** @var array<string, bool> */
     private array $tableCache = [];
@@ -43,7 +48,7 @@ final class ExecutiveDashboardService
 
         $cacheKey = 'executive-dashboard:v3:'.sha1(json_encode([
             'company_id' => $companyId,
-            'scope_user_id' => $access['own_only'] ? (int) $user->id : 0,
+            'user_id' => $user->id,
             'roles' => $access['roles'],
             'filters' => $filters,
             'range' => [
@@ -682,12 +687,11 @@ final class ExecutiveDashboardService
                 $this->routeUrl('orders.index', ['status' => 'duyet2'])
             );
 
-            $warehouse = (clone $base)->where('o.current_department', 'warehouse');
-            if ($this->hasColumn('crm_orders', 'inventory_issued')) {
-                $warehouse->where(function (Builder $query): void {
+            $warehouse = (clone $base)
+                ->where('o.current_department', 'warehouse')
+                ->where(function (Builder $query): void {
                     $query->whereNull('o.inventory_issued')->orWhere('o.inventory_issued', 0);
                 });
-            }
             $push(
                 'warehouse',
                 'Đơn chờ xuất kho',
@@ -699,9 +703,7 @@ final class ExecutiveDashboardService
                 $this->routeUrl('orders.index', ['status' => 'kho'])
             );
 
-            if ($this->hasColumn('crm_orders', 'estimated_delivery')
-                && $this->hasColumn('crm_orders', 'inventory_issued')
-                && $this->hasColumn('crm_orders', 'shipping_status')) {
+            if ($this->hasColumn('crm_orders', 'estimated_delivery')) {
                 $lateShipping = (clone $base)
                     ->where('o.inventory_issued', 1)
                     ->whereDate('o.estimated_delivery', '<', now()->toDateString())
@@ -781,7 +783,7 @@ final class ExecutiveDashboardService
                 (int) (clone $query)->count(),
                 0.0,
                 'warning',
-                $this->routeUrl('ky-thuat.maintenance.index')
+                $this->routeUrl('projects-unified.maintenance.index')
             );
         }
 
@@ -1090,7 +1092,7 @@ final class ExecutiveDashboardService
             'maintenance_next_7' => 0,
             'maintenance_overdue' => 0,
             'returns_url' => $this->routeUrl('order-returns.dashboard'),
-            'maintenance_url' => $this->routeUrl('ky-thuat.maintenance.index'),
+            'maintenance_url' => $this->routeUrl('projects-unified.maintenance.index'),
         ];
 
         try {
@@ -1273,7 +1275,7 @@ final class ExecutiveDashboardService
                         'description' => (string) ($row->site_name ?: $row->status),
                         'actor' => 'Kỹ thuật',
                         'time' => $row->updated_at,
-                        'url' => $this->routeUrl('ky-thuat.maintenance.show', ['schedule' => $row->id]),
+                        'url' => $this->routeUrl('projects-unified.maintenance.show', ['schedule' => $row->id]),
                     ]);
                 }
             }
@@ -1510,7 +1512,7 @@ final class ExecutiveDashboardService
         return $this->tableCache[$table]
             ??= (function () use ($table): bool {
                 try {
-                    return Schema::hasTable($table);
+                    return SchemaCache::hasTable($table);
                 } catch (\Throwable) {
                     return false;
                 }
@@ -1527,7 +1529,7 @@ final class ExecutiveDashboardService
         return $this->columnCache[$key]
             ??= (function () use ($table, $column): bool {
                 try {
-                    return $this->hasTable($table) && Schema::hasColumn($table, $column);
+                    return $this->hasTable($table) && SchemaCache::hasColumn($table, $column);
                 } catch (\Throwable) {
                     return false;
                 }
@@ -1586,7 +1588,7 @@ final class ExecutiveDashboardService
      */
     private function money(float $value): string
     {
-        return number_format($value, 0, ',', '.').' đ';
+        return DisplayFormat::money($value);
     }
 
     /**

@@ -3,9 +3,8 @@
 namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
-use App\Support\EgoCompanyLock;
+use App\Support\SchemaCache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -21,13 +20,13 @@ class EgoPaymentRequestAttachmentPreviewController extends Controller
         ini_set('memory_limit', '1024M');
         set_time_limit(180);
 
-        abort_unless(Schema::hasTable('payment_requests'), 404, 'Không thấy bảng payment_requests.');
-        abort_unless(Schema::hasTable('payment_attachments'), 404, 'Không thấy bảng payment_attachments.');
+        abort_unless(SchemaCache::hasTable('payment_requests'), 404, 'Không thấy bảng payment_requests.');
+        abort_unless(SchemaCache::hasTable('payment_attachments'), 404, 'Không thấy bảng payment_attachments.');
 
         $paymentRequestId = (int) $paymentRequest;
         $attachmentId = (int) $attachment;
 
-        $pr = DB::table('payment_requests')->where('company_id', EgoCompanyLock::id())->where('id', $paymentRequestId)->first();
+        $pr = DB::table('payment_requests')->where('id', $paymentRequestId)->first();
         abort_unless($pr, 404, 'Không tìm thấy phiếu đề nghị thanh toán.');
 
         $att = DB::table('payment_attachments')

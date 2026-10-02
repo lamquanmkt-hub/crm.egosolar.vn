@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('hr_process_periods')) {
+        if (! Schema::hasTable('hr_process_periods')) {
             Schema::create('hr_process_periods', function (Blueprint $table) {
                 $table->id();
                 $table->string('name', 100);
@@ -17,7 +17,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_process_items')) {
+        if (! Schema::hasTable('hr_process_items')) {
             Schema::create('hr_process_items', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('period_id')->nullable();

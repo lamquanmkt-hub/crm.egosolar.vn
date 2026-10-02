@@ -13,35 +13,9 @@
 @if(request('step') === 'finance' && $canSeeFinance)
 <link rel="stylesheet" href="{{ asset('css/ego-project-admin-finance.css') }}?v={{ file_exists(public_path('css/ego-project-admin-finance.css')) ? filemtime(public_path('css/ego-project-admin-finance.css')) : time() }}">
 @endif
-<link rel="stylesheet" href="{{ asset('css/project-unification-20260906.css') }}?v=1">
 @endpush
 
 @section('content')
-@php
-    $money = fn ($value) => number_format((float) ($value ?? 0), 0, ',', '.').' đ';
-    $uiStep = (string) request('step', 'overview');
-    $allowedSteps = ['overview','survey','contract','materials','construction','acceptance'];
-    if ($canSeeFinance) {
-        $allowedSteps[] = 'finance';
-    }
-    $uiStep = in_array($uiStep, $allowedSteps, true) ? $uiStep : 'overview';
-    $deploymentProgress = (int) ($workflow['progress'] ?? $progressEngine['calculated'] ?? $project['progress'] ?? 0);
-    $customerName = data_get($site, 'customer.name')
-        ?? data_get($site, 'client.name')
-        ?? ($site->customer_name ?? $site->client_name ?? 'Chưa cập nhật');
-    $projectStatus = $project['phase_info']['label'] ?? 'Đang thực hiện';
-    $rail = [
-        'overview' => ['Tổng quan', null],
-        'survey' => ['Khảo sát & PA', 'Khảo sát & Phương án'],
-        'contract' => ['HĐ & Pháp lý', 'Hợp đồng & Pháp lý'],
-        'materials' => ['Đề xuất vật tư', 'Đề xuất vật tư'],
-        'construction' => ['Thi công', 'Thi công'],
-        'acceptance' => ['Nghiệm thu', 'Nghiệm thu'],
-    ];
-    if ($canSeeFinance) {
-        $rail['finance'] = ['Tài chính công trình', 'Tài chính công trình'];
-    }
-@endphp
 
 <div class="pword-page">
     @if(session('success'))
@@ -53,12 +27,12 @@
 
     <header class="pword-hero">
         <div>
-            <div class="pword-hero-kicker">{{ $project['code'] }} <i class="bi bi-chevron-right"></i> {{ $rail[$uiStep][1] ?? 'Tổng quan' }}</div>
+            <div class="pword-hero-kicker">{{ $project['code'] }} <i class="bi bi-chevron-right"></i> {{ $railTitle }}</div>
             <h1>{{ $project['name'] }}</h1>
             <div class="pword-hero-meta">
                 @if($project['address'])<span><i class="bi bi-geo-alt"></i>{{ $project['address'] }}</span>@endif
                 <span><i class="bi bi-person"></i>{{ $project['lead_engineer'] }}</span>
-                <span><i class="bi bi-lightning-charge"></i>{{ rtrim(rtrim(number_format((float) ($site->system_kwp ?? 0), 2, ',', '.'), '0'), ',') }} kWp</span>
+                <span><i class="bi bi-lightning-charge"></i>{{ number_format((float) ($site->system_kwp ?? 0), 0, ',', '.') }} kWp</span>
                 @if($project['target_date'])<span><i class="bi bi-calendar-event"></i>Hạn {{ $project['target_date']->format('d/m/Y') }}</span>@endif
             </div>
         </div>
@@ -75,86 +49,15 @@
         <div class="pword-progress" style="--p:{{ $deploymentProgress }}"><strong>{{ $deploymentProgress }}%</strong><span>TIẾN ĐỘ CÔNG TRÌNH</span></div>
     </header>
 
-    @if(!empty($salesRevenue))
-        <section class="pu-sales-revenue-summary" aria-label="Tài chính công trình">
-            <div><small>Giá trị hợp đồng</small><strong>{{ $money($salesRevenue['contract']) }}</strong></div>
-            <div><small>Đã thu</small><strong>{{ $money($salesRevenue['received']) }}</strong></div>
-            <div><small>Còn phải thu</small><strong>{{ $money($salesRevenue['debt']) }}</strong></div>
-            <p>Số liệu từ tài chính Công trình · Chỉ xem</p>
-        </section>
-    @endif
-
     <div class="pword-layout">
         <aside class="pword-rail">
             <small>QUY TRÌNH</small>
             <h2>Công trình</h2>
             <nav>
-                @foreach($rail as $code => $item)
-                    @php
-                        $href = $code === 'overview'
-                            ? route('projects-unified.show', $site)
-                            : route('projects-unified.show', ['site'=>$site->id, 'step'=>$code]);
-                        $row = in_array($code, ['materials', 'finance'], true) ? null : ($workflow['steps'][$code] ?? null);
-                        $done = $row && (($row['status'] ?? '') === 'approved');
-                        $railIcon = '○';
-                        $railTone = 'muted';
-                        $railStatus = 'Chưa bắt đầu';
-
-                        if ($code === 'overview') {
-                            $railIcon = '•';
-                            $railTone = 'working';
-                            $railStatus = 'Tiến độ '.$deploymentProgress.'%';
-                        } elseif ($code === 'finance') {
-                            $railIcon = '₫';
-                            $railTone = 'working';
-                            $railStatus = 'Chỉ Admin · Thu chi & giá vốn';
-                        } elseif ($code === 'materials') {
-                            $materialCount = $materialProposals->count();
-                            if ($materialCount > 0) {
-                                $latestMaterialStatus = (string) ($materialProposals->first()->status ?? 'SUBMITTED');
-                                $railIcon = $latestMaterialStatus === 'EXPORTED' ? '✓' : '•';
-                                $railTone = $latestMaterialStatus === 'EXPORTED' ? 'complete' : 'working';
-                                $railStatus = $materialCount.' đề xuất · '.(['SUBMITTED'=>'chờ Admin','NEEDS_REVISION'=>'cần sửa','ADMIN_APPROVED'=>'chờ Kho','PARTIALLY_ALLOCATED'=>'Kho đang soạn','WAREHOUSE_ALLOCATED'=>'Kho đã soạn','READY_FOR_EXPORT'=>'chờ xuất kho','EXPORTED'=>'đã xuất kho'][$latestMaterialStatus] ?? 'đang xử lý');
-                            } else {
-                                $railStatus = 'Chưa có đề xuất';
-                            }
-                        } elseif($row) {
-                            $stepStatus = (string) ($row['status'] ?? 'not_assigned');
-                            $missingCount = count($row['document_state']['file_missing'] ?? $row['document_state']['missing'] ?? []);
-                            $overdueDays = (int) ($row['overdue_days'] ?? 0);
-                            $stepRow = $row['row'] ?? null;
-
-                            if ($overdueDays > 0 && $stepStatus !== 'approved') {
-                                $railIcon = '!';
-                                $railTone = 'danger';
-                                $railStatus = 'Quá hạn '.$overdueDays.' ngày';
-                            } elseif ($stepStatus === 'approved') {
-                                $approvedAt = $stepRow->approved_at ?? $stepRow->updated_at ?? null;
-                                $railIcon = '✓';
-                                $railTone = 'complete';
-                                $railStatus = 'Đã duyệt'.($missingCount > 0
-                                    ? ' · còn thiếu '.$missingCount.' hồ sơ'
-                                    : ($approvedAt ? ' · '.\Illuminate\Support\Carbon::parse($approvedAt)->format('d/m/Y') : ''));
-                            } elseif ($stepStatus === 'revision') {
-                                $railIcon = '!';
-                                $railTone = 'danger';
-                                $railStatus = 'Cần bổ sung'.($missingCount > 0 ? ' · thiếu '.$missingCount.' hồ sơ' : '');
-                            } elseif ($stepStatus === 'submitted') {
-                                $railIcon = '•';
-                                $railTone = 'pending';
-                                $railStatus = 'Đang chờ duyệt';
-                            } elseif (in_array($stepStatus, ['assigned','in_progress'], true)) {
-                                $railIcon = '•';
-                                $railTone = $missingCount > 0 ? 'warning' : 'working';
-                                $railStatus = 'Đang làm'.($missingCount > 0 ? ' · còn thiếu '.$missingCount.' hồ sơ' : ' · đủ hồ sơ');
-                            } else {
-                                $railStatus = 'Chưa phân công';
-                            }
-                        }
-                    @endphp
-                    <a href="{{ $href }}" class="{{ $uiStep === $code ? 'active' : '' }} {{ $done ? 'done' : '' }} rail-{{ $railTone }}">
-                        <span class="pword-rail-icon">{{ $railIcon }}</span>
-                        <div class="pword-rail-copy"><strong>{{ $item[0] }}</strong><small>{{ $railStatus }}</small></div>
+                @foreach($rail as $railItem)
+                    <a href="{{ $railItem->code === 'overview' ? route('projects-unified.show', $site) : route('projects-unified.show', ['site' => $site->id, 'step' => $railItem->code]) }}" class="{{ $uiStep === $railItem->code ? 'active' : '' }} {{ $railItem->done ? 'done' : '' }} rail-{{ $railItem->tone }}">
+                        <span class="pword-rail-icon">{{ $railItem->icon }}</span>
+                        <div class="pword-rail-copy"><strong>{{ $railItem->label }}</strong><small>{{ $railItem->status }}</small></div>
                     </a>
                 @endforeach
             </nav>
@@ -172,7 +75,7 @@
                         <div><dt>Tên công trình</dt><dd>{{ $project['name'] }}</dd></div>
                         <div><dt>Mã công trình</dt><dd>{{ $project['code'] }}</dd></div>
                         <div><dt>Khách hàng</dt><dd>{{ $customerName }}</dd></div>
-                        <div><dt>Công suất</dt><dd>{{ rtrim(rtrim(number_format((float) ($site->system_kwp ?? 0), 2, ',', '.'), '0'), ',') }} kWp</dd></div>
+                        <div><dt>Công suất</dt><dd>{{ number_format((float) ($site->system_kwp ?? 0), 0, ',', '.') }} kWp</dd></div>
                         <div><dt>Trạng thái</dt><dd>{{ $projectStatus }}</dd></div>
                         <div><dt>Người phụ trách</dt><dd>{{ $project['lead_engineer'] }}</dd></div>
                         <div><dt>Tiến độ</dt><dd>{{ $deploymentProgress }}%</dd></div>
@@ -232,14 +135,6 @@
             @elseif($uiStep === 'finance' && $canSeeFinance)
                 @include('projects-unified.partials.admin-finance')
             @elseif($uiStep === 'materials')
-                @php
-                    $proposalStatuses = ['SUBMITTED' => 'Chờ Admin duyệt', 'NEEDS_REVISION' => 'Cần chỉnh sửa', 'ADMIN_APPROVED' => 'Đã duyệt · Chờ Kho', 'PARTIALLY_ALLOCATED' => 'Kho đang soạn', 'WAREHOUSE_ALLOCATED' => 'Kho đã soạn', 'READY_FOR_EXPORT' => 'Đã chuyển Kho', 'EXPORTED' => 'Đã xuất kho'];
-                    $proposalTone = fn ($status) => match ((string) $status) { 'SUBMITTED' => 'pending', 'NEEDS_REVISION' => 'revision', 'EXPORTED' => 'complete', default => 'warehouse' };
-                    $waitingCount = $materialProposals->whereIn('status', ['SUBMITTED', 'NEEDS_REVISION'])->count();
-                    $warehouseCount = $materialProposals->whereIn('status', ['ADMIN_APPROVED', 'PARTIALLY_ALLOCATED', 'WAREHOUSE_ALLOCATED', 'READY_FOR_EXPORT'])->count();
-                    $exportedCount = $materialProposals->where('status', 'EXPORTED')->count();
-                    $formatProposalQty = fn ($quantity) => rtrim(rtrim(number_format((float) $quantity, 2, ',', '.'), '0'), ',');
-                @endphp
                 <section class="pword-panel epm-panel">
                     <header class="epm-header"><div><small>CÔNG TRÌNH · BƯỚC 3</small><h2>Đề xuất vật tư</h2><p>Kỹ thuật lập nhu cầu, Admin duyệt rồi mới chuyển sang Kho.</p></div>
                         @if($canProposeMaterials)
@@ -250,37 +145,32 @@
                     <div class="epm-summary"><div><span>Tổng đề xuất</span><strong>{{ $materialProposals->count() }}</strong></div><div class="pending"><span>Chờ duyệt</span><strong>{{ $waitingCount }}</strong></div><div class="warehouse"><span>Kho xử lý</span><strong>{{ $warehouseCount }}</strong></div><div class="complete"><span>Đã xuất</span><strong>{{ $exportedCount }}</strong></div></div>
 
                     <div class="epm-list"><div class="epm-list-head"><span>Phiếu / Người đề xuất</span><span>Vật tư</span><span>Trạng thái</span><span>Thao tác</span></div>
-                        @forelse($materialProposals as $proposal)
-                            @php
-                                $proposalItems = $materialProposalItems[$proposal->id] ?? collect();
-                                $linkedMaterialRequestId = $proposalItems->pluck('material_request_id')->filter()->first();
-                                $proposalStatus = (string) $proposal->status;
-                            @endphp
+                        @forelse($proposalRows as $row)
                             <details class="epm-proposal">
-                                <summary class="epm-proposal-summary"><div><strong>DX-{{ str_pad((string) $proposal->id, 5, '0', STR_PAD_LEFT) }}</strong><small>{{ $proposal->creator_name ?: 'Người lập' }} · {{ \Illuminate\Support\Carbon::parse($proposal->created_at)->format('d/m/Y H:i') }}</small></div><div><strong>{{ $proposalItems->count() }} dòng</strong><small>{{ $formatProposalQty($proposalItems->sum('requested_qty')) }} tổng số lượng</small></div><div><span class="epm-status {{ $proposalTone($proposalStatus) }}">{{ $proposalStatuses[$proposalStatus] ?? $proposalStatus }}</span></div><div class="epm-expand-label"><span>Xem chi tiết</span><i class="bi bi-chevron-down"></i></div></summary>
+                                <summary class="epm-proposal-summary"><div><strong>DX-{{ str_pad((string) $row->proposal->id, 5, '0', STR_PAD_LEFT) }}</strong><small>{{ $row->proposal->creator_name ?: 'Người lập' }} · {{ \Illuminate\Support\Carbon::parse($row->proposal->created_at)->format('d/m/Y H:i') }}</small></div><div><strong>{{ $row->itemCount }} dòng</strong><small>{{ $row->totalQuantityText }} tổng số lượng</small></div><div><span class="epm-status {{ $row->tone }}">{{ $row->statusLabel }}</span></div><div class="epm-expand-label"><span>Xem chi tiết</span><i class="bi bi-chevron-down"></i></div></summary>
 
-                                <div class="epm-proposal-body"><header class="epm-popup-header"><div><small>CHI TIẾT ĐỀ XUẤT</small><strong>DX-{{ str_pad((string) $proposal->id, 5, '0', STR_PAD_LEFT) }}</strong></div><button type="button" class="epm-popup-close" onclick="this.closest('details').removeAttribute('open')"><i class="bi bi-x-lg"></i></button></header><table class="epm-lines"><thead><tr><th>Tên vật tư đề xuất</th><th>Số lượng</th><th>Ghi chú</th><th>Sản phẩm Kho đã chọn</th></tr></thead><tbody>
-                                    @foreach($proposalItems as $item)
-                                        <tr><td><strong>{{ $item->requested_name }}</strong></td><td>{{ $formatProposalQty($item->requested_qty) }}</td><td>{{ $item->request_note ?: '—' }}</td><td>@if($item->selected_product_name)<strong>{{ $item->selected_product_name }}</strong><small>{{ $item->selected_warehouse_name ?: 'Kho đã ghép' }}</small>@elseif($linkedMaterialRequestId)<span class="epm-muted">Kho chưa ghép sản phẩm</span>@else<span class="epm-muted">Chưa chuyển Kho</span>@endif</td></tr>
+                                <div class="epm-proposal-body"><header class="epm-popup-header"><div><small>CHI TIẾT ĐỀ XUẤT</small><strong>DX-{{ str_pad((string) $row->proposal->id, 5, '0', STR_PAD_LEFT) }}</strong></div><button type="button" class="epm-popup-close" onclick="this.closest('details').removeAttribute('open')"><i class="bi bi-x-lg"></i></button></header><table class="epm-lines"><thead><tr><th>Tên vật tư đề xuất</th><th>Số lượng</th><th>Ghi chú</th><th>Sản phẩm Kho đã chọn</th></tr></thead><tbody>
+                                    @foreach($row->items as $line)
+                                        <tr><td><strong>{{ $line->item->requested_name }}</strong></td><td>{{ $line->quantityText }}</td><td>{{ $line->item->request_note ?: '—' }}</td><td>@if($line->item->selected_product_name)<strong>{{ $line->item->selected_product_name }}</strong><small>{{ $line->item->selected_warehouse_name ?: 'Kho đã ghép' }}</small>@elseif($row->linkedMaterialRequestId)<span class="epm-muted">Kho chưa ghép sản phẩm</span>@else<span class="epm-muted">Chưa chuyển Kho</span>@endif</td></tr>
                                     @endforeach
                                 </tbody></table>
 
-                                    @if($proposalStatus === 'NEEDS_REVISION' && !empty($proposal->approval_note))
-                                        <div class="epm-revision-note"><i class="bi bi-exclamation-circle"></i> {{ $proposal->approval_note }}</div>
+                                    @if($row->status === 'NEEDS_REVISION' && !empty($row->proposal->approval_note))
+                                        <div class="epm-revision-note"><i class="bi bi-exclamation-circle"></i> {{ $row->proposal->approval_note }}</div>
                                     @endif
 
                                     <footer class="epm-proposal-actions">
-                                        @if($canAdminApproveMaterials && in_array($proposalStatus, ['SUBMITTED', 'NEEDS_REVISION'], true))
-                                            <button class="pword-btn primary" type="button" data-pword-open-dialog="material-approve-{{ $proposal->id }}"><i class="bi bi-check2-circle"></i> Duyệt &amp; chuyển Kho</button>
-                                            <button class="pword-btn danger" type="button" data-pword-open-dialog="material-return-{{ $proposal->id }}">Trả chỉnh sửa</button>
-                                            <dialog class="pword-assign-dialog" id="material-approve-{{ $proposal->id }}"><div class="pword-assign-dialog-card"><header><div><small>PHÊ DUYỆT VẬT TƯ</small><h3>Duyệt đề xuất #{{ $proposal->id }}</h3></div><button type="button" data-pword-close-dialog><i class="bi bi-x-lg"></i></button></header><form method="POST" action="{{ route('projects-unified.materials.proposal.approve', [$site, $proposal->id]) }}" class="pword-form">@csrf<label>Ý kiến Admin<textarea name="approval_note" rows="3" placeholder="Lưu ý cho Kho nếu cần..."></textarea></label><div class="pword-dialog-actions"><button class="pword-btn light" type="button" data-pword-close-dialog>Hủy</button><button class="pword-btn primary" type="submit">Duyệt &amp; chuyển Kho</button></div></form></div></dialog>
-                                            <dialog class="pword-assign-dialog" id="material-return-{{ $proposal->id }}"><div class="pword-assign-dialog-card"><header><div><small>PHẢN HỒI ĐỀ XUẤT</small><h3>Trả đề xuất #{{ $proposal->id }}</h3></div><button type="button" data-pword-close-dialog><i class="bi bi-x-lg"></i></button></header><form method="POST" action="{{ route('projects-unified.materials.proposal.return', [$site, $proposal->id]) }}" class="pword-form">@csrf<label>Lý do cần chỉnh sửa<textarea name="revision_note" rows="4" required></textarea></label><div class="pword-dialog-actions"><button class="pword-btn light" type="button" data-pword-close-dialog>Hủy</button><button class="pword-btn danger" type="submit">Trả chỉnh sửa</button></div></form></div></dialog>
+                                        @if($canAdminApproveMaterials && in_array($row->status, ['SUBMITTED', 'NEEDS_REVISION'], true))
+                                            <button class="pword-btn primary" type="button" data-pword-open-dialog="material-approve-{{ $row->proposal->id }}"><i class="bi bi-check2-circle"></i> Duyệt &amp; chuyển Kho</button>
+                                            <button class="pword-btn danger" type="button" data-pword-open-dialog="material-return-{{ $row->proposal->id }}">Trả chỉnh sửa</button>
+                                            <dialog class="pword-assign-dialog" id="material-approve-{{ $row->proposal->id }}"><div class="pword-assign-dialog-card"><header><div><small>PHÊ DUYỆT VẬT TƯ</small><h3>Duyệt đề xuất #{{ $row->proposal->id }}</h3></div><button type="button" data-pword-close-dialog><i class="bi bi-x-lg"></i></button></header><form method="POST" action="{{ route('projects-unified.materials.proposal.approve', [$site, $row->proposal->id]) }}" class="pword-form">@csrf<label>Ý kiến Admin<textarea name="approval_note" rows="3" placeholder="Lưu ý cho Kho nếu cần..."></textarea></label><div class="pword-dialog-actions"><button class="pword-btn light" type="button" data-pword-close-dialog>Hủy</button><button class="pword-btn primary" type="submit">Duyệt &amp; chuyển Kho</button></div></form></div></dialog>
+                                            <dialog class="pword-assign-dialog" id="material-return-{{ $row->proposal->id }}"><div class="pword-assign-dialog-card"><header><div><small>PHẢN HỒI ĐỀ XUẤT</small><h3>Trả đề xuất #{{ $row->proposal->id }}</h3></div><button type="button" data-pword-close-dialog><i class="bi bi-x-lg"></i></button></header><form method="POST" action="{{ route('projects-unified.materials.proposal.return', [$site, $row->proposal->id]) }}" class="pword-form">@csrf<label>Lý do cần chỉnh sửa<textarea name="revision_note" rows="4" required></textarea></label><div class="pword-dialog-actions"><button class="pword-btn light" type="button" data-pword-close-dialog>Hủy</button><button class="pword-btn danger" type="submit">Trả chỉnh sửa</button></div></form></div></dialog>
                                         @endif
-                                        @if($linkedMaterialRequestId && Route::has('material-requests.show'))
-                                            <a class="pword-btn light" href="{{ route('material-requests.show', $linkedMaterialRequestId) }}"><i class="bi bi-box-seam"></i> Xem phiếu Kho #{{ $linkedMaterialRequestId }}</a>
+                                        @if($row->linkedMaterialRequestId && Route::has('material-requests.show'))
+                                            <a class="pword-btn light" href="{{ route('material-requests.show', $row->linkedMaterialRequestId) }}"><i class="bi bi-box-seam"></i> Xem phiếu Kho #{{ $row->linkedMaterialRequestId }}</a>
                                         @endif
-                                        @if($proposal->attachment_path)
-                                            <a class="epm-original-file" href="{{ asset('storage/'.$proposal->attachment_path) }}" target="_blank"><i class="bi bi-file-earmark-excel"></i> File gốc</a>
+                                        @if($row->proposal->attachment_path)
+                                            <a class="epm-original-file" href="{{ asset('storage/'.$row->proposal->attachment_path) }}" target="_blank"><i class="bi bi-file-earmark-excel"></i> File gốc</a>
                                         @endif
                                     </footer>
                                 </div>

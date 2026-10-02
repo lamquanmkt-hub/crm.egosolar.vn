@@ -1,7 +1,9 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+
 return new class extends Migration
 {
     /**
@@ -9,15 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('crm_serial_units', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->foreignId('product_id')
-                ->constrained('crm_product_catalog')
-                ->cascadeOnDelete();
-            $table->timestamps();
-            $table->index(['product_id', 'id'], 'crm_serial_units_product_id_id_idx');
-        });
+        if (! Schema::hasTable('crm_serial_units')) {
+            Schema::create('crm_serial_units', function (Blueprint $table) {
+                $table->bigIncrements('id');
+                $table->foreignId('product_id')
+                    ->constrained('crm_product_catalog')
+                    ->cascadeOnDelete();
+                $table->timestamps();
+                $table->index(['product_id', 'id'], 'crm_serial_units_product_id_id_idx');
+            });
+        }
     }
+
     /**
      * Reverse the migrations.
      */

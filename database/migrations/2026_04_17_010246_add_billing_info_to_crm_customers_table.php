@@ -11,12 +11,22 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('crm_customers', function (Blueprint $table) {
-            $table->string('billing_company_name')->nullable()->after('email');
-            $table->string('billing_tax_code', 50)->nullable()->after('billing_company_name');
-            $table->string('billing_address', 500)->nullable()->after('billing_tax_code');
-            $table->string('billing_email')->nullable()->after('billing_address');
-        });
+        if (Schema::hasTable('crm_customers')) {
+            Schema::table('crm_customers', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_customers', 'billing_company_name')) {
+                    $table->string('billing_company_name')->nullable()->after('email');
+                }
+                if (! Schema::hasColumn('crm_customers', 'billing_tax_code')) {
+                    $table->string('billing_tax_code', 50)->nullable()->after('billing_company_name');
+                }
+                if (! Schema::hasColumn('crm_customers', 'billing_address')) {
+                    $table->string('billing_address', 500)->nullable()->after('billing_tax_code');
+                }
+                if (! Schema::hasColumn('crm_customers', 'billing_email')) {
+                    $table->string('billing_email')->nullable()->after('billing_address');
+                }
+            });
+        }
     }
 
     /**
@@ -24,13 +34,15 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('crm_customers', function (Blueprint $table) {
-            $table->dropColumn([
-                'billing_company_name',
-                'billing_tax_code',
-                'billing_address',
-                'billing_email',
-            ]);
-        });
+        if (Schema::hasTable('crm_customers')) {
+            Schema::table('crm_customers', function (Blueprint $table) {
+                $table->dropColumn([
+                    'billing_company_name',
+                    'billing_tax_code',
+                    'billing_address',
+                    'billing_email',
+                ]);
+            });
+        }
     }
 };

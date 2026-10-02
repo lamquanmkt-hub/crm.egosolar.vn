@@ -1,532 +1,486 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid px-4 mt-3">
+<div class="tw:w-full tw:mx-auto tw:px-6 tw:mt-4">
 
     {{-- HEADER --}}
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="tw:flex tw:justify-between tw:items-center tw:mb-4">
         <div>
-            <h4 class="fw-bold mb-0">Ngân sách & Chỉ số Marketing</h4>
-            <small class="text-muted">Marketing / Quảng cáo</small>
+            <h4 class="tw:font-bold tw:mb-0">Ngân sách & Chỉ số Marketing</h4>
+            <small class="tw:text-[rgba(33,37,41,0.75)]">Marketing / Quảng cáo</small>
         </div>
     </div>
 
     @if (session('success'))
-        <div class="alert alert-success py-2">{{ session('success') }}</div>
+        <x-ui.alert variant="success" class="tw:py-2">{{ session('success') }}</x-ui.alert>
     @endif
 
     {{-- KPI TỔNG --}}
-    <div class="row g-3 mb-3">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Ngân sách</div>
-                    <div class="fs-5 fw-bold">{{ number_format($totalBudget) }} đ</div>
-                </div>
-            </div>
+    <div class="tw:row tw:g-3 tw:mb-4">
+        <div class="tw:md:col12-3">
+            <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)]">
+                <x-ui.card-body>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Ngân sách</div>
+                    <div class="tw:text-[20px] tw:font-bold">{{ number_format($totalBudget) }} đ</div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
 
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Đã chi (ngân sách)</div>
-                    <div class="fs-5 fw-bold">{{ number_format($totalSpent) }} đ</div>
-                    <div class="text-muted small">Chi theo chỉ số: {{ number_format($sumSpend) }} đ</div>
-                </div>
-            </div>
+        <div class="tw:md:col12-3">
+            <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)]">
+                <x-ui.card-body>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Đã chi (ngân sách)</div>
+                    <div class="tw:text-[20px] tw:font-bold">{{ number_format($totalSpent) }} đ</div>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Chi theo chỉ số: {{ number_format($sumSpend) }} đ</div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
 
-        <div class="col-md-2">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Lead</div>
-                    <div class="fs-5 fw-bold">{{ number_format($sumLeads) }}</div>
-                </div>
-            </div>
+        <div class="tw:md:col12-2">
+            <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)]">
+                <x-ui.card-body>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Lead</div>
+                    <div class="tw:text-[20px] tw:font-bold">{{ number_format($sumLeads) }}</div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
 
-        <div class="col-md-2">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Đơn</div>
-                    <div class="fs-5 fw-bold">{{ number_format($sumOrders) }}</div>
-                </div>
-            </div>
+        <div class="tw:md:col12-2">
+            <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)]">
+                <x-ui.card-body>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Đơn</div>
+                    <div class="tw:text-[20px] tw:font-bold">{{ number_format($sumOrders) }}</div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
 
-        <div class="col-md-2">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">ROAS</div>
-                    <div class="fs-5 fw-bold">{{ $roas }}</div>
-                    <div class="text-muted small">CPL {{ number_format($cpl) }} | CPO {{ number_format($cpo) }}</div>
-                </div>
-            </div>
+        <div class="tw:md:col12-2">
+            <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)]">
+                <x-ui.card-body>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">ROAS</div>
+                    <div class="tw:text-[20px] tw:font-bold">{{ $roas }}</div>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">CPL {{ number_format($cpl) }} | CPO {{ number_format($cpo) }}</div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
     </div>
 
     {{-- THANH ĐIỀU KHIỂN --}}
-    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
-        <div class="d-flex gap-2">
-            <button class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#budgetSummary">
+    <div class="tw:flex tw:flex-wrap tw:gap-2 tw:justify-between tw:items-center tw:mb-4">
+        <div class="tw:flex tw:gap-2">
+            <x-ui.button variant="outline-secondary" type="button"
+                          x-on:click="$dispatch('toggle-disclosure', 'budgetSummary')">
                 Tổng hợp ngân sách
-            </button>
+            </x-ui.button>
 
-            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#adsModal">
+            <x-ui.button variant="success" type="button"
+                          x-on:click="$dispatch('open-modal', 'adsModal')">
                 + Thêm
-            </button>
+            </x-ui.button>
         </div>
-        <div class="text-muted small">Xem tổng → lọc → nhập</div>
+        <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Xem tổng → lọc → nhập</div>
     </div>
 
     {{-- TỔNG HỢP NGÂN SÁCH --}}
-    @php
-    $hasFilter = request()->filled('from')
-        || request()->filled('to')
-        || request()->filled('platform')
-        || request()->filled('campaign_id')
-        || request()->filled('month'); // legacy
-@endphp
-
-<div class="collapse {{ $hasFilter ? 'show' : '' }}" id="budgetSummary">
-        <div class="card border-0 shadow-sm mb-3">
-            <div class="card-header bg-white fw-semibold">Tổng hợp theo tháng & kênh</div>
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
-                    <thead class="table-light">
+<x-ui.disclosure name="budgetSummary" :open="$hasFilter">
+        <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mb-4">
+            <x-ui.card-header class="tw:bg-white tw:font-semibold">Tổng hợp theo tháng & kênh</x-ui.card-header>
+            <x-ui.table-wrap>
+                <x-ui.table size="sm" hover class="tw:mb-0">
+                    <x-ui.table-head>
                         <tr>
                             <th>Khoảng</th>
                             <th>Kênh</th>
-                            <th class="text-end">Ngân sách</th>
-                            <th class="text-end">Đã chi</th>
-                            <th class="text-end">% tiêu</th>
+                            <th class="tw:text-right">Ngân sách</th>
+                            <th class="tw:text-right">Đã chi</th>
+                            <th class="tw:text-right">% tiêu</th>
                         </tr>
-                    </thead>
+                    </x-ui.table-head>
                     <tbody>
                         @forelse($summary as $s)
-                            @php
-                                $p = ($s->total_budget ?? 0) > 0 ? round($s->total_spent / $s->total_budget * 100) : 0;
-                            @endphp
                             <tr>
-                                <td>{{ \Illuminate\Support\Carbon::parse($s->month)->format('m/Y') }}</td>
+                                <td>{{ $s->monthText }}</td>
                                 <td>{{ $s->platform }}</td>
-                                <td class="text-end">{{ number_format($s->total_budget) }}</td>
-                                <td class="text-end">{{ number_format($s->total_spent) }}</td>
-                                <td class="text-end">{{ $p }}%</td>
+                                <td class="tw:text-right">{{ number_format($s->totalBudget) }}</td>
+                                <td class="tw:text-right">{{ number_format($s->totalSpent) }}</td>
+                                <td class="tw:text-right">{{ $s->percentSpent }}%</td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="text-center text-muted">Chưa có dữ liệu</td></tr>
+                            <tr><td colspan="5" class="tw:text-center tw:text-[rgba(33,37,41,0.75)]">Chưa có dữ liệu</td></tr>
                         @endforelse
                     </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+                </x-ui.table>
+            </x-ui.table-wrap>
+        </x-ui.card>
+</x-ui.disclosure>
 
     {{-- LỌC --}}
-    <div class="card border-0 shadow-sm mb-3">
-    <div class="card-body">
-        <form class="row g-2 align-items-end" method="GET">
-            <div class="col-md-3">
-                <label class="form-label small">Từ ngày</label>
-                <input type="text" name="from" value="{{ $from ?? '' }}" class="form-control" placeholder="dd/mm/yyyy">
+    <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mb-4">
+    <x-ui.card-body>
+        <form class="tw:row tw:g-2 tw:items-end" method="GET">
+            <div class="tw:md:col12-3">
+                <x-ui.label class="tw:text-[0.875em]">Từ ngày</x-ui.label>
+                <x-ui.input type="text" name="from" value="{{ $from ?? '' }}" placeholder="dd/mm/yyyy" />
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label small">Đến ngày</label>
-                <input type="text" name="to" value="{{ $to ?? '' }}" class="form-control" placeholder="dd/mm/yyyy">
+            <div class="tw:md:col12-3">
+                <x-ui.label class="tw:text-[0.875em]">Đến ngày</x-ui.label>
+                <x-ui.input type="text" name="to" value="{{ $to ?? '' }}" placeholder="dd/mm/yyyy" />
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label small">Kênh</label>
-                <select name="platform" class="form-select">
+            <div class="tw:md:col12-3">
+                <x-ui.label class="tw:text-[0.875em]">Kênh</x-ui.label>
+                <x-ui.select name="platform">
                     <option value="">-- Tất cả --</option>
                     @foreach(['Facebook','Google','TikTok','Zalo','Khác'] as $p)
                         <option value="{{ $p }}" {{ ($platform ?? '')==$p?'selected':'' }}>{{ $p }}</option>
                     @endforeach
-                </select>
+                </x-ui.select>
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label small">Chiến dịch (từ kho campaign)</label>
-                <select name="campaign_id" class="form-select">
+            <div class="tw:md:col12-3">
+                <x-ui.label class="tw:text-[0.875em]">Chiến dịch (từ kho campaign)</x-ui.label>
+                <x-ui.select name="campaign_id">
                     <option value="">-- Tất cả --</option>
                     @foreach($campaigns as $c)
                         <option value="{{ $c->id }}" {{ (string)($campaign_id ?? '') === (string)$c->id ? 'selected':'' }}>
                             {{ $c->name }}
                         </option>
                     @endforeach
-                </select>
+                </x-ui.select>
             </div>
 
-            <div class="col-md-2 d-flex gap-2">
-                <button class="btn btn-outline-secondary w-100">Lọc</button>
-                <a href="{{ route('marketing.budget') }}" class="btn btn-light w-100">Xóa</a>
+            <div class="tw:md:col12-2 tw:flex tw:gap-2">
+                <x-ui.button variant="outline-secondary" class="tw:w-full" type="submit">Lọc</x-ui.button>
+                <x-ui.button variant="light" class="tw:w-full" :href="route('marketing.budget')">Xóa</x-ui.button>
             </div>
 
             {{-- legacy month (nếu còn link cũ), không cần hiển thị --}}
-            @if(request()->filled('month'))
-                <input type="hidden" name="month" value="{{ request('month') }}">
+            @if($legacyMonth !== null)
+                <input type="hidden" name="month" value="{{ $legacyMonth }}">
             @endif
         </form>
 
-        <div class="text-muted small mt-2">
+        <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em] tw:mt-2">
             Định dạng: <b>dd/mm/yyyy</b>. Nếu không nhập sẽ mặc định tính <b>cả tháng hiện tại</b>.
         </div>
-    </div>
-</div>
+    </x-ui.card-body>
+</x-ui.card>
 
 
     {{-- BẢNG NGÂN SÁCH --}}
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white fw-semibold">Danh sách ngân sách</div>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+    <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)]">
+        <x-ui.card-header class="tw:bg-white tw:font-semibold">Danh sách ngân sách</x-ui.card-header>
+        <x-ui.table-wrap>
+            <x-ui.table hover class="tw:mb-0">
+                <x-ui.table-head>
                     <tr>
                         <th>Tháng</th>
                         <th>Kênh</th>
                         <th>Chiến dịch</th>
-                        <th class="text-end">Ngân sách</th>
-                        <th class="text-end">Đã chi</th>
-                        @hasanyrole('marketing_manager|admin')
-                            <th class="text-end">Thao tác</th>
-                        @endhasanyrole
+                        <th class="tw:text-right">Ngân sách</th>
+                        <th class="tw:text-right">Đã chi</th>
+                        @if($canManage)
+                            <th class="tw:text-right">Thao tác</th>
+                        @endif
                     </tr>
-                </thead>
+                </x-ui.table-head>
                 <tbody>
                     @forelse($rows as $r)
                         <tr>
-                            <td>{{ optional($r->month)->format('m/Y') }}</td>
+                            <td>{{ $r->monthText }}</td>
                             <td>{{ $r->platform }}</td>
-                            <td>{{ $r->marketingCampaign?->name ?? '-' }}</td>
-                            <td class="text-end">{{ number_format($r->budget) }}</td>
-                            <td class="text-end">{{ number_format($r->actual_spent) }}</td>
+                            <td>{{ $r->campaignName }}</td>
+                            <td class="tw:text-right">{{ number_format($r->budget) }}</td>
+                            <td class="tw:text-right">{{ number_format($r->actualSpent) }}</td>
 
-                            @hasanyrole('marketing_manager|admin')
-                                <td class="text-end">
-                                    <a href="{{ route('marketing.budget.edit',$r->id) }}" class="btn btn-sm btn-outline-primary">Sửa</a>
+                            @if($canManage)
+                                <td class="tw:text-right">
+                                    <x-ui.button variant="outline-primary" size="sm" :href="route('marketing.budget.edit',$r->id)">Sửa</x-ui.button>
 
                                     <form action="{{ route('marketing.budget.destroy', $r->id) }}"
                                           method="POST"
-                                          class="d-inline"
+                                          class="tw:inline"
                                           onsubmit="return confirm('Xóa dòng ngân sách này?');">
                                         @csrf
                                         @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger">Xóa</button>
+                                        <x-ui.button variant="outline-danger" size="sm" type="submit">Xóa</x-ui.button>
                                     </form>
                                 </td>
-                            @endhasanyrole
+                            @endif
                         </tr>
                     @empty
-                        <tr><td colspan="{{ auth()->user()?->hasAnyRole('marketing_manager|admin') ? 6 : 5 }}" class="text-center text-muted py-3">Chưa có dữ liệu</td></tr>
+                        <tr><td colspan="{{ $canManage ? 6 : 5 }}" class="tw:text-center tw:text-[rgba(33,37,41,0.75)] tw:py-4">Chưa có dữ liệu</td></tr>
                     @endforelse
                 </tbody>
-            </table>
-        </div>
-        <div class="card-body">{{ $rows->links() }}</div>
-    </div>
+            </x-ui.table>
+        </x-ui.table-wrap>
+        <x-ui.card-body>{{ $rows->links() }}</x-ui.card-body>
+    </x-ui.card>
 
     {{-- CHỈ SỐ GẦN ĐÂY --}}
-    @php
-        $formatBreakdown = function($arr){
-            if(!$arr || !is_array($arr) || count($arr)===0) return '-';
-            $pairs = [];
-            foreach($arr as $k=>$v){
-                if((int)$v > 0) $pairs[] = $k.':'.number_format($v);
-            }
-            return count($pairs) ? implode(', ', $pairs) : '-';
-        };
-    @endphp
-
-    <div class="card border-0 shadow-sm mt-4">
-        <div class="card-header bg-white fw-semibold">Chỉ số marketing (gần đây)</div>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+    <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mt-6">
+        <x-ui.card-header class="tw:bg-white tw:font-semibold">Chỉ số marketing (gần đây)</x-ui.card-header>
+        <x-ui.table-wrap>
+            <x-ui.table hover class="tw:mb-0">
+                <x-ui.table-head>
                     <tr>
                         <th>Ngày</th>
                         <th>Kênh</th>
                         <th>Chiến dịch</th>
-                        <th class="text-end">Chi</th>
-                        <th class="text-end">Reach</th>
-                        <th class="text-end">Lead</th>
+                        <th class="tw:text-right">Chi</th>
+                        <th class="tw:text-right">Reach</th>
+                        <th class="tw:text-right">Lead</th>
                         <th>Giới tính</th>
                         <th>Độ tuổi</th>
                         <th>Khu vực</th>
-                        <th class="text-end" style="width:160px;">Thao tác</th>
+                        <th class="tw:text-right" style="width:160px;">Thao tác</th>
                     </tr>
-                </thead>
+                </x-ui.table-head>
                 <tbody>
                     @forelse($metricRows as $m)
                         <tr>
                             <td>
-                                {{ $m->date_from ? \Illuminate\Support\Carbon::parse($m->date_from)->format('d/m') : '' }}
-                                @if($m->date_to) - {{ \Illuminate\Support\Carbon::parse($m->date_to)->format('d/m') }} @endif
+                                {{ $m->dateFromText }}
+                                @if($m->dateToText !== '') - {{ $m->dateToText }} @endif
                             </td>
                             <td>{{ $m->platform }}</td>
 
                             {{-- ✅ FIX: đúng campaign theo từng dòng metrics --}}
-                            <td>{{ $m->campaign?->name ?? '-' }}</td>
+                            <td>{{ $m->campaignName }}</td>
 
-                            <td class="text-end">{{ number_format($m->spend ?? 0) }}</td>
-                            <td class="text-end">{{ number_format($m->reach ?? 0) }}</td>
-                            <td class="text-end">{{ number_format($m->leads ?? 0) }}</td>
+                            <td class="tw:text-right">{{ number_format($m->spend) }}</td>
+                            <td class="tw:text-right">{{ number_format($m->reach) }}</td>
+                            <td class="tw:text-right">{{ number_format($m->leads) }}</td>
 
-                            <td>{{ $formatBreakdown($m->gender_breakdown) }}</td>
-                            <td>{{ $formatBreakdown($m->age_breakdown) }}</td>
-                            <td>{{ $formatBreakdown($m->region_breakdown) }}</td>
+                            <td>{{ $m->genderText }}</td>
+                            <td>{{ $m->ageText }}</td>
+                            <td>{{ $m->regionText }}</td>
 
-                            <td class="text-end">
-                                @hasanyrole('marketing_manager|admin')
-                                    <a href="{{ route('marketing.metrics.edit', $m->id) }}" class="btn btn-sm btn-outline-primary">Sửa</a>
+                            <td class="tw:text-right">
+                                @if($canManage)
+                                    <x-ui.button variant="outline-primary" size="sm" :href="route('marketing.metrics.edit', $m->id)">Sửa</x-ui.button>
 
                                     <form action="{{ route('marketing.metrics.destroy', $m->id) }}"
                                           method="POST"
-                                          class="d-inline"
+                                          class="tw:inline"
                                           onsubmit="return confirm('Xóa chỉ số này nhé?');">
                                         @csrf
                                         @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger">Xóa</button>
+                                        <x-ui.button variant="outline-danger" size="sm" type="submit">Xóa</x-ui.button>
                                     </form>
-                                @endhasanyrole
+                                @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="10" class="text-center text-muted py-3">Chưa có dữ liệu</td></tr>
+                        <tr><td colspan="10" class="tw:text-center tw:text-[rgba(33,37,41,0.75)] tw:py-4">Chưa có dữ liệu</td></tr>
                     @endforelse
                 </tbody>
-            </table>
-        </div>
-    </div>
+            </x-ui.table>
+        </x-ui.table-wrap>
+    </x-ui.card>
 
     {{-- CAMPAIGN TỔNG HỢP --}}
-    <div class="card border-0 shadow-sm mt-4">
-        <div class="card-header bg-white fw-semibold">Campaign tổng hợp (Ngân sách + Chỉ số)</div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+    <x-ui.card class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mt-6">
+        <x-ui.card-header class="tw:bg-white tw:font-semibold">Campaign tổng hợp (Ngân sách + Chỉ số)</x-ui.card-header>
+        <x-ui.table-wrap>
+            <x-ui.table hover class="tw:align-middle tw:mb-0">
+                <x-ui.table-head>
                     <tr>
                         <th>Tháng</th>
                         <th>Kênh</th>
                         <th>Chiến dịch</th>
-                        <th class="text-end">Ngân sách</th>
-                        <th class="text-end">Đã chi (NS)</th>
-                        <th class="text-end">Chi tiêu (chỉ số)</th>
-                        <th class="text-end">Reach</th>
-                        <th class="text-end">Lead</th>
+                        <th class="tw:text-right">Ngân sách</th>
+                        <th class="tw:text-right">Đã chi (NS)</th>
+                        <th class="tw:text-right">Chi tiêu (chỉ số)</th>
+                        <th class="tw:text-right">Reach</th>
+                        <th class="tw:text-right">Lead</th>
                     </tr>
-                </thead>
+                </x-ui.table-head>
                 <tbody>
-    @php($campaignCombined = $campaignCombined ?? collect())
-
-    @forelse($campaignCombined as $c)
+    {{-- $cc chứ không phải $c: $c đã là biến vòng lặp của các dropdown chiến dịch trong trang --}}
+    @forelse($campaignCombined as $cc)
         <tr>
             <td>
                 @if($month)
-                    {{ \Illuminate\Support\Carbon::parse($c->month)->format('m/Y') }}
+                    {{ $cc->monthText }}
                 @else
-                    {{ $c->month }}
+                    {{ $cc->monthRaw }}
                 @endif
             </td>
-            <td>{{ $c->platform }}</td>
-            <td>{{ $c->campaign_name ?? '-' }}</td>
-            <td class="text-end">{{ number_format($c->budget ?? 0) }}</td>
-            <td class="text-end">{{ number_format($c->budget_spent ?? 0) }}</td>
-            <td class="text-end">{{ number_format($c->spend ?? 0) }}</td>
-            <td class="text-end">{{ number_format($c->reach ?? 0) }}</td>
-            <td class="text-end">{{ number_format($c->leads ?? 0) }}</td>
+            <td>{{ $cc->platform }}</td>
+            <td>{{ $cc->campaignName }}</td>
+            <td class="tw:text-right">{{ number_format($cc->budget) }}</td>
+            <td class="tw:text-right">{{ number_format($cc->budgetSpent) }}</td>
+            <td class="tw:text-right">{{ number_format($cc->spend) }}</td>
+            <td class="tw:text-right">{{ number_format($cc->reach) }}</td>
+            <td class="tw:text-right">{{ number_format($cc->leads) }}</td>
         </tr>
     @empty
-        <tr><td colspan="8" class="text-center text-muted py-3">Chưa có dữ liệu</td></tr>
+        <tr><td colspan="8" class="tw:text-center tw:text-[rgba(33,37,41,0.75)] tw:py-4">Chưa có dữ liệu</td></tr>
     @endforelse
 </tbody>
-            </table>
-        </div>
-    </div>
+            </x-ui.table>
+        </x-ui.table-wrap>
+    </x-ui.card>
 
 </div>
 
 {{-- MODAL: Ngân sách + Chỉ số + Chiến dịch --}}
-<div class="modal fade" id="adsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header">
-                <div>
-                    <h5 class="modal-title fw-bold mb-0">Thêm dữ liệu Marketing</h5>
-                    <small class="text-muted">Chọn tab Ngân sách hoặc Chỉ số hoặc Chiến dịch</small>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
+<x-ui.modal name="adsModal" size="lg"
+            title="Thêm dữ liệu Marketing"
+            subtitle="Chọn tab Ngân sách hoặc Chỉ số hoặc Chiến dịch">
 
-            <div class="modal-body">
-                <ul class="nav nav-tabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabBudget" type="button" role="tab">
-                            Ngân sách
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMetric" type="button" role="tab">
-                            Chỉ số
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCampaign" type="button" role="tab">
-                            Chiến dịch
-                        </button>
-                    </li>
-                </ul>
-
-                <div class="tab-content pt-3">
+    <x-ui.tabs :tabs="['budget' => 'Ngân sách', 'metric' => 'Chỉ số', 'campaign' => 'Chiến dịch']">
 
                     {{-- TAB: NGÂN SÁCH --}}
-                    <div class="tab-pane fade show active" id="tabBudget" role="tabpanel">
-                        <form method="POST" action="{{ route('marketing.budget.store') }}" class="row g-2">
+                    <x-ui.tab-panel name="budget">
+                        <form method="POST" action="{{ route('marketing.budget.store') }}" class="tw:row tw:g-2">
                             @csrf
 
-                            <div class="col-md-3">
-                                <label class="form-label small text-muted">Tháng</label>
-                                <input type="month" name="month" class="form-control" required>
+                            <div class="tw:md:col12-3">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Tháng</x-ui.label>
+                                <x-ui.input type="month" name="month" required />
                             </div>
 
-                            <div class="col-md-3">
-                                <label class="form-label small text-muted">Kênh</label>
-                                <select name="platform" class="form-select" required>
+                            <div class="tw:md:col12-3">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Kênh</x-ui.label>
+                                <x-ui.select name="platform" required>
                                     @foreach(['Facebook','Google','TikTok','Zalo','Khác'] as $p)
                                         <option value="{{ $p }}">{{ $p }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted">Chiến dịch</label>
-                                <select name="campaign_id" class="form-select" required>
+                            <div class="tw:md:col12-6">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Chiến dịch</x-ui.label>
+                                <x-ui.select name="campaign_id" required>
                                     <option value="">-- Chọn chiến dịch --</option>
                                     @foreach($campaigns as $c)
                                         <option value="{{ $c->id }}">{{ $c->name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
 
-                            <div class="col-md-3">
-                                <label class="form-label small text-muted">Ngân sách (đ)</label>
-                                <input type="number" name="budget" class="form-control" min="0" required>
+                            <div class="tw:md:col12-3">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Ngân sách (đ)</x-ui.label>
+                                <x-ui.input type="number" name="budget" min="0" required />
                             </div>
 
-                            <div class="col-md-3">
-                                <label class="form-label small text-muted">Đã chi (đ)</label>
-                                <input type="number" name="actual_spent" class="form-control" min="0" value="0">
+                            <div class="tw:md:col12-3">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Đã chi (đ)</x-ui.label>
+                                <x-ui.input type="number" name="actual_spent" min="0" value="0" />
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted">Ghi chú</label>
-                                <input type="text" name="note" class="form-control" placeholder="Tuỳ chọn">
+                            <div class="tw:md:col12-6">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Ghi chú</x-ui.label>
+                                <x-ui.input type="text" name="note" placeholder="Tuỳ chọn" />
                             </div>
 
-                            <div class="col-12 d-flex justify-content-end gap-2 mt-2">
-                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Đóng</button>
-                                <button class="btn btn-success">Lưu ngân sách</button>
+                            <div class="tw:col12-12 tw:flex tw:justify-end tw:gap-2 tw:mt-2">
+                                <x-ui.button variant="light" type="button"
+                                              x-on:click="$dispatch('close-modal', 'adsModal')">Đóng</x-ui.button>
+                                <x-ui.button variant="success" type="submit">Lưu ngân sách</x-ui.button>
                             </div>
                         </form>
-                    </div>
+                    </x-ui.tab-panel>
 
                     {{-- TAB: CHỈ SỐ --}}
-                    <div class="tab-pane fade" id="tabMetric" role="tabpanel">
-                        <form method="POST" action="{{ route('marketing.metrics.store') }}" class="row g-2">
+                    <x-ui.tab-panel name="metric">
+                        <form method="POST" action="{{ route('marketing.metrics.store') }}" class="tw:row tw:g-2">
                             @csrf
 
-                            <div class="col-md-3">
-                                <label class="form-label small text-muted">Từ ngày</label>
-                                <input type="date" name="date_from" class="form-control" required>
+                            <div class="tw:md:col12-3">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Từ ngày</x-ui.label>
+                                <x-ui.input type="date" name="date_from" required />
                             </div>
 
-                            <div class="col-md-3">
-                                <label class="form-label small text-muted">Đến ngày</label>
-                                <input type="date" name="date_to" class="form-control" required>
+                            <div class="tw:md:col12-3">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Đến ngày</x-ui.label>
+                                <x-ui.input type="date" name="date_to" required />
                             </div>
 
-                            <div class="col-md-3">
-                                <label class="form-label small text-muted">Kênh</label>
-                                <select name="platform" class="form-select" required>
+                            <div class="tw:md:col12-3">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Kênh</x-ui.label>
+                                <x-ui.select name="platform" required>
                                     @foreach(['Facebook','Google','TikTok','Zalo','Khác'] as $p)
                                         <option value="{{ $p }}">{{ $p }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
 
-                            <div class="col-md-3">
-                                <label class="form-label small text-muted">Chiến dịch</label>
-                                <select name="campaign_id" class="form-select" required>
+                            <div class="tw:md:col12-3">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Chiến dịch</x-ui.label>
+                                <x-ui.select name="campaign_id" required>
                                     <option value="">-- Chọn chiến dịch --</option>
                                     @foreach($campaigns as $c)
                                         <option value="{{ $c->id }}">{{ $c->name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
 
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Reach (tiếp cận)</label>
-                                <input type="number" name="reach" class="form-control" min="0" required>
+                            <div class="tw:md:col12-4">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Reach (tiếp cận)</x-ui.label>
+                                <x-ui.input type="number" name="reach" min="0" required />
                             </div>
 
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Số lead</label>
-                                <input type="number" name="leads" class="form-control" min="0" required>
+                            <div class="tw:md:col12-4">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Số lead</x-ui.label>
+                                <x-ui.input type="number" name="leads" min="0" required />
                             </div>
 
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Chi tiêu (nếu có)</label>
-                                <input type="number" name="spend" class="form-control" min="0" value="0">
+                            <div class="tw:md:col12-4">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Chi tiêu (nếu có)</x-ui.label>
+                                <x-ui.input type="number" name="spend" min="0" value="0" />
                             </div>
 
-                            <div class="col-12">
-                                <label class="form-label small text-muted">Ghi chú</label>
-                                <input type="text" name="note" class="form-control" placeholder="Tuỳ chọn">
+                            <div class="tw:col12-12">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Ghi chú</x-ui.label>
+                                <x-ui.input type="text" name="note" placeholder="Tuỳ chọn" />
                             </div>
 
-                            <div class="col-12 d-flex justify-content-end gap-2 mt-2">
-                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Đóng</button>
-                                <button class="btn btn-primary">Lưu chỉ số</button>
+                            <div class="tw:col12-12 tw:flex tw:justify-end tw:gap-2 tw:mt-2">
+                                <x-ui.button variant="light" type="button"
+                                              x-on:click="$dispatch('close-modal', 'adsModal')">Đóng</x-ui.button>
+                                <x-ui.button variant="primary" type="submit">Lưu chỉ số</x-ui.button>
                             </div>
                         </form>
-                    </div>
+                    </x-ui.tab-panel>
 
                     {{-- TAB: CHIẾN DỊCH --}}
-                    <div class="tab-pane fade" id="tabCampaign" role="tabpanel">
-                        <form method="POST" action="{{ route('marketing.campaigns.store') }}" class="row g-2">
+                    <x-ui.tab-panel name="campaign">
+                        <form method="POST" action="{{ route('marketing.campaigns.store') }}" class="tw:row tw:g-2">
                             @csrf
 
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted">Tên chiến dịch</label>
-                                <input type="text" name="name" class="form-control" placeholder="VD: Goodwe 5kw" required>
+                            <div class="tw:md:col12-6">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Tên chiến dịch</x-ui.label>
+                                <x-ui.input type="text" name="name" placeholder="VD: Goodwe 5kw" required />
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted">Kênh</label>
-                                <select name="platform" class="form-select" required>
+                            <div class="tw:md:col12-6">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Kênh</x-ui.label>
+                                <x-ui.select name="platform" required>
                                     @foreach(['Facebook','Google','TikTok','Zalo','Khác'] as $p)
                                         <option value="{{ $p }}">{{ $p }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
 
-                            <div class="col-12">
-                                <label class="form-label small text-muted">Ghi chú</label>
-                                <input type="text" name="note" class="form-control" placeholder="Tuỳ chọn">
+                            <div class="tw:col12-12">
+                                <x-ui.label class="tw:text-[0.875em] tw:text-[rgba(33,37,41,0.75)]">Ghi chú</x-ui.label>
+                                <x-ui.input type="text" name="note" placeholder="Tuỳ chọn" />
                             </div>
 
-                            <div class="col-12 d-flex justify-content-end gap-2 mt-2">
-                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Đóng</button>
-                                <button class="btn btn-primary">Tạo chiến dịch</button>
+                            <div class="tw:col12-12 tw:flex tw:justify-end tw:gap-2 tw:mt-2">
+                                <x-ui.button variant="light" type="button"
+                                              x-on:click="$dispatch('close-modal', 'adsModal')">Đóng</x-ui.button>
+                                <x-ui.button variant="primary" type="submit">Tạo chiến dịch</x-ui.button>
                             </div>
                         </form>
-                    </div>
+                    </x-ui.tab-panel>
 
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+    </x-ui.tabs>
+
+</x-ui.modal>
 
 @endsection

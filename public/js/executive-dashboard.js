@@ -102,7 +102,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: { duration: 420 },
+                animation: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
                     legend: { display: false },
@@ -155,7 +155,7 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 cutout: '70%',
-                animation: { duration: 420 },
+                animation: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -193,7 +193,7 @@
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: { duration: 420 },
+                animation: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {

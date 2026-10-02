@@ -1,4 +1,5 @@
 <?php
+
 return [
     'cache_seconds' => 30,
     'groups' => [

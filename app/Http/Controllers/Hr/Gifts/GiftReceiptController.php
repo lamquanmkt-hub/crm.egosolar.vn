@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Hr\Gift;
 use App\Models\Hr\GiftReceipt;
 use App\Services\Hr\GiftStockService;
-use App\Support\EgoCompanyLock;
+use App\Support\EgoCompanyScope;
 use App\Support\GiftAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,14 +18,12 @@ use Throwable;
 
 final class GiftReceiptController extends Controller
 {
-    public function __construct(private readonly GiftStockService $stockService)
-    {
-    }
+    public function __construct(private readonly GiftStockService $stockService) {}
 
     public function index(Request $request): View
     {
         $this->authorizeStock($request);
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
 
         $query = GiftReceipt::query()
             ->where('company_id', $companyId)
@@ -47,7 +45,7 @@ final class GiftReceiptController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $this->authorizeStock($request);
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
 
         $data = $request->validate([
             'receipt_date' => ['required', 'date'],
@@ -171,6 +169,7 @@ final class GiftReceiptController extends Controller
             $this->stockService->approveReceipt($receipt, $request->user());
         } catch (Throwable $e) {
             report($e);
+
             return back()->with('error', $e->getMessage());
         }
 
@@ -240,6 +239,6 @@ final class GiftReceiptController extends Controller
 
     private function guardCompany(GiftReceipt $receipt): void
     {
-        abort_unless((int) $receipt->company_id === EgoCompanyLock::id(), 404);
+        abort_unless((int) $receipt->company_id === EgoCompanyScope::currentId(), 404);
     }
 }

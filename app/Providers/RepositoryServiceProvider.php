@@ -8,6 +8,7 @@ use App\Contracts\Repositories\LeadRepositoryInterface;
 use App\Contracts\Repositories\OrderRepositoryInterface;
 use App\Contracts\Repositories\PaymentMethodRepositoryInterface;
 use App\Contracts\Repositories\PaymentRepositoryInterface;
+use App\Contracts\Repositories\PaymentRequestRepositoryInterface;
 use App\Contracts\Repositories\PriceTierRepositoryInterface;
 use App\Contracts\Repositories\ProductCategoryRepositoryInterface;
 use App\Contracts\Repositories\ProductRepositoryInterface;
@@ -24,6 +25,7 @@ use App\Repositories\Eloquent\ProductCategoryRepository;
 use App\Repositories\Eloquent\ProductRepository;
 use App\Repositories\Eloquent\UserRepository;
 use App\Repositories\Eloquent\WarehouseRepository;
+use App\Repositories\PaymentRequestRepository;
 use Illuminate\Support\ServiceProvider;
 
 class RepositoryServiceProvider extends ServiceProvider
@@ -38,6 +40,9 @@ class RepositoryServiceProvider extends ServiceProvider
         $this->app->bind(OrderRepositoryInterface::class, OrderRepository::class);
         $this->app->bind(LeadRepositoryInterface::class, LeadRepository::class);
         $this->app->bind(PaymentRepositoryInterface::class, PaymentRepository::class);
+        // ĐNTT dùng query builder + dò schema chứ không phải Eloquent — lý do
+        // ghi trong PaymentRequestRepositoryInterface.
+        $this->app->bind(PaymentRequestRepositoryInterface::class, PaymentRequestRepository::class);
         $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
         $this->app->bind(ProductRepositoryInterface::class, ProductRepository::class);
         $this->app->bind(ProductCategoryRepositoryInterface::class, ProductCategoryRepository::class);

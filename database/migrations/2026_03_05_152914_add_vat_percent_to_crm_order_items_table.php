@@ -11,9 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('crm_order_items', function (Blueprint $table) {
-    $table->decimal('vat_percent', 5, 2)->default(0)->after('unit_price');
-});
+        if (Schema::hasTable('crm_order_items')) {
+            Schema::table('crm_order_items', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_order_items', 'vat_percent')) {
+                    $table->decimal('vat_percent', 5, 2)->default(0)->after('unit_price');
+                }
+            });
+        }
     }
 
     /**
@@ -21,8 +25,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('crm_order_items', function (Blueprint $table) {
-    $table->decimal('vat_percent', 5, 2)->default(0)->after('unit_price');
-});
+        if (Schema::hasTable('crm_order_items')) {
+            Schema::table('crm_order_items', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_order_items', 'vat_percent')) {
+                    $table->decimal('vat_percent', 5, 2)->default(0)->after('unit_price');
+                }
+            });
+        }
     }
 };

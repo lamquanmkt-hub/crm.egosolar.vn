@@ -8,6 +8,7 @@ use App\Contracts\Services\ProductCategoryServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ProductCategoryRequest;
 use App\Models\Inventory\Catalog\ProductCategory;
+use App\View\Presenters\Inventory\ProductCategoryDetailPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -78,7 +79,10 @@ class ProductCategoryController extends Controller
     {
         $category = $this->service->findWithProducts($category->id);
 
-        return view('product-categories.show', compact('category'));
+        return view('product-categories.show', array_merge(
+            compact('category'),
+            app(ProductCategoryDetailPresenter::class)->viewData($category)
+        ));
     }
 
     /**

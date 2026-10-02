@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Hr\Gifts;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hr\Gift;
-use App\Support\EgoCompanyLock;
+use App\Support\EgoCompanyScope;
 use App\Support\GiftAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +18,7 @@ final class GiftCatalogController extends Controller
     public function index(Request $request): View
     {
         $this->authorizeStock($request);
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
 
         $query = Gift::query()->where('company_id', $companyId);
 
@@ -46,7 +46,7 @@ final class GiftCatalogController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $this->authorizeStock($request);
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
 
         $data = $request->validate([
             'sku' => ['required', 'string', 'max:80', Rule::unique('hr_gifts', 'sku')->where('company_id', $companyId)],
@@ -74,7 +74,7 @@ final class GiftCatalogController extends Controller
     {
         $this->authorizeStock($request);
         $this->guardCompany($gift);
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
 
         $data = $request->validate([
             'sku' => [
@@ -121,6 +121,6 @@ final class GiftCatalogController extends Controller
 
     private function guardCompany(Gift $gift): void
     {
-        abort_unless((int) $gift->company_id === EgoCompanyLock::id(), 404);
+        abort_unless((int) $gift->company_id === EgoCompanyScope::currentId(), 404);
     }
 }

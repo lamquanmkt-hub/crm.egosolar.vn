@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
-use App\Support\EgoCompanyLock;
+use App\Support\EgoCompanyContext;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -14,16 +14,43 @@ use Illuminate\Support\Facades\Validator;
  */
 class ProductGoodsReceiptController extends Controller
 {
+    private function vnWarehouseIdsQuery()
+    {
+        $query = DB::table('crm_warehouses')->select('id');
+
+        $query->where(function ($warehouseQuery) {
+            $hasCondition = false;
+
+            if (SchemaCache::hasColumn('crm_warehouses', 'company_id')) {
+                $warehouseQuery->where('company_id', EgoCompanyContext::defaultCompanyId());
+                $hasCondition = true;
+            }
+
+            if (SchemaCache::hasTable('company_warehouse')) {
+                $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                $warehouseQuery->{$method}('id', DB::table('company_warehouse')
+                    ->select('warehouse_id')
+                    ->where('company_id', EgoCompanyContext::defaultCompanyId()));
+                $hasCondition = true;
+            }
+
+            if (! $hasCondition) {
+                $warehouseQuery->whereRaw('1 = 0');
+            }
+        });
+
+        return $query;
+    }
+
     /**
      * Danh sách phiếu nhập hàng có tìm kiếm, lọc trạng thái thanh toán và thống kê.
      */
     public function index(Request $request)
     {
-        abort_unless(Schema::hasTable('product_goods_receipts'), 500, 'Chưa có bảng product_goods_receipts.');
+        abort_unless(SchemaCache::hasTable('product_goods_receipts'), 500, 'Chưa có bảng product_goods_receipts.');
 
         $q = trim((string) $request->get('q', ''));
         $paymentStatus = trim((string) $request->get('payment_status', ''));
-        $warehouseId = $request->filled('warehouse_id') ? (int) $request->get('warehouse_id') : null;
 
         $query = DB::table('product_goods_receipts as r')
             ->leftJoin('companies as c', 'c.id', '=', 'r.company_id')
@@ -33,7 +60,8 @@ class ProductGoodsReceiptController extends Controller
                 'c.name as company_name',
                 'w.name as warehouse_name',
             ])
-            ->where('r.company_id', EgoCompanyLock::id());
+            ->where('r.company_id', EgoCompanyContext::defaultCompanyId())
+            ->whereIn('r.warehouse_id', $this->vnWarehouseIdsQuery());
 
         if ($q !== '') {
             $query->where(function ($x) use ($q) {
@@ -49,118 +77,51 @@ class ProductGoodsReceiptController extends Controller
             $query->where('r.payment_status', $paymentStatus);
         }
 
-        if ($warehouseId) {
-            $query->where('r.warehouse_id', $warehouseId);
-        }
-
         $receipts = $query->orderByDesc('r.id')->paginate(20)->appends($request->query());
 
+        // Nạp chi tiết hàng hóa cho các phiếu trên trang hiện tại để người dùng
+        // có thể bấm mở ngay trong danh sách, không cần thêm route hoặc truy vấn AJAX.
+        $receiptItems = collect();
+        $receiptIds = $receipts->getCollection()->pluck('id')->filter()->values();
+
+        if (
+            $receiptIds->isNotEmpty()
+            && SchemaCache::hasTable('product_goods_receipt_items')
+            && SchemaCache::hasTable('crm_product_catalog')
+        ) {
+            $receiptItems = DB::table('product_goods_receipt_items as i')
+                ->leftJoin('crm_product_catalog as p', 'p.id', '=', 'i.product_id')
+                ->whereIn('i.receipt_id', $receiptIds->all())
+                ->select([
+                    'i.id',
+                    'i.receipt_id',
+                    'i.product_id',
+                    'i.qty',
+                    'i.unit_price',
+                    'i.vat_percent',
+                    'i.amount',
+                    'i.note',
+                    'p.sku',
+                    'p.name as product_name',
+                    'p.unit',
+                ])
+                ->orderBy('i.receipt_id')
+                ->orderBy('i.id')
+                ->get()
+                ->groupBy('receipt_id');
+        }
+
         $stats = [
-            'total' => DB::table('product_goods_receipts')->where('company_id', EgoCompanyLock::id())->count(),
-            'posted' => DB::table('product_goods_receipts')->where('company_id', EgoCompanyLock::id())->where('status', 'posted')->count(),
-            'unpaid' => DB::table('product_goods_receipts')->where('company_id', EgoCompanyLock::id())->whereIn('payment_status', ['unpaid', 'partial'])->sum('debt_amount'),
-            'paid' => DB::table('product_goods_receipts')->where('company_id', EgoCompanyLock::id())->where('payment_status', 'paid')->sum('total_amount'),
+            'total' => DB::table('product_goods_receipts')->where('company_id', EgoCompanyContext::defaultCompanyId())->count(),
+            'posted' => DB::table('product_goods_receipts')->where('company_id', EgoCompanyContext::defaultCompanyId())->where('status', 'posted')->count(),
+            'unpaid' => DB::table('product_goods_receipts')->where('company_id', EgoCompanyContext::defaultCompanyId())->whereIn('payment_status', ['unpaid', 'partial'])->sum('debt_amount'),
+            'paid' => DB::table('product_goods_receipts')->where('company_id', EgoCompanyContext::defaultCompanyId())->where('payment_status', 'paid')->sum('total_amount'),
         ];
 
         return view('products.goods-receipts.index', array_merge(
             $this->formData(),
-            compact('receipts', 'stats', 'q', 'paymentStatus', 'warehouseId')
+            compact('receipts', 'receiptItems', 'stats', 'q', 'paymentStatus')
         ));
-    }
-
-    /**
-     * Chi tiết phiếu nhập hàng và toàn bộ sản phẩm trong phiếu.
-     */
-    public function show($id)
-    {
-        abort_unless(Schema::hasTable('product_goods_receipts'), 404);
-        abort_unless(Schema::hasTable('product_goods_receipt_items'), 404);
-
-        $receipt = DB::table('product_goods_receipts as r')
-            ->leftJoin('crm_warehouses as w', 'w.id', '=', 'r.warehouse_id')
-            ->select([
-                'r.*',
-                'w.name as warehouse_name',
-            ])
-            ->where('r.company_id', EgoCompanyLock::id())
-            ->where('r.id', (int) $id)
-            ->first();
-
-        abort_unless($receipt, 404);
-
-        $items = DB::table('product_goods_receipt_items as i')
-            ->leftJoin('crm_product_catalog as p', 'p.id', '=', 'i.product_id')
-            ->select([
-                'i.*',
-                'p.name as product_name',
-                'p.sku as product_sku',
-                'p.unit as product_unit',
-            ])
-            ->where('i.receipt_id', (int) $receipt->id)
-            ->orderBy('i.id')
-            ->get();
-
-        return view('products.goods-receipts.show', compact('receipt', 'items'));
-    }
-
-    /**
-     * Tạo nhanh nhà cung cấp từ popup của phiếu nhập hàng.
-     */
-    public function storeSupplier(Request $request)
-    {
-        abort_unless(Schema::hasTable('product_suppliers'), 500, 'Chưa có bảng danh mục nhà cung cấp.');
-
-        $data = Validator::make($request->all(), [
-            'name' => ['required', 'string', 'max:191'],
-            'phone' => ['nullable', 'string', 'max:80'],
-            'tax_code' => ['nullable', 'string', 'max:80'],
-            'address' => ['nullable', 'string', 'max:500'],
-            'note' => ['nullable', 'string', 'max:1000'],
-        ])->validate();
-
-        $name = trim((string) $data['name']);
-        $companyId = EgoCompanyLock::id();
-
-        try {
-            $existing = DB::table('product_suppliers')
-                ->where('company_id', $companyId)
-                ->where('name', $name)
-                ->first();
-
-            $payload = [
-                'name' => $name,
-                'phone' => trim((string) ($data['phone'] ?? '')) ?: null,
-                'tax_code' => trim((string) ($data['tax_code'] ?? '')) ?: null,
-                'address' => trim((string) ($data['address'] ?? '')) ?: null,
-                'note' => trim((string) ($data['note'] ?? '')) ?: null,
-                'is_active' => 1,
-                'updated_at' => now(),
-            ];
-
-            if ($existing) {
-                DB::table('product_suppliers')->where('id', $existing->id)->update($payload);
-                $id = (int) $existing->id;
-            } else {
-                $id = (int) DB::table('product_suppliers')->insertGetId(array_merge($payload, [
-                    'company_id' => $companyId,
-                    'created_by' => auth()->id(),
-                    'created_at' => now(),
-                ]));
-            }
-
-            $supplier = DB::table('product_suppliers')->where('id', $id)->first();
-
-            return response()->json([
-                'ok' => true,
-                'supplier' => $supplier,
-                'message' => $existing ? 'Đã cập nhật nhà cung cấp.' : 'Đã tạo nhà cung cấp mới.',
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'ok' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        }
     }
 
     /**
@@ -168,54 +129,11 @@ class ProductGoodsReceiptController extends Controller
      */
     public function store(Request $request)
     {
-        // Luôn khóa phiếu vào Công ty Quốc Tế EGO, không tin company_id từ trình duyệt.
-        $request->merge(['company_id' => EgoCompanyLock::id()]);
-
-        // Nhà cung cấp được chọn từ danh mục. Dữ liệu tên luôn lấy lại từ server.
-        if ($request->filled('supplier_id')) {
-            abort_unless(Schema::hasTable('product_suppliers'), 500, 'Chưa có bảng danh mục nhà cung cấp.');
-
-            $supplier = DB::table('product_suppliers')
-                ->where('company_id', EgoCompanyLock::id())
-                ->where('is_active', 1)
-                ->where('id', (int) $request->input('supplier_id'))
-                ->first();
-
-            if (! $supplier) {
-                return back()->withInput()->with('error', 'Nhà cung cấp không tồn tại hoặc đã ngừng sử dụng.');
-            }
-
-            $request->merge([
-                'supplier_name' => $supplier->name,
-                'supplier_phone' => $request->filled('supplier_phone') ? $request->input('supplier_phone') : $supplier->phone,
-                'supplier_tax_code' => $request->filled('supplier_tax_code') ? $request->input('supplier_tax_code') : $supplier->tax_code,
-                'supplier_address' => $request->filled('supplier_address') ? $request->input('supplier_address') : $supplier->address,
-            ]);
-        }
-
-        // Chuẩn hóa trường tiền trước khi validate để chống mất 3 số 0 khi người dùng
-        // nhập theo định dạng VN: 30,000 / 30.000 / 1.250.000 / 34.000.000,56.
-        $normalizedItems = (array) $request->input('items', []);
-
-        foreach ($normalizedItems as $index => $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
-            if (array_key_exists('unit_price', $row)) {
-                $normalizedItems[$index]['unit_price'] = $this->parseMoneyInput($row['unit_price']);
-            }
-        }
-
-        $request->merge([
-            'paid_amount' => $this->parseMoneyInput($request->input('paid_amount', 0)),
-            'items' => $normalizedItems,
-        ]);
+        $request->merge(['company_id' => EgoCompanyContext::defaultCompanyId()]);
 
         $validator = Validator::make($request->all(), [
             'company_id' => ['required', 'integer'],
             'warehouse_id' => ['required', 'integer'],
-            'supplier_id' => ['required', 'integer'],
             'supplier_name' => ['required', 'string', 'max:255'],
             'supplier_phone' => ['nullable', 'string', 'max:80'],
             'supplier_tax_code' => ['nullable', 'string', 'max:80'],
@@ -284,9 +202,8 @@ class ProductGoodsReceiptController extends Controller
 
                 $id = DB::table('product_goods_receipts')->insertGetId([
                     'code' => $this->makeCode(),
-                    'company_id' => EgoCompanyLock::id(),
+                    'company_id' => EgoCompanyContext::defaultCompanyId(),
                     'warehouse_id' => (int) $request->input('warehouse_id'),
-                    'supplier_id' => (int) $request->input('supplier_id'),
                     'supplier_name' => $request->input('supplier_name'),
                     'supplier_phone' => $request->input('supplier_phone'),
                     'supplier_tax_code' => $request->input('supplier_tax_code'),
@@ -352,7 +269,7 @@ class ProductGoodsReceiptController extends Controller
      */
     public function destroy($id)
     {
-        $row = DB::table('product_goods_receipts')->where('company_id', EgoCompanyLock::id())->where('id', (int) $id)->first();
+        $row = DB::table('product_goods_receipts')->where('id', (int) $id)->where('company_id', EgoCompanyContext::defaultCompanyId())->first();
         abort_unless($row, 404);
 
         if (($row->status ?? '') === 'posted') {
@@ -361,7 +278,7 @@ class ProductGoodsReceiptController extends Controller
 
         DB::transaction(function () use ($id) {
             DB::table('product_goods_receipt_items')->where('receipt_id', (int) $id)->delete();
-            DB::table('product_goods_receipts')->where('company_id', EgoCompanyLock::id())->where('id', (int) $id)->delete();
+            DB::table('product_goods_receipts')->where('id', (int) $id)->delete();
         });
 
         return back()->with('success', 'Đã xóa phiếu nháp.');
@@ -372,7 +289,7 @@ class ProductGoodsReceiptController extends Controller
      */
     private function postInsideTransaction(int $id): void
     {
-        $receipt = DB::table('product_goods_receipts')->where('company_id', EgoCompanyLock::id())->where('id', $id)->lockForUpdate()->first();
+        $receipt = DB::table('product_goods_receipts')->where('id', $id)->where('company_id', EgoCompanyContext::defaultCompanyId())->lockForUpdate()->first();
 
         if (! $receipt) {
             throw new \RuntimeException('Không tìm thấy phiếu nhập hàng.');
@@ -405,12 +322,135 @@ class ProductGoodsReceiptController extends Controller
 
         $this->createInventoryRef($eventId, 'product_goods_receipt', $id);
 
-        DB::table('product_goods_receipts')->where('company_id', EgoCompanyLock::id())->where('id', $id)->update([
+        DB::table('product_goods_receipts')->where('id', $id)->update([
             'status' => 'posted',
             'posted_by' => auth()->id(),
             'posted_at' => now(),
             'updated_at' => now(),
         ]);
+
+        // Khi phiếu nhập được ghi sổ, tự sinh/cập nhật công nợ NCC trong nước.
+        $this->syncSupplierDebtFromGoodsReceipt($id);
+    }
+
+    /**
+     * Đồng bộ phiếu nhập kho đã ghi sổ sang Công nợ NCC trong nước.
+     * Đây là liên kết 1-1 qua source_type + source_id, không tạo công nợ trùng.
+     */
+    private function syncSupplierDebtFromGoodsReceipt(int $id): void
+    {
+        if (! SchemaCache::hasTable('finance_supplier_debts')) {
+            return;
+        }
+
+        foreach (['source_type', 'source_id', 'source_code', 'supplier_scope'] as $column) {
+            if (! SchemaCache::hasColumn('finance_supplier_debts', $column)) {
+                return;
+            }
+        }
+
+        $receipt = DB::table('product_goods_receipts')->where('id', $id)->first();
+        if (! $receipt || ($receipt->status ?? '') !== 'posted') {
+            return;
+        }
+
+        $debt = DB::table('finance_supplier_debts')
+            ->where('source_type', 'product_goods_receipt')
+            ->where('source_id', $id)
+            ->lockForUpdate()
+            ->first();
+
+        $companyName = SchemaCache::hasTable('companies')
+            ? DB::table('companies')->where('id', (int) $receipt->company_id)->value('name')
+            : null;
+
+        $documentDate = $receipt->invoice_date ?: substr((string) ($receipt->posted_at ?: now()), 0, 10);
+        $debtMonth = substr((string) $documentDate, 0, 7).'-01';
+        $paidAmount = min(max(0, (float) ($receipt->paid_amount ?? 0)), max(0, (float) ($receipt->total_amount ?? 0)));
+        $status = $paidAmount >= (float) $receipt->total_amount && (float) $receipt->total_amount > 0
+            ? 'paid'
+            : ($paidAmount > 0 ? 'partial' : 'unpaid');
+
+        $payload = [
+            'source_type' => 'product_goods_receipt',
+            'source_id' => $id,
+            'source_code' => (string) $receipt->code,
+            'supplier_scope' => 'domestic',
+            'supplier_name' => (string) $receipt->supplier_name,
+            'company_name' => $companyName,
+            'document_no' => $receipt->invoice_no ?: $receipt->code,
+            'document_date' => $documentDate,
+            'debt_month' => $debtMonth,
+            'total_amount' => (float) $receipt->total_amount,
+            'note' => 'Tự động đồng bộ từ phiếu nhập kho '.$receipt->code,
+            'status' => $status,
+            'updated_at' => now(),
+        ];
+
+        if (SchemaCache::hasColumn('finance_supplier_debts', 'due_date')) {
+            $payload['due_date'] = $receipt->payment_due_date ?: null;
+        }
+        if (SchemaCache::hasColumn('finance_supplier_debts', 'company_id')) {
+            $payload['company_id'] = $receipt->company_id ?: null;
+        }
+
+        if ($debt) {
+            DB::table('finance_supplier_debts')->where('id', $debt->id)->update($payload);
+            $debtId = (int) $debt->id;
+        } else {
+            $payload['paid_amount'] = $paidAmount;
+            $payload['created_by'] = $receipt->posted_by ?: $receipt->created_by ?: auth()->id();
+            $payload['created_at'] = now();
+            if (SchemaCache::hasColumn('finance_supplier_debts', 'bank_info')) {
+                $payload['bank_info'] = null;
+            }
+            $debtId = (int) DB::table('finance_supplier_debts')->insertGetId($payload);
+        }
+
+        // Nếu phiếu nhập đã khai báo có tiền thanh toán ngay, tạo đúng một đợt đã chi
+        // để SupplierDebtService không làm mất số đã trả khi tính lại công nợ.
+        if (SchemaCache::hasTable('finance_supplier_debt_payments')) {
+            $autoRoundQuery = DB::table('finance_supplier_debt_payments')
+                ->where('supplier_debt_id', $debtId);
+
+            if (SchemaCache::hasColumn('finance_supplier_debt_payments', 'source_type')) {
+                $autoRoundQuery->where('source_type', 'product_goods_receipt_paid')->where('source_id', $id);
+            } else {
+                $autoRoundQuery->where('note', 'Tự động ghi nhận số đã thanh toán từ phiếu nhập '.$receipt->code);
+            }
+
+            $autoRound = $autoRoundQuery->first();
+
+            if ($paidAmount > 0) {
+                $roundPayload = [
+                    'amount' => $paidAmount,
+                    'payment_date' => $documentDate,
+                    'status' => 'paid',
+                    'note' => 'Tự động ghi nhận số đã thanh toán từ phiếu nhập '.$receipt->code,
+                    'updated_at' => now(),
+                ];
+
+                if (SchemaCache::hasColumn('finance_supplier_debt_payments', 'source_type')) {
+                    $roundPayload['source_type'] = 'product_goods_receipt_paid';
+                    $roundPayload['source_id'] = $id;
+                }
+
+                if ($autoRound) {
+                    DB::table('finance_supplier_debt_payments')->where('id', $autoRound->id)->update($roundPayload);
+                } else {
+                    $roundPayload['supplier_debt_id'] = $debtId;
+                    $roundPayload['payment_request_id'] = null;
+                    $roundPayload['payment_round'] = ((int) DB::table('finance_supplier_debt_payments')->where('supplier_debt_id', $debtId)->max('payment_round')) + 1;
+                    $roundPayload['created_by'] = $receipt->posted_by ?: $receipt->created_by ?: auth()->id();
+                    $roundPayload['created_at'] = now();
+                    DB::table('finance_supplier_debt_payments')->insert($roundPayload);
+                }
+            } elseif ($autoRound) {
+                DB::table('finance_supplier_debt_payments')->where('id', $autoRound->id)->delete();
+            }
+
+            app(\App\Services\Finance\SupplierDebtService::class)->syncSupplierDebtTotals($debtId);
+        }
     }
 
     /**
@@ -419,10 +459,10 @@ class ProductGoodsReceiptController extends Controller
     private function formData(): array
     {
         $companies = collect();
-        if (Schema::hasTable('companies')) {
-            $q = DB::table('companies')->select('id', 'code', 'name')->where('id', EgoCompanyLock::id());
+        if (SchemaCache::hasTable('companies')) {
+            $q = DB::table('companies')->select('id', 'code', 'name')->where('id', EgoCompanyContext::defaultCompanyId());
 
-            if (Schema::hasColumn('companies', 'is_active')) {
+            if (SchemaCache::hasColumn('companies', 'is_active')) {
                 $q->where('is_active', 1);
             }
 
@@ -430,117 +470,39 @@ class ProductGoodsReceiptController extends Controller
         }
 
         $warehouses = collect();
-        if (Schema::hasTable('crm_warehouses')) {
+        if (SchemaCache::hasTable('crm_warehouses')) {
             $warehouses = DB::table('crm_warehouses')
                 ->select('id', 'company_id', 'name', 'location')
-                ->where('company_id', EgoCompanyLock::id())
-                ->orderBy('company_id')
+                ->whereIn('id', $this->vnWarehouseIdsQuery())
                 ->orderBy('name')
-                ->get();
-        }
-
-        $suppliers = collect();
-        if (Schema::hasTable('product_suppliers')) {
-            $suppliers = DB::table('product_suppliers')
-                ->select('id', 'name', 'phone', 'tax_code', 'address')
-                ->where('company_id', EgoCompanyLock::id())
-                ->where('is_active', 1)
                 ->orderBy('name')
                 ->get();
         }
 
         $products = collect();
-        if (Schema::hasTable('crm_product_catalog')) {
+        if (SchemaCache::hasTable('crm_product_catalog')) {
             $q = DB::table('crm_product_catalog as p')
-                ->leftJoin('crm_product_stock as st', function ($join) {
-                    $join->on('st.product_id', '=', 'p.id')
-                        ->where('st.company_id', EgoCompanyLock::id());
-                })
+                ->leftJoin('crm_product_stock as st', 'st.product_id', '=', 'p.id')
                 ->selectRaw('p.id, p.company_id, p.sku, p.name, p.unit, COALESCE(SUM(st.qty),0) as stock_qty')
                 ->groupBy('p.id', 'p.company_id', 'p.sku', 'p.name', 'p.unit')
                 ->orderBy('p.name')
                 ->limit(3000);
 
-            if (Schema::hasColumn('crm_product_catalog', 'is_active')) {
+            if (SchemaCache::hasColumn('crm_product_catalog', 'is_active')) {
                 $q->where('p.is_active', 1);
             }
 
-            if (Schema::hasColumn('crm_product_catalog', 'company_id')) {
-                $q->where(function ($query) {
-                    $query->where('p.company_id', EgoCompanyLock::id())->orWhereNull('p.company_id');
+            if (SchemaCache::hasColumn('crm_product_catalog', 'company_id')) {
+                $q->where(function ($productQuery) {
+                    $productQuery->where('p.company_id', EgoCompanyContext::defaultCompanyId())
+                        ->orWhereNull('p.company_id');
                 });
             }
 
             $products = $q->get();
         }
 
-        return compact('companies', 'warehouses', 'suppliers', 'products');
-    }
-
-    /**
-     * Chuẩn hóa chuỗi tiền VN/US về số thập phân chuẩn để lưu DB.
-     *
-     * Ví dụ:
-     * - 30,000 / 30.000     => 30000
-     * - 1,250,000 / 1.250.000 => 1250000
-     * - 34.000.000,56       => 34000000.56
-     * - 34,000,000.56       => 34000000.56
-     * - 34000000,56         => 34000000.56
-     * - 34000000.56         => 34000000.56
-     * - 150000000,000        => 150000000 (khong bi x1000)
-     */
-    private function parseMoneyInput($value): float
-    {
-        if (is_int($value) || is_float($value)) {
-            return max(0, (float) $value);
-        }
-
-        $raw = trim((string) $value);
-        $raw = preg_replace('/\s+/u', '', $raw) ?? '';
-        $raw = preg_replace('/[^0-9,.\-]/u', '', $raw) ?? '';
-
-        if ($raw === '') {
-            return 0.0;
-        }
-
-        $negative = substr($raw, 0, 1) === '-';
-        $raw = str_replace('-', '', $raw);
-
-        $commaCount = substr_count($raw, ',');
-        $dotCount = substr_count($raw, '.');
-        $lastComma = strrpos($raw, ',');
-        $lastDot = strrpos($raw, '.');
-
-        if ($commaCount > 0 && $dotCount > 0) {
-            if ($lastComma > $lastDot) {
-                $raw = str_replace('.', '', $raw);
-                $raw = preg_replace('/,/', '.', $raw, 1) ?? $raw;
-            } else {
-                $raw = str_replace(',', '', $raw);
-            }
-        } elseif ($commaCount > 0) {
-            $parts = explode(',', $raw);
-
-            if ($commaCount > 1 || (strlen($parts[1] ?? '') === 3 && strlen($parts[0] ?? '') <= 3)) {
-                $raw = implode('', $parts);
-            } else {
-                $raw = ($parts[0] ?? '0').'.'.($parts[1] ?? '');
-            }
-        } elseif ($dotCount > 0) {
-            $parts = explode('.', $raw);
-
-            if ($dotCount > 1 || (strlen($parts[1] ?? '') === 3 && strlen($parts[0] ?? '') <= 3)) {
-                $raw = implode('', $parts);
-            }
-        }
-
-        $number = is_numeric($raw) ? (float) $raw : 0.0;
-
-        if ($negative) {
-            $number *= -1;
-        }
-
-        return max(0, $number);
+        return compact('companies', 'warehouses', 'products');
     }
 
     /**
@@ -548,14 +510,16 @@ class ProductGoodsReceiptController extends Controller
      */
     private function guardCompanyWarehouseProducts(int $companyId, int $warehouseId, array $productIds): void
     {
-        $companyId = EgoCompanyLock::id();
-
-        if ($warehouseId <= 0) {
-            throw new \RuntimeException('Vui lòng chọn kho nhập hàng.');
+        if ($companyId !== EgoCompanyContext::defaultCompanyId()) {
+            throw new \RuntimeException('Kho/Sản phẩm chỉ sử dụng cho EGO Việt Nam.');
         }
 
-        if (Schema::hasTable('crm_warehouses') && Schema::hasColumn('crm_warehouses', 'company_id')) {
-            $warehouse = DB::table('crm_warehouses')->where('company_id', EgoCompanyLock::id())->where('id', $warehouseId)->first();
+        if ($warehouseId <= 0 || ! $this->vnWarehouseIdsQuery()->where('id', $warehouseId)->exists()) {
+            throw new \RuntimeException('Kho nhập hàng không thuộc EGO Việt Nam.');
+        }
+
+        if (SchemaCache::hasTable('crm_warehouses') && SchemaCache::hasColumn('crm_warehouses', 'company_id')) {
+            $warehouse = DB::table('crm_warehouses')->where('id', $warehouseId)->first();
 
             if (! $warehouse) {
                 throw new \RuntimeException('Kho nhập hàng không tồn tại.');
@@ -572,7 +536,7 @@ class ProductGoodsReceiptController extends Controller
             throw new \RuntimeException('Vui lòng chọn hàng hóa nhập kho.');
         }
 
-        if (Schema::hasTable('crm_product_catalog') && Schema::hasColumn('crm_product_catalog', 'company_id')) {
+        if (SchemaCache::hasTable('crm_product_catalog') && SchemaCache::hasColumn('crm_product_catalog', 'company_id')) {
             $bad = DB::table('crm_product_catalog')
                 ->whereIn('id', $productIds)
                 ->whereNotNull('company_id')
@@ -591,7 +555,7 @@ class ProductGoodsReceiptController extends Controller
     private function makeCode(): string
     {
         $prefix = 'NH-'.now()->format('Ymd').'-';
-        $count = DB::table('product_goods_receipts')->where('company_id', EgoCompanyLock::id())->where('code', 'like', $prefix.'%')->count() + 1;
+        $count = DB::table('product_goods_receipts')->where('code', 'like', $prefix.'%')->count() + 1;
 
         return $prefix.str_pad((string) $count, 4, '0', STR_PAD_LEFT);
     }
@@ -607,7 +571,7 @@ class ProductGoodsReceiptController extends Controller
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId);
 
-        if (Schema::hasColumn($stockTable, 'company_id')) {
+        if (SchemaCache::hasColumn($stockTable, 'company_id')) {
             $query->where('company_id', $companyId);
         }
 
@@ -619,11 +583,11 @@ class ProductGoodsReceiptController extends Controller
         if ($row) {
             $data = ['qty' => $after];
 
-            if (Schema::hasColumn($stockTable, 'last_updated')) {
+            if (SchemaCache::hasColumn($stockTable, 'last_updated')) {
                 $data['last_updated'] = now();
             }
 
-            if (Schema::hasColumn($stockTable, 'updated_at')) {
+            if (SchemaCache::hasColumn($stockTable, 'updated_at')) {
                 $data['updated_at'] = now();
             }
 
@@ -635,31 +599,31 @@ class ProductGoodsReceiptController extends Controller
                 'qty' => $after,
             ];
 
-            if (Schema::hasColumn($stockTable, 'company_id')) {
+            if (SchemaCache::hasColumn($stockTable, 'company_id')) {
                 $data['company_id'] = $companyId;
             }
 
-            if (Schema::hasColumn($stockTable, 'serials_json')) {
+            if (SchemaCache::hasColumn($stockTable, 'serials_json')) {
                 $data['serials_json'] = null;
             }
 
-            if (Schema::hasColumn($stockTable, 'last_updated')) {
+            if (SchemaCache::hasColumn($stockTable, 'last_updated')) {
                 $data['last_updated'] = now();
             }
 
-            if (Schema::hasColumn($stockTable, 'created_at')) {
+            if (SchemaCache::hasColumn($stockTable, 'created_at')) {
                 $data['created_at'] = now();
             }
 
-            if (Schema::hasColumn($stockTable, 'updated_at')) {
+            if (SchemaCache::hasColumn($stockTable, 'updated_at')) {
                 $data['updated_at'] = now();
             }
 
             DB::table($stockTable)->insert($data);
         }
 
-        if (Schema::hasTable('crm_stock_movements')) {
-            $cols = Schema::getColumnListing('crm_stock_movements');
+        if (SchemaCache::hasTable('crm_stock_movements')) {
+            $cols = SchemaCache::columns('crm_stock_movements');
 
             $data = [
                 'product_id' => $productId,
@@ -681,8 +645,8 @@ class ProductGoodsReceiptController extends Controller
             DB::table('crm_stock_movements')->insert(array_intersect_key($data, array_flip($cols)));
         }
 
-        if (Schema::hasTable('crm_product_catalog') && Schema::hasColumn('crm_product_catalog', 'quantity')) {
-            $total = (float) DB::table('crm_product_stock')->where('company_id', EgoCompanyLock::id())->where('product_id', $productId)->sum('qty');
+        if (SchemaCache::hasTable('crm_product_catalog') && SchemaCache::hasColumn('crm_product_catalog', 'quantity')) {
+            $total = (float) DB::table('crm_product_stock')->where('product_id', $productId)->sum('qty');
 
             DB::table('crm_product_catalog')->where('id', $productId)->update([
                 'quantity' => $total,
@@ -696,11 +660,11 @@ class ProductGoodsReceiptController extends Controller
      */
     private function createStockLot(object $receipt, object $item): void
     {
-        if (! Schema::hasTable('crm_product_stock_lots')) {
+        if (! SchemaCache::hasTable('crm_product_stock_lots')) {
             return;
         }
 
-        $cols = Schema::getColumnListing('crm_product_stock_lots');
+        $cols = SchemaCache::columns('crm_product_stock_lots');
         $unitCost = (float) $item->unit_price;
         $qty = (float) $item->qty;
 
@@ -734,11 +698,11 @@ class ProductGoodsReceiptController extends Controller
      */
     private function createInventoryEvent(string $type, string $note): ?int
     {
-        if (! Schema::hasTable('crm_inventory_events')) {
+        if (! SchemaCache::hasTable('crm_inventory_events')) {
             return null;
         }
 
-        $cols = Schema::getColumnListing('crm_inventory_events');
+        $cols = SchemaCache::columns('crm_inventory_events');
 
         $data = [
             'event_type' => $type,
@@ -757,11 +721,11 @@ class ProductGoodsReceiptController extends Controller
      */
     private function createInventoryRef(?int $eventId, string $refType, int $refId): void
     {
-        if (! $eventId || ! Schema::hasTable('crm_inventory_event_refs')) {
+        if (! $eventId || ! SchemaCache::hasTable('crm_inventory_event_refs')) {
             return;
         }
 
-        $cols = Schema::getColumnListing('crm_inventory_event_refs');
+        $cols = SchemaCache::columns('crm_inventory_event_refs');
 
         $data = [
             'event_id' => $eventId,

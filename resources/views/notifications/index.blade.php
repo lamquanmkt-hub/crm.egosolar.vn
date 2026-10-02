@@ -233,16 +233,16 @@
 
             <form method="POST" action="{{ route('notifications.mark-all-read') }}">
                 @csrf
-                <button class="btn btn-light btn-pill" type="submit">
+                <x-ui.button variant="light" type="submit" size="none" class="btn-pill tw:leading-[1.5]">
                     <i class="bi bi-check2-all"></i> Đọc tất cả
-                </button>
+                </x-ui.button>
             </form>
         </div>
 
         @if(session('success'))
-            <div class="alert alert-success border-0 shadow-sm rounded-4">
+            <x-ui.alert variant="success" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[1rem]">
                 {{ session('success') }}
-            </div>
+            </x-ui.alert>
         @endif
 
         <div class="noti-card">
@@ -258,9 +258,9 @@
 
                 <form method="POST" action="{{ route('notifications.mark-all-read') }}">
                     @csrf
-                    <button class="btn btn-outline-primary btn-pill" type="submit">
+                    <x-ui.button variant="outline-primary" type="submit" size="none" class="btn-pill tw:leading-[1.5]">
                         Đánh dấu đã đọc
-                    </button>
+                    </x-ui.button>
                 </form>
             </div>
 
@@ -269,8 +269,8 @@
                     <div class="empty-icon">
                         <i class="bi bi-bell-slash"></i>
                     </div>
-                    <div class="fw-bold text-dark">Chưa có thông báo</div>
-                    <div class="mt-1">Khi có thông báo mới, nó sẽ xuất hiện tại đây.</div>
+                    <div class="tw:font-bold tw:text-[#212529]">Chưa có thông báo</div>
+                    <div class="tw:mt-1">Khi có thông báo mới, nó sẽ xuất hiện tại đây.</div>
                 </div>
             @else
                 <div class="noti-list">
@@ -342,9 +342,9 @@
                                 @if($id)
                                     <form method="POST" action="{{ route('notifications.mark-read', $id) }}">
                                         @csrf
-                                        <button class="btn btn-sm btn-outline-secondary btn-pill" type="submit">
+                                        <x-ui.button variant="outline-secondary" type="submit" size="none" class="btn-pill tw:leading-[1.5]">
                                             Đã đọc
-                                        </button>
+                                        </x-ui.button>
                                     </form>
                                 @endif
                             </div>

@@ -1,3 +1,21 @@
+{{--
+    EGO_VIEW_CHET — VIEW CHẾT, KHÔNG AI RENDER (rà soát 2026-09-25)
+
+    Route `nhan-su/org-chart` (hr.org-chart) trỏ tới EmployeeController::orgChart(), nhưng method
+    đó chỉ `return $this->index($request)` — tức render `hr.employees.index`, KHÔNG render tệp này.
+    Rà cả app/, routes/, resources/views/ với đủ 4 cách viết tên view: 0 tham chiếu.
+
+    Nói cách khác: sơ đồ tổ chức đã được dựng xong (523 dòng, có CSS riêng, 5 cấp lồng nhau) nhưng
+    CHƯA NỐI DÂY. Người vào /nhan-su/org-chart đang thấy trang danh sách nhân viên.
+
+    Vì thế 5 khối PHP nội tuyến trong đây KHÔNG được dọn: không sửa view chết.
+    Cần chủ dự án quyết: nối dây (đổi orgChart() để render tệp này và cấp $boardUsers,
+    $departmentNodes) hoặc xoá hẳn.
+
+    CHƯA XOÁ theo yêu cầu: chỉ đánh dấu để lần sau khỏi rà lại.
+    Nếu bạn đấu view này vào một route/@include sống, hãy XOÁ dấu này —
+    tests/Feature/View/DeadViewsMarkedTest.php sẽ báo đỏ để nhắc.
+--}}
 @extends('layouts.app')
 
 @section('content')
@@ -293,7 +311,7 @@
     }
 </style>
 
-<div class="container-fluid py-3 org-page">
+<div class="container-fluid tw:py-4 org-page">
     <div class="page-shell">
 
         <div class="hero">
@@ -305,9 +323,9 @@
         </div>
 
         {{-- BAN GIÁM ĐỐC --}}
-        <div class="surface-card p-4 mb-4">
+        <div class="surface-card tw:p-6 tw:mb-6">
             <div class="section-title">Ban giám đốc</div>
-            <div class="section-sub mb-4">Nhóm điều hành cấp cao của công ty</div>
+            <div class="section-sub tw:mb-6">Nhóm điều hành cấp cao của công ty</div>
 
             <div class="board-grid">
                 @forelse($boardUsers as $user)
@@ -334,15 +352,15 @@
                         <div class="person-role">{{ $user->position->name ?? 'Ban giám đốc' }}</div>
                     </div>
                 @empty
-                    <div class="text-muted">Chưa có dữ liệu ban giám đốc</div>
+                    <div class="tw:text-[rgba(33,37,41,0.75)]">Chưa có dữ liệu ban giám đốc</div>
                 @endforelse
             </div>
         </div>
 
         {{-- NHÁNH PHÒNG BAN --}}
-        <div class="surface-card p-4">
+        <div class="surface-card tw:p-6">
             <div class="section-title">Trưởng nhóm các phòng ban</div>
-            <div class="section-sub mb-4">
+            <div class="section-sub tw:mb-6">
                 Mỗi khối hiển thị trưởng nhóm trước, sau đó là nhân viên thuộc phòng ban đó.
             </div>
 

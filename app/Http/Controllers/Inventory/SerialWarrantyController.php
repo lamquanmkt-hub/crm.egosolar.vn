@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller quản lý serial sản phẩm và bảo hành (nhập/xuất kho, chuyển kho, tra cứu, claim).
@@ -98,7 +98,7 @@ class SerialWarrantyController extends Controller
             ->limit(500)
             ->get();
 
-        $events = Schema::hasTable('crm_serial_warranty_events')
+        $events = SchemaCache::hasTable('crm_serial_warranty_events')
             ? DB::table('crm_serial_warranty_events as e')
                 ->leftJoin('crm_warehouses as fw', 'fw.id', '=', 'e.from_warehouse_id')
                 ->leftJoin('crm_warehouses as tw', 'tw.id', '=', 'e.to_warehouse_id')
@@ -110,7 +110,7 @@ class SerialWarrantyController extends Controller
                 ->get()
             : collect();
 
-        $claims = Schema::hasTable('crm_serial_warranty_claims')
+        $claims = SchemaCache::hasTable('crm_serial_warranty_claims')
             ? DB::table('crm_serial_warranty_claims as cl')
                 ->leftJoin('crm_serial_units as su', 'su.id', '=', 'cl.serial_unit_id')
                 ->leftJoin('crm_product_catalog as p', 'p.id', '=', 'su.product_id')
@@ -179,7 +179,7 @@ class SerialWarrantyController extends Controller
         }
 
         DB::transaction(function () use ($codes, $data, $warehouse) {
-            if (Schema::hasColumn('crm_product_catalog', 'is_serialized')) {
+            if (SchemaCache::hasColumn('crm_product_catalog', 'is_serialized')) {
                 DB::table('crm_product_catalog')->where('id', $data['product_id'])->update([
                     'is_serialized' => 1,
                     'updated_at' => now(),
@@ -216,7 +216,7 @@ class SerialWarrantyController extends Controller
                     'note' => request()->input('note', request()->input('notes', request()->input('ghi_chu'))), // EGO_SERIAL_NOTE_SAVE_PATCH
                 ];
 
-                if (Schema::hasColumn('crm_serial_unit_states', 'company_id')) {
+                if (SchemaCache::hasColumn('crm_serial_unit_states', 'company_id')) {
                     $stateData['company_id'] = $warehouse->company_id ?? null;
                 }
 
@@ -298,7 +298,7 @@ class SerialWarrantyController extends Controller
                     ]
                 );
 
-                if (Schema::hasColumn('crm_serial_units', 'warehouse_id')) {
+                if (SchemaCache::hasColumn('crm_serial_units', 'warehouse_id')) {
                     DB::table('crm_serial_units')->where('id', $row->serial_unit_id)->update([
                         'warehouse_id' => null,
                         'updated_at' => now(),
@@ -307,14 +307,14 @@ class SerialWarrantyController extends Controller
 
                 $orderItemId = null;
 
-                if ($orderId > 0 && Schema::hasTable('crm_order_items')) {
+                if ($orderId > 0 && SchemaCache::hasTable('crm_order_items')) {
                     $orderItemId = DB::table('crm_order_items')
                         ->where('order_id', $orderId)
                         ->where('product_id', $row->product_id)
                         ->orderBy('id')
                         ->value('id');
 
-                    if ($orderItemId && Schema::hasTable('crm_order_item_serial_units')) {
+                    if ($orderItemId && SchemaCache::hasTable('crm_order_item_serial_units')) {
                         DB::table('crm_order_item_serial_units')->updateOrInsert(
                             ['serial_unit_id' => $row->serial_unit_id],
                             [
@@ -387,7 +387,7 @@ class SerialWarrantyController extends Controller
                     ]
                 );
 
-                if (Schema::hasColumn('crm_serial_units', 'warehouse_id')) {
+                if (SchemaCache::hasColumn('crm_serial_units', 'warehouse_id')) {
                     DB::table('crm_serial_units')->where('id', $row->serial_unit_id)->update([
                         'warehouse_id' => $data['to_warehouse_id'],
                         'updated_at' => now(),
@@ -432,7 +432,7 @@ class SerialWarrantyController extends Controller
                     ]
                 );
 
-                if (Schema::hasColumn('crm_serial_units', 'warehouse_id')) {
+                if (SchemaCache::hasColumn('crm_serial_units', 'warehouse_id')) {
                     DB::table('crm_serial_units')->where('id', $row->serial_unit_id)->update([
                         'warehouse_id' => $data['warehouse_id'],
                         'updated_at' => now(),
@@ -519,7 +519,7 @@ class SerialWarrantyController extends Controller
      */
     private function validateSerialsAgainstOrder(int $orderId, $rows)
     {
-        if (! Schema::hasTable('crm_order_items')) {
+        if (! SchemaCache::hasTable('crm_order_items')) {
             return true;
         }
 
@@ -541,7 +541,7 @@ class SerialWarrantyController extends Controller
                 ->where('product_id', $productId)
                 ->pluck('id');
 
-            $already = Schema::hasTable('crm_order_item_serial_units')
+            $already = SchemaCache::hasTable('crm_order_item_serial_units')
                 ? DB::table('crm_order_item_serial_units')->whereIn('order_item_id', $orderItemIds)->count()
                 : 0;
 
@@ -584,7 +584,7 @@ class SerialWarrantyController extends Controller
             return (int) $order->customer_id;
         }
 
-        if (! empty($order->lead_id) && Schema::hasTable('crm_leads')) {
+        if (! empty($order->lead_id) && SchemaCache::hasTable('crm_leads')) {
             return (int) DB::table('crm_leads')->where('id', (int) $order->lead_id)->value('customer_id');
         }
 
@@ -596,7 +596,7 @@ class SerialWarrantyController extends Controller
      */
     private function logEvent($unitId, $code, $type, $fromState, $toState, $fromWh, $toWh, $customerId, $orderId, $note): void
     {
-        if (! Schema::hasTable('crm_serial_warranty_events')) {
+        if (! SchemaCache::hasTable('crm_serial_warranty_events')) {
             return;
         }
 
@@ -623,7 +623,7 @@ class SerialWarrantyController extends Controller
     private function ensureBaseTables(): void
     {
         foreach (['crm_product_catalog', 'crm_warehouses', 'crm_serial_units', 'crm_serial_identifiers', 'crm_serial_unit_identifiers', 'crm_serial_unit_states', 'crm_serial_warranties'] as $table) {
-            abort_unless(Schema::hasTable($table), 500, 'Thiếu bảng hệ thống: '.$table);
+            abort_unless(SchemaCache::hasTable($table), 500, 'Thiếu bảng hệ thống: '.$table);
         }
     }
 
@@ -660,7 +660,7 @@ class SerialWarrantyController extends Controller
         }
 
         DB::transaction(function () use ($codes, $productId, $data) {
-            if (Schema::hasColumn('crm_product_catalog', 'is_serialized')) {
+            if (SchemaCache::hasColumn('crm_product_catalog', 'is_serialized')) {
                 DB::table('crm_product_catalog')
                     ->where('id', $productId)
                     ->update([
@@ -676,7 +676,7 @@ class SerialWarrantyController extends Controller
                     'updated_at' => now(),
                 ];
 
-                if (Schema::hasColumn('crm_serial_units', 'warehouse_id')) {
+                if (SchemaCache::hasColumn('crm_serial_units', 'warehouse_id')) {
                     $unitData['warehouse_id'] = (int) $data['warehouse_id'];
                 }
 
@@ -707,7 +707,7 @@ class SerialWarrantyController extends Controller
                     ]
                 );
 
-                if (Schema::hasTable('crm_serial_warranty_events')) {
+                if (SchemaCache::hasTable('crm_serial_warranty_events')) {
                     DB::table('crm_serial_warranty_events')->insert([
                         'serial_unit_id' => $unitId,
                         'serial_code' => $code,
@@ -788,7 +788,7 @@ class SerialWarrantyController extends Controller
                     ]
                 );
 
-                if (Schema::hasColumn('crm_serial_units', 'warehouse_id')) {
+                if (SchemaCache::hasColumn('crm_serial_units', 'warehouse_id')) {
                     DB::table('crm_serial_units')
                         ->where('id', $unitId)
                         ->update([
@@ -798,13 +798,13 @@ class SerialWarrantyController extends Controller
                 }
             }
 
-            if (Schema::hasTable('crm_serial_warranty_events')) {
+            if (SchemaCache::hasTable('crm_serial_warranty_events')) {
                 DB::table('crm_serial_warranty_events')
                     ->where('serial_unit_id', $unitId)
                     ->update(['serial_code' => $newCode]);
             }
 
-            if (Schema::hasTable('crm_serial_warranty_claims')) {
+            if (SchemaCache::hasTable('crm_serial_warranty_claims')) {
                 DB::table('crm_serial_warranty_claims')
                     ->where('serial_unit_id', $unitId)
                     ->update(['serial_code' => $newCode]);
@@ -845,15 +845,15 @@ class SerialWarrantyController extends Controller
                 ->pluck('serial_identifier_id')
                 ->all();
 
-            if (Schema::hasTable('crm_serial_warranties')) {
+            if (SchemaCache::hasTable('crm_serial_warranties')) {
                 DB::table('crm_serial_warranties')->where('serial_unit_id', $unitId)->delete();
             }
 
-            if (Schema::hasTable('crm_serial_warranty_claims')) {
+            if (SchemaCache::hasTable('crm_serial_warranty_claims')) {
                 DB::table('crm_serial_warranty_claims')->where('serial_unit_id', $unitId)->delete();
             }
 
-            if (Schema::hasTable('crm_serial_warranty_events')) {
+            if (SchemaCache::hasTable('crm_serial_warranty_events')) {
                 DB::table('crm_serial_warranty_events')->where('serial_unit_id', $unitId)->delete();
             }
 
@@ -908,7 +908,7 @@ class SerialWarrantyController extends Controller
      */
     private function egoSerialLogEvent($unitId, $code, $type, $fromState, $toState, $fromWh, $toWh, $customerId, $orderId, $note): void
     {
-        if (! Schema::hasTable('crm_serial_warranty_events')) {
+        if (! SchemaCache::hasTable('crm_serial_warranty_events')) {
             return;
         }
 
@@ -1085,7 +1085,7 @@ class SerialWarrantyController extends Controller
                     'note' => request()->input('note', request()->input('notes', request()->input('ghi_chu'))), // EGO_SERIAL_NOTE_SAVE_PATCH
                 ];
 
-                if (Schema::hasColumn('crm_serial_unit_states', 'company_id')) {
+                if (SchemaCache::hasColumn('crm_serial_unit_states', 'company_id')) {
                     $stateData['company_id'] = null;
                 }
 
@@ -1096,14 +1096,14 @@ class SerialWarrantyController extends Controller
 
                 $orderItemId = null;
 
-                if ($orderId > 0 && Schema::hasTable('crm_order_items')) {
+                if ($orderId > 0 && SchemaCache::hasTable('crm_order_items')) {
                     $orderItemId = DB::table('crm_order_items')
                         ->where('order_id', $orderId)
                         ->where('product_id', (int) $data['product_id'])
                         ->orderBy('id')
                         ->value('id');
 
-                    if ($orderItemId && Schema::hasTable('crm_order_item_serial_units')) {
+                    if ($orderItemId && SchemaCache::hasTable('crm_order_item_serial_units')) {
                         DB::table('crm_order_item_serial_units')->updateOrInsert(
                             ['serial_unit_id' => $unitId],
                             [
@@ -1279,11 +1279,11 @@ class SerialWarrantyController extends Controller
                 'updated_at' => now(),
             ];
 
-            if (Schema::hasColumn('crm_serial_warranties', 'order_item_id')) {
+            if (SchemaCache::hasColumn('crm_serial_warranties', 'order_item_id')) {
                 $warrantyData['order_item_id'] = $serial->order_item_id ?? null;
             }
 
-            if (Schema::hasColumn('crm_serial_warranties', 'site_id')) {
+            if (SchemaCache::hasColumn('crm_serial_warranties', 'site_id')) {
                 $warrantyData['site_id'] = $serial->site_id ?? null;
             }
 
@@ -1292,7 +1292,7 @@ class SerialWarrantyController extends Controller
                 $warrantyData
             );
 
-            if (Schema::hasTable('crm_serial_warranty_events')) {
+            if (SchemaCache::hasTable('crm_serial_warranty_events')) {
                 DB::table('crm_serial_warranty_events')->insert([
                     'serial_unit_id' => $unitId,
                     'serial_code' => $serial->code ?? null,
@@ -1374,7 +1374,7 @@ class SerialWarrantyController extends Controller
                 ]
             );
 
-            if (Schema::hasTable('crm_serial_warranty_events')) {
+            if (SchemaCache::hasTable('crm_serial_warranty_events')) {
                 DB::table('crm_serial_warranty_events')->insert([
                     'serial_unit_id' => $unitId,
                     'serial_code' => $serial->code ?? null,

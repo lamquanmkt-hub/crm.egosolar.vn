@@ -7,10 +7,10 @@ use App\Models\Department;
 use App\Models\System\Conversation;
 use App\Models\System\Message;
 use App\Models\User;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -19,88 +19,6 @@ use Illuminate\Validation\ValidationException;
  */
 class ChatController extends Controller
 {
-    /**
-     * Tự tạo/bổ sung các bảng và cột chat (conversations, conversation_user, messages) nếu còn thiếu.
-     */
-    private function ensureChatSchema(): void
-    {
-        DB::statement("
-            CREATE TABLE IF NOT EXISTS conversations (
-                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                type VARCHAR(50) NOT NULL DEFAULT 'direct',
-                name VARCHAR(255) NULL,
-                is_internal TINYINT(1) NOT NULL DEFAULT 1,
-                department_id BIGINT UNSIGNED NULL,
-                task_id BIGINT UNSIGNED NULL,
-                created_by BIGINT UNSIGNED NULL,
-                last_message_at TIMESTAMP NULL DEFAULT NULL,
-                created_at TIMESTAMP NULL DEFAULT NULL,
-                updated_at TIMESTAMP NULL DEFAULT NULL,
-                INDEX conversations_type_index (type),
-                INDEX conversations_department_id_index (department_id),
-                INDEX conversations_last_message_at_index (last_message_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ");
-
-        DB::statement('
-            CREATE TABLE IF NOT EXISTS conversation_user (
-                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                conversation_id BIGINT UNSIGNED NOT NULL,
-                user_id BIGINT UNSIGNED NOT NULL,
-                last_read_at TIMESTAMP NULL DEFAULT NULL,
-                created_at TIMESTAMP NULL DEFAULT NULL,
-                updated_at TIMESTAMP NULL DEFAULT NULL,
-                UNIQUE KEY conversation_user_unique (conversation_id, user_id),
-                INDEX conversation_user_user_id_index (user_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ');
-
-        DB::statement('
-            CREATE TABLE IF NOT EXISTS messages (
-                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                conversation_id BIGINT UNSIGNED NOT NULL,
-                user_id BIGINT UNSIGNED NOT NULL,
-                body TEXT NULL,
-                attachment_path VARCHAR(500) NULL,
-                attachment_name VARCHAR(255) NULL,
-                attachment_mime VARCHAR(150) NULL,
-                attachment_size BIGINT UNSIGNED NULL,
-                created_at TIMESTAMP NULL DEFAULT NULL,
-                updated_at TIMESTAMP NULL DEFAULT NULL,
-                INDEX messages_conversation_id_index (conversation_id),
-                INDEX messages_user_id_index (user_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ');
-
-        $this->trySql('ALTER TABLE messages MODIFY body TEXT NULL');
-
-        foreach ([
-            'name' => 'ALTER TABLE conversations ADD COLUMN name VARCHAR(255) NULL AFTER type',
-            'is_internal' => 'ALTER TABLE conversations ADD COLUMN is_internal TINYINT(1) NOT NULL DEFAULT 1 AFTER name',
-            'department_id' => 'ALTER TABLE conversations ADD COLUMN department_id BIGINT UNSIGNED NULL AFTER is_internal',
-            'task_id' => 'ALTER TABLE conversations ADD COLUMN task_id BIGINT UNSIGNED NULL AFTER department_id',
-        ] as $column => $sql) {
-            if (! Schema::hasColumn('conversations', $column)) {
-                $this->trySql($sql);
-            }
-        }
-
-        foreach ([
-            'attachment_path' => 'ALTER TABLE messages ADD COLUMN attachment_path VARCHAR(500) NULL AFTER body',
-            'attachment_name' => 'ALTER TABLE messages ADD COLUMN attachment_name VARCHAR(255) NULL AFTER attachment_path',
-            'attachment_mime' => 'ALTER TABLE messages ADD COLUMN attachment_mime VARCHAR(150) NULL AFTER attachment_name',
-            'attachment_size' => 'ALTER TABLE messages ADD COLUMN attachment_size BIGINT UNSIGNED NULL AFTER attachment_mime',
-        ] as $column => $sql) {
-            if (! Schema::hasColumn('messages', $column)) {
-                $this->trySql($sql);
-            }
-        }
-
-        if (! Schema::hasColumn('conversation_user', 'last_read_at')) {
-            $this->trySql('ALTER TABLE conversation_user ADD COLUMN last_read_at TIMESTAMP NULL DEFAULT NULL AFTER user_id');
-        }
-    }
-
     /**
      * Chạy một câu SQL và bỏ qua lỗi (dùng cho các lệnh ALTER có thể trùng).
      */
@@ -118,7 +36,6 @@ class ChatController extends Controller
      */
     public function inbox()
     {
-        $this->ensureChatSchema();
 
         return view('chat.inbox', [
             'initialConversationId' => null,
@@ -130,12 +47,11 @@ class ChatController extends Controller
      */
     public function users()
     {
-        $this->ensureChatSchema();
 
         $users = User::query()
             ->select('id', 'name', 'email', 'department_id', 'avatar')
             ->where('id', '!=', auth()->id())
-            ->when(Schema::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
+            ->when(SchemaCache::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
             ->orderBy('name')
             ->get();
 
@@ -147,7 +63,6 @@ class ChatController extends Controller
      */
     public function direct(Request $request)
     {
-        $this->ensureChatSchema();
 
         $data = $request->validate([
             'user_id' => 'required|exists:users,id',
@@ -163,7 +78,6 @@ class ChatController extends Controller
      */
     public function show(Conversation $conversation)
     {
-        $this->ensureChatSchema();
         $this->abortUnlessMember($conversation);
 
         $conversation->users()->updateExistingPivot(auth()->id(), [
@@ -180,7 +94,6 @@ class ChatController extends Controller
      */
     public function send(Request $request, Conversation $conversation)
     {
-        $this->ensureChatSchema();
         $this->abortUnlessMember($conversation);
 
         $this->createMessagesFromRequest($request, $conversation);
@@ -195,12 +108,11 @@ class ChatController extends Controller
      */
     public function usersJson()
     {
-        $this->ensureChatSchema();
 
         $users = User::query()
             ->leftJoin('departments', 'departments.id', '=', 'users.department_id')
             ->where('users.id', '!=', auth()->id())
-            ->when(Schema::hasColumn('users', 'is_active'), fn ($q) => $q->where('users.is_active', 1))
+            ->when(SchemaCache::hasColumn('users', 'is_active'), fn ($q) => $q->where('users.is_active', 1))
             ->select([
                 'users.id',
                 'users.name',
@@ -226,9 +138,8 @@ class ChatController extends Controller
      */
     public function departmentsJson()
     {
-        $this->ensureChatSchema();
 
-        if (! Schema::hasTable('departments')) {
+        if (! SchemaCache::hasTable('departments')) {
             return response()->json(['departments' => []]);
         }
 
@@ -252,7 +163,6 @@ class ChatController extends Controller
      */
     public function directJson(Request $request)
     {
-        $this->ensureChatSchema();
 
         $data = $request->validate([
             'user_id' => 'required|exists:users,id',
@@ -271,7 +181,6 @@ class ChatController extends Controller
      */
     public function departmentJson(Request $request)
     {
-        $this->ensureChatSchema();
 
         $data = $request->validate([
             'department_id' => 'required|integer',
@@ -297,7 +206,7 @@ class ChatController extends Controller
 
         $userIds = User::query()
             ->where('department_id', $department->id)
-            ->when(Schema::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
+            ->when(SchemaCache::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
             ->pluck('id')
             ->push((int) auth()->id())
             ->unique()
@@ -316,7 +225,6 @@ class ChatController extends Controller
      */
     public function groupJson(Request $request)
     {
-        $this->ensureChatSchema();
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
@@ -352,7 +260,6 @@ class ChatController extends Controller
      */
     public function conversationsJson()
     {
-        $this->ensureChatSchema();
 
         $meId = (int) auth()->id();
 
@@ -365,7 +272,7 @@ class ChatController extends Controller
             ->orderByDesc('conversations.id')
             ->get();
 
-        if (Schema::hasColumn('users', 'is_active')) {
+        if (SchemaCache::hasColumn('users', 'is_active')) {
             $conversations = $conversations->filter(function ($c) use ($meId) {
                 if ($c->type !== 'direct') {
                     return true;
@@ -420,7 +327,6 @@ class ChatController extends Controller
      */
     public function messagesJson(Request $request, Conversation $conversation)
     {
-        $this->ensureChatSchema();
         $this->abortUnlessMember($conversation);
 
         $afterId = (int) $request->query('after_id', 0);
@@ -455,7 +361,6 @@ class ChatController extends Controller
      */
     public function sendJson(Request $request, Conversation $conversation)
     {
-        $this->ensureChatSchema();
         $this->abortUnlessMember($conversation);
 
         $messages = $this->createMessagesFromRequest($request, $conversation);
@@ -473,7 +378,6 @@ class ChatController extends Controller
      */
     public function markReadJson(Conversation $conversation)
     {
-        $this->ensureChatSchema();
         $this->abortUnlessMember($conversation);
 
         $conversation->users()->updateExistingPivot(auth()->id(), [
@@ -488,7 +392,6 @@ class ChatController extends Controller
      */
     public function downloadAttachment(Request $request, Message $message)
     {
-        $this->ensureChatSchema();
 
         $conversation = $message->conversation;
         $this->abortUnlessMember($conversation);
@@ -519,10 +422,9 @@ class ChatController extends Controller
      */
     public function quickTaskStore(Request $request, Conversation $conversation)
     {
-        $this->ensureChatSchema();
         $this->abortUnlessMember($conversation);
 
-        abort_unless(Schema::hasTable('tasks'), 422, 'Chưa có bảng tasks.');
+        abort_unless(SchemaCache::hasTable('tasks'), 422, 'Chưa có bảng tasks.');
 
         $data = $request->validate([
             'title' => 'required|string|max:255',
@@ -532,7 +434,7 @@ class ChatController extends Controller
             'due_at' => 'nullable|date',
         ]);
 
-        $columns = array_flip(Schema::getColumnListing('tasks'));
+        $columns = array_flip(SchemaCache::columns('tasks'));
 
         $payload = [
             'title' => $data['title'],
@@ -588,7 +490,7 @@ class ChatController extends Controller
 
         if (! $conversation) {
             $other = User::query()
-                ->when(Schema::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
+                ->when(SchemaCache::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
                 ->find($otherId);
 
             abort_unless($other, 404, 'Nhan su nay dang ngung hoat dong hoac khong ton tai.');

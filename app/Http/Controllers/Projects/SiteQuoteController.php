@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Projects;
 
 use App\Http\Controllers\Controller;
-use App\Models\Site;
+use App\Models\Projects\Site;
+use App\Models\Projects\SiteQuote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Controller báo giá công trình: soạn hạng mục vật tư và đợt thanh toán.
+ *
+ * ⚠️ Chưa có route nào trỏ tới (`sites.quote.*` chưa từng tồn tại trong lịch sử git). Giữ lại
+ * và chuyển sang ghi `site_quotes` (P1l CONTRACT) để khi nối route thì dùng được ngay.
  */
 class SiteQuoteController extends Controller
 {
@@ -17,6 +21,8 @@ class SiteQuoteController extends Controller
      */
     public function edit(Site $site)
     {
+        $quote = $site->latestQuote ?? new SiteQuote(['status' => 'draft']);
+
         $quoteItems = DB::table('site_planned_materials')
             ->where('site_id', $site->id)
             ->where('source', 'quote')
@@ -49,11 +55,11 @@ class SiteQuoteController extends Controller
             ]);
         }
 
-        return view('sites.quote', compact('site', 'quoteItems', 'paymentTerms'));
+        return view('sites.quote', compact('site', 'quote', 'quoteItems', 'paymentTerms'));
     }
 
     /**
-     * Lưu báo giá: ghi lại hạng mục, tính tổng/giảm giá/VAT, cập nhật site và đợt thanh toán.
+     * Lưu báo giá: ghi lại hạng mục, tính tổng/giảm giá/VAT, ghi bản báo giá và đợt thanh toán.
      */
     public function update(Request $request, Site $site)
     {
@@ -133,25 +139,32 @@ class SiteQuoteController extends Controller
                 $quoteNo = 'BGCT-'.now()->format('Ymd').'-'.str_pad((string) $site->id, 4, '0', STR_PAD_LEFT);
             }
 
+            // Ghi đè bản mới nhất (giữ đúng nghĩa "một công trình một bản" của form này); chưa có thì tạo v1.
+            SiteQuote::query()->updateOrCreate(
+                ['site_id' => $site->id, 'version' => $site->latestQuote?->version ?? 1],
+                [
+                    'code' => $quoteNo,
+                    'issued_on' => $data['quote_date'] ?? now()->toDateString(),
+                    'valid_until' => $data['quote_valid_until'] ?? now()->addDays(15)->toDateString(),
+                    'status' => $data['quote_status'] ?? 'draft',
+                    'customer_company' => $data['quote_customer_company'] ?? null,
+                    'customer_email' => $data['quote_customer_email'] ?? null,
+                    'customer_tax_code' => $data['quote_customer_tax_code'] ?? null,
+                    'config_summary' => $data['quote_config_summary'] ?? null,
+                    'application_note' => $data['quote_application_note'] ?? null,
+                    'scope' => $data['quote_scope'] ?? null,
+                    'commercial_terms' => $data['quote_commercial_terms'] ?? null,
+                    'warranty_terms' => $data['quote_warranty_terms'] ?? null,
+                    'om_terms' => $data['quote_om_terms'] ?? null,
+                    'subtotal' => $subtotal,
+                    'discount_amount' => $discount,
+                    'vat_percent' => $vatPercent,
+                    'vat_amount' => $vatAmount,
+                    'grand_total' => $grandTotal,
+                ],
+            );
+
             DB::table('sites')->where('id', $site->id)->update([
-                'quote_no' => $quoteNo,
-                'quote_date' => $data['quote_date'] ?? now()->toDateString(),
-                'quote_valid_until' => $data['quote_valid_until'] ?? now()->addDays(15)->toDateString(),
-                'quote_status' => $data['quote_status'] ?? 'draft',
-                'quote_customer_company' => $data['quote_customer_company'] ?? null,
-                'quote_customer_email' => $data['quote_customer_email'] ?? null,
-                'quote_customer_tax_code' => $data['quote_customer_tax_code'] ?? null,
-                'quote_config_summary' => $data['quote_config_summary'] ?? null,
-                'quote_application_note' => $data['quote_application_note'] ?? null,
-                'quote_scope' => $data['quote_scope'] ?? null,
-                'quote_commercial_terms' => $data['quote_commercial_terms'] ?? null,
-                'quote_warranty_terms' => $data['quote_warranty_terms'] ?? null,
-                'quote_om_terms' => $data['quote_om_terms'] ?? null,
-                'quote_subtotal' => $subtotal,
-                'quote_discount_amount' => $discount,
-                'quote_vat_percent' => $vatPercent,
-                'quote_vat_amount' => $vatAmount,
-                'quote_grand_total' => $grandTotal,
                 'contract_amount' => $grandTotal,
                 'updated_at' => now(),
             ]);

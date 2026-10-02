@@ -15,9 +15,11 @@ return new class extends Migration
 
         if (! Schema::hasColumn('meeting_room_bookings', 'usage_status')) {
             Schema::table('meeting_room_bookings', function (Blueprint $table): void {
-                $table->string('usage_status', 24)
-                    ->default('unused')
-                    ->after('status');
+                if (! Schema::hasColumn('meeting_room_bookings', 'usage_status')) {
+                    $table->string('usage_status', 24)
+                        ->default('unused')
+                        ->after('status');
+                }
 
                 $table->index(
                     ['usage_status', 'start_at'],

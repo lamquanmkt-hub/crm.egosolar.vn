@@ -3,26 +3,10 @@
 @section('title', 'Cài đặt KPI Sales')
 
 @section('content')
-@php
-    $enabled = fn($key) => (int)($settings[$key] ?? 0) === 1;
-    $money = fn($value) => number_format((int)($value ?? 0), 0, ',', '.') . 'đ';
 
-    $coreOn = collect($coreModules ?? [])->filter(fn($m) => $enabled($m['enabled_key']))->count();
-    $suggestedOn = collect($suggestedModules ?? [])->filter(fn($m) => $enabled($m['enabled_key']))->count();
-
-    $workload =
-        (int)($settings['posts_target'] ?? 0) +
-        (int)($settings['calls_target'] ?? 0) +
-        (int)($settings['company_data_target'] ?? 0);
-
-    $maxPenalty = $enabled('enable_penalty')
-        ? (int)($settings['penalty_per_missing'] ?? 0) * max(1, $coreOn)
-        : 0;
-@endphp
-
-<div class="container-fluid px-3 px-lg-4 py-3 sales-kpi-settings-v2">
+<div class="container-fluid tw:px-4 tw:py-4 sales-kpi-settings-v2">
     @if(session('success'))
-        <div class="mini-alert mini-alert--success mb-3">
+        <div class="mini-alert mini-alert--success tw:mb-4">
             <i class="bi bi-check-circle"></i>
             <div>
                 <strong>Đã lưu cấu hình</strong>
@@ -32,11 +16,11 @@
     @endif
 
     @if ($errors->any())
-        <div class="mini-alert mini-alert--danger mb-3">
+        <div class="mini-alert mini-alert--danger tw:mb-4">
             <i class="bi bi-exclamation-triangle"></i>
             <div>
                 <strong>Có lỗi khi lưu</strong>
-                <ul class="mb-0 ps-3">
+                <ul class="tw:mb-0 ps-3">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
@@ -48,7 +32,7 @@
     <form method="POST" action="{{ route('sales.kpi.settings.save') }}" id="kpiSettingsForm">
         @csrf
 
-        <section class="kpi-hero mb-3">
+        <section class="kpi-hero tw:mb-4">
             <div class="kpi-hero__glow kpi-hero__glow--one"></div>
             <div class="kpi-hero__glow kpi-hero__glow--two"></div>
 
@@ -66,15 +50,15 @@
                 </p>
 
                 <div class="hero-actions">
-                    <a href="{{ route('sales.kpi.index') }}" class="btn btn-hero btn-hero--light">
+                    <x-ui.button variant="none" size="none" class="btn-hero btn-hero--light tw:text-[16px]/[24px]" href="{{ route('sales.kpi.index') }}">
                         <i class="bi bi-speedometer2 me-1"></i>Dashboard KPI
-                    </a>
-                    <a href="{{ route('sales.kpi.my') }}" class="btn btn-hero btn-hero--ghost">
+                    </x-ui.button>
+                    <x-ui.button variant="none" size="none" class="btn-hero btn-hero--ghost tw:text-[16px]/[24px]" href="{{ route('sales.kpi.my') }}">
                         <i class="bi bi-pencil-square me-1"></i>Nhập KPI
-                    </a>
-                    <button type="submit" class="btn btn-hero btn-hero--primary">
+                    </x-ui.button>
+                    <x-ui.button variant="none" size="none" class="btn-hero btn-hero--primary" type="submit">
                         <i class="bi bi-save2 me-1"></i>Lưu cấu hình
-                    </button>
+                    </x-ui.button>
                 </div>
             </div>
 
@@ -89,14 +73,14 @@
                 </div>
                 <div class="hero-stat hero-stat--danger">
                     <span>Phạt tối đa/ngày</span>
-                    <strong id="heroMaxPenalty">{{ $money($maxPenalty) }}</strong>
+                    <strong id="heroMaxPenalty">{{ $maxPenaltyText }}</strong>
                 </div>
             </div>
         </section>
 
-        <div class="row g-3">
-            <div class="col-xxl-8">
-                <div class="policy-card mb-3">
+        <div class="tw:row tw:g-3">
+            <div class="tw:min-[87.5rem]:col12-8">
+                <div class="policy-card tw:mb-4">
                     <div class="policy-card__head">
                         <div>
                             <div class="section-chip">CORE KPI</div>
@@ -113,47 +97,42 @@
 
                     <div class="core-grid">
                         @foreach($coreModules as $module)
-                            @php
-                                $isOn = $enabled($module['enabled_key']);
-                                $targetKey = $module['target_key'];
-                                $targetValue = $targetKey ? (int)($settings[$targetKey] ?? 0) : 1;
-                            @endphp
 
-                            <div class="module-card module-card--{{ $module['tone'] }} {{ $isOn ? 'is-on' : 'is-off' }}" data-module-card>
+                            <div class="module-card module-card--{{ $module->tone }} {{ $module->isOn ? 'is-on' : 'is-off' }}" data-module-card>
                                 <div class="module-card__top">
                                     <div class="module-icon">
-                                        <i class="bi {{ $module['icon'] }}"></i>
+                                        <i class="bi {{ $module->icon }}"></i>
                                     </div>
 
                                     <div class="module-copy">
-                                        <strong>{{ $module['title'] }}</strong>
-                                        <span>{{ $module['description'] }}</span>
+                                        <strong>{{ $module->title }}</strong>
+                                        <span>{{ $module->description }}</span>
                                     </div>
 
                                     <label class="smart-switch">
-                                        <input type="hidden" name="{{ $module['enabled_key'] }}" value="0">
-                                        <input type="checkbox" name="{{ $module['enabled_key'] }}" value="1" data-toggle-input {{ $isOn ? 'checked' : '' }}>
+                                        <input type="hidden" name="{{ $module->enabledKey }}" value="0">
+                                        <input type="checkbox" name="{{ $module->enabledKey }}" value="1" data-toggle-input {{ $module->isOn ? 'checked' : '' }}>
                                         <span></span>
                                     </label>
                                 </div>
 
-                                @if($targetKey)
-                                    <div class="compact-field mt-3">
+                                @if($module->targetKey)
+                                    <div class="compact-field tw:mt-4">
                                         <label>Target</label>
                                         <div class="compact-input">
                                             <input
                                                 type="number"
                                                 min="0"
-                                                name="{{ $targetKey }}"
-                                                id="{{ $targetKey }}"
-                                                value="{{ $targetValue }}"
+                                                name="{{ $module->targetKey }}"
+                                                id="{{ $module->targetKey }}"
+                                                value="{{ $module->targetValue }}"
                                                 data-core-target
                                             >
-                                            <em>{{ $module['unit'] }}</em>
+                                            <em>{{ $module->unit }}</em>
                                         </div>
                                     </div>
                                 @else
-                                    <div class="boolean-preview mt-3">
+                                    <div class="boolean-preview tw:mt-4">
                                         <i class="bi bi-check2-circle"></i>
                                         Checklist bắt buộc, không cần nhập số target.
                                     </div>
@@ -163,7 +142,7 @@
                     </div>
                 </div>
 
-                <div class="policy-card mb-3">
+                <div class="policy-card tw:mb-4">
                     <div class="policy-card__head">
                         <div>
                             <div class="section-chip section-chip--purple">MODULE GỢI Ý</div>
@@ -179,26 +158,21 @@
 
                     <div class="suggestion-grid">
                         @foreach($suggestedModules as $module)
-                            @php
-                                $isOn = $enabled($module['enabled_key']);
-                                $targetKey = $module['target_key'];
-                                $targetValue = (int)($settings[$targetKey] ?? 0);
-                            @endphp
 
-                            <div class="suggestion-card {{ $isOn ? 'is-on' : 'is-off' }}" data-suggested-card>
+                            <div class="suggestion-card {{ $module->isOn ? 'is-on' : 'is-off' }}" data-suggested-card>
                                 <div class="suggestion-card__main">
                                     <div class="suggestion-icon">
-                                        <i class="bi {{ $module['icon'] }}"></i>
+                                        <i class="bi {{ $module->icon }}"></i>
                                     </div>
 
                                     <div class="suggestion-copy">
-                                        <strong>{{ $module['title'] }}</strong>
-                                        <span>{{ $module['description'] }}</span>
+                                        <strong>{{ $module->title }}</strong>
+                                        <span>{{ $module->description }}</span>
                                     </div>
 
                                     <label class="smart-switch smart-switch--sm">
-                                        <input type="hidden" name="{{ $module['enabled_key'] }}" value="0">
-                                        <input type="checkbox" name="{{ $module['enabled_key'] }}" value="1" data-toggle-input data-suggested-toggle {{ $isOn ? 'checked' : '' }}>
+                                        <input type="hidden" name="{{ $module->enabledKey }}" value="0">
+                                        <input type="checkbox" name="{{ $module->enabledKey }}" value="1" data-toggle-input data-suggested-toggle {{ $module->isOn ? 'checked' : '' }}>
                                         <span></span>
                                     </label>
                                 </div>
@@ -206,8 +180,8 @@
                                 <div class="suggestion-target">
                                     <label>Target</label>
                                     <div>
-                                        <input type="number" min="0" name="{{ $targetKey }}" value="{{ $targetValue }}">
-                                        <em>{{ $module['unit'] }}</em>
+                                        <input type="number" min="0" name="{{ $module->targetKey }}" value="{{ $module->targetValue }}">
+                                        <em>{{ $module->unit }}</em>
                                     </div>
                                 </div>
                             </div>
@@ -225,28 +199,19 @@
                     </div>
 
                     <div class="ops-grid">
-                        @php
-                            $ops = [
-                                ['key' => 'enable_warnings', 'title' => 'Cảnh báo thiếu KPI', 'desc' => 'Hiển thị warning khi nhân viên chưa nhập hoặc thiếu KPI.', 'icon' => 'bi-bell'],
-                                ['key' => 'enable_penalty', 'title' => 'Tính khấu trừ dự kiến', 'desc' => 'Tắt mục này thì KPI vẫn tính %, nhưng phạt = 0đ.', 'icon' => 'bi-cash-coin'],
-                                ['key' => 'enable_manager_approval', 'title' => 'Quản lý duyệt KPI', 'desc' => 'Chuẩn bị workflow duyệt trước khi chốt lương.', 'icon' => 'bi-shield-check'],
-                                ['key' => 'enable_callio_sync', 'title' => 'Đồng bộ Callio', 'desc' => 'Chuẩn bị auto-sync số cuộc gọi từ Callio.', 'icon' => 'bi-cloud-arrow-down'],
-                                ['key' => 'enable_lock_after_days', 'title' => 'Khóa sửa sau số ngày', 'desc' => 'Giới hạn nhân viên sửa KPI sau ngày đã nhập.', 'icon' => 'bi-lock'],
-                            ];
-                        @endphp
 
                         @foreach($ops as $item)
-                            <div class="ops-item {{ $enabled($item['key']) ? 'is-on' : 'is-off' }}">
+                            <div class="ops-item {{ $item->isOn ? 'is-on' : 'is-off' }}">
                                 <div class="ops-icon">
-                                    <i class="bi {{ $item['icon'] }}"></i>
+                                    <i class="bi {{ $item->icon }}"></i>
                                 </div>
                                 <div class="ops-copy">
-                                    <strong>{{ $item['title'] }}</strong>
-                                    <span>{{ $item['desc'] }}</span>
+                                    <strong>{{ $item->title }}</strong>
+                                    <span>{{ $item->description }}</span>
                                 </div>
                                 <label class="smart-switch smart-switch--sm">
-                                    <input type="hidden" name="{{ $item['key'] }}" value="0">
-                                    <input type="checkbox" name="{{ $item['key'] }}" value="1" data-toggle-input {{ $enabled($item['key']) ? 'checked' : '' }}>
+                                    <input type="hidden" name="{{ $item->key }}" value="0">
+                                    <input type="checkbox" name="{{ $item->key }}" value="1" data-toggle-input {{ $item->isOn ? 'checked' : '' }}>
                                     <span></span>
                                 </label>
                             </div>
@@ -264,14 +229,14 @@
                         </div>
                     </div>
 
-                    <div class="note-box mt-3">
+                    <div class="note-box tw:mt-4">
                         <label>Ghi chú chính sách</label>
                         <textarea name="settings_note" rows="3" placeholder="Ví dụ: Áp dụng từ tháng 05/2026, team sales C&I ưu tiên gọi data công ty...">{{ $settings['settings_note'] ?? '' }}</textarea>
                     </div>
                 </div>
             </div>
 
-            <div class="col-xxl-4">
+            <div class="tw:min-[87.5rem]:col12-4">
                 <div class="sticky-side">
                     <div class="side-card side-card--dark">
                         <div class="side-card__head">
@@ -305,7 +270,7 @@
                             </div>
                             <div class="danger">
                                 <span>Max phạt/ngày</span>
-                                <strong id="sideMaxPenalty">{{ $money($maxPenalty) }}</strong>
+                                <strong id="sideMaxPenalty">{{ $maxPenaltyText }}</strong>
                             </div>
                         </div>
                     </div>
@@ -321,7 +286,7 @@
                             <li data-rule="calls">Cuộc gọi: <strong>{{ number_format((int)($settings['calls_target'] ?? 0), 0, ',', '.') }}</strong> call/ngày</li>
                             <li data-rule="company">Data công ty: <strong>{{ number_format((int)($settings['company_data_target'] ?? 0), 0, ',', '.') }}</strong> data/ngày</li>
                             <li>Follow up khách cũ: <strong>bắt buộc nếu bật</strong></li>
-                            <li>Phạt mỗi KPI thiếu: <strong id="sidePenalty">{{ $money($settings['penalty_per_missing'] ?? 0) }}</strong></li>
+                            <li>Phạt mỗi KPI thiếu: <strong id="sidePenalty">{{ $penaltyPerMissingText }}</strong></li>
                         </ul>
                     </div>
 
@@ -331,9 +296,9 @@
                             <span>File cấu hình nằm tại <code>storage/app/sales_kpi_settings.json</code>.</span>
                         </div>
 
-                        <button type="submit" class="btn btn-save w-100">
+                        <x-ui.button variant="none" size="none" class="btn-save tw:w-full tw:py-[6px] tw:px-3" type="submit">
                             <i class="bi bi-lightning-charge-fill me-1"></i>Lưu toàn bộ cấu hình
-                        </button>
+                        </x-ui.button>
                     </div>
                 </div>
             </div>

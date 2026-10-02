@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
-use App\Support\EgoCompanyLock;
+use App\Support\SchemaCache;
+use App\View\Presenters\Finance\AssetListPresenter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -18,11 +18,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class AssetController extends Controller
 {
-    private function assetQuery()
-    {
-        return DB::table('finance_assets')->where('company_id', EgoCompanyLock::id());
-    }
-
     private array $statuses = [
         'active' => 'Đang sử dụng',
         'idle' => 'Nhàn rỗi',
@@ -55,7 +50,7 @@ class AssetController extends Controller
     /**
      * Danh sách tài sản kèm bộ lọc, chỉ số khấu hao, lịch sử và tệp đính kèm.
      */
-    public function index(Request $request)
+    public function index(Request $request, AssetListPresenter $presenter)
     {
         $this->ensureDefaultCategories();
 
@@ -68,19 +63,18 @@ class AssetController extends Controller
         ];
 
         $query = DB::table('finance_assets as a')
-            ->where('a.company_id', EgoCompanyLock::id())
             ->leftJoin('finance_asset_categories as c', 'c.id', '=', 'a.category_id')
             ->select('a.*', 'c.name as category_name', 'c.color as category_color')
             ->whereNull('a.deleted_at');
 
-        if (Schema::hasTable('companies')) {
+        if (SchemaCache::hasTable('companies')) {
             $query->leftJoin('companies as co', 'co.id', '=', 'a.company_id')
                 ->addSelect('co.name as company_name');
         } else {
             $query->addSelect(DB::raw('NULL as company_name'));
         }
 
-        if (Schema::hasTable('users')) {
+        if (SchemaCache::hasTable('users')) {
             $query->leftJoin('users as u', 'u.id', '=', 'a.assigned_to')
                 ->addSelect('u.name as assigned_name');
         } else {
@@ -154,22 +148,22 @@ class AssetController extends Controller
             $asset->files = $files->get($asset->id, collect());
         }
 
-        $allAssets = $this->assetQuery()->whereNull('deleted_at')->get();
+        $allAssets = DB::table('finance_assets')->whereNull('deleted_at')->get();
         $summary = $this->summary($allAssets);
 
         $categories = DB::table('finance_asset_categories')
             ->orderBy('name')
             ->get();
 
-        $companies = Schema::hasTable('companies')
-            ? DB::table('companies')->where('id', EgoCompanyLock::id())->orderBy('name')->get(['id', 'name'])
+        $companies = SchemaCache::hasTable('companies')
+            ? DB::table('companies')->orderBy('name')->get(['id', 'name'])
             : collect();
 
-        $users = Schema::hasTable('users')
+        $users = SchemaCache::hasTable('users')
             ? DB::table('users')->orderBy('name')->get(['id', 'name'])
             : collect();
 
-        return view('finance.assets.index', [
+        return view('finance.assets.index', array_merge([
             'assets' => $assets,
             'summary' => $summary,
             'filters' => $filters,
@@ -179,7 +173,15 @@ class AssetController extends Controller
             'statuses' => $this->statuses,
             'conditions' => $this->conditions,
             'eventTypes' => $this->eventTypes,
-        ]);
+        ], $presenter->viewData(
+            assets: $assets,
+            statuses: $this->statuses,
+            conditions: $this->conditions,
+            eventTypes: $this->eventTypes,
+            oldInput: (array) $request->old(),
+            sttOffset: ($assets->currentPage() - 1) * $assets->perPage(),
+            summary: $summary,
+        )));
     }
 
     /**
@@ -188,7 +190,6 @@ class AssetController extends Controller
     public function store(Request $request)
     {
         $data = $this->validatedAsset($request);
-        $data['company_id'] = EgoCompanyLock::id();
         $data['code'] = $data['code'] ?: $this->nextAssetCode();
         $data['status'] = $data['status'] ?: 'active';
         $data['condition'] = $data['condition'] ?: 'good';
@@ -199,7 +200,7 @@ class AssetController extends Controller
         $assetId = null;
 
         DB::transaction(function () use (&$assetId, $data, $request) {
-            $assetId = $this->assetQuery()->insertGetId($data);
+            $assetId = DB::table('finance_assets')->insertGetId($data);
 
             $this->recordEvent($assetId, [
                 'type' => 'purchase',
@@ -223,15 +224,14 @@ class AssetController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $asset = $this->assetQuery()->whereNull('deleted_at')->where('id', (int) $id)->first();
+        $asset = DB::table('finance_assets')->whereNull('deleted_at')->where('id', (int) $id)->first();
         abort_unless($asset, 404);
 
         $data = $this->validatedAsset($request, (int) $id);
-        $data['company_id'] = EgoCompanyLock::id();
         $data['updated_at'] = now();
 
         DB::transaction(function () use ($asset, $data, $request) {
-            $this->assetQuery()->where('id', $asset->id)->update($data);
+            DB::table('finance_assets')->where('id', $asset->id)->update($data);
 
             if ((string) $asset->status !== (string) $data['status'] || (string) $asset->assigned_to !== (string) ($data['assigned_to'] ?? '')) {
                 $this->recordEvent($asset->id, [
@@ -257,10 +257,10 @@ class AssetController extends Controller
      */
     public function destroy($id)
     {
-        $asset = $this->assetQuery()->whereNull('deleted_at')->where('id', (int) $id)->first();
+        $asset = DB::table('finance_assets')->whereNull('deleted_at')->where('id', (int) $id)->first();
         abort_unless($asset, 404);
 
-        $this->assetQuery()->where('id', $asset->id)->update([
+        DB::table('finance_assets')->where('id', $asset->id)->update([
             'deleted_at' => now(),
             'updated_at' => now(),
         ]);
@@ -302,7 +302,7 @@ class AssetController extends Controller
      */
     public function storeEvent(Request $request, $assetId)
     {
-        $asset = $this->assetQuery()->whereNull('deleted_at')->where('id', (int) $assetId)->first();
+        $asset = DB::table('finance_assets')->whereNull('deleted_at')->where('id', (int) $assetId)->first();
         abort_unless($asset, 404);
 
         $data = $request->validate([
@@ -355,7 +355,7 @@ class AssetController extends Controller
                 $update['next_maintenance_date'] = $data['next_maintenance_date'];
             }
 
-            $this->assetQuery()->where('id', $asset->id)->update($update);
+            DB::table('finance_assets')->where('id', $asset->id)->update($update);
         });
 
         return back()->with('success', 'Đã ghi nhận lịch sử tài sản.');
@@ -392,7 +392,6 @@ class AssetController extends Controller
     public function exportCsv(Request $request): StreamedResponse
     {
         $rows = DB::table('finance_assets as a')
-            ->where('a.company_id', EgoCompanyLock::id())
             ->leftJoin('finance_asset_categories as c', 'c.id', '=', 'a.category_id')
             ->whereNull('a.deleted_at')
             ->select('a.*', 'c.name as category_name')
@@ -469,7 +468,7 @@ class AssetController extends Controller
         $code = strtoupper(trim((string) ($data['code'] ?? '')));
 
         if ($code !== '') {
-            $exists = $this->assetQuery()
+            $exists = DB::table('finance_assets')
                 ->whereNull('deleted_at')
                 ->where('code', $code)
                 ->when($id, fn ($q) => $q->where('id', '!=', $id))
@@ -540,7 +539,7 @@ class AssetController extends Controller
     private function nextAssetCode(): string
     {
         $prefix = 'TS-'.now()->format('Y').'-';
-        $last = $this->assetQuery()
+        $last = DB::table('finance_assets')
             ->where('code', 'like', $prefix.'%')
             ->orderByDesc('id')
             ->value('code');
@@ -695,7 +694,7 @@ class AssetController extends Controller
      */
     private function ensureDefaultCategories(): void
     {
-        if (! Schema::hasTable('finance_asset_categories')) {
+        if (! SchemaCache::hasTable('finance_asset_categories')) {
             return;
         }
 

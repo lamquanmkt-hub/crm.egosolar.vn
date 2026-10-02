@@ -22,60 +22,60 @@
     if (!is_array($attachments)) $attachments = [];
 @endphp
 
-<div class="container-fluid px-4 mt-3 weekly-task-show">
+<div class="container-fluid tw:px-6 tw:mt-4 weekly-task-show">
 
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="tw:flex flex-wrap tw:justify-between tw:items-center tw:gap-2 tw:mb-4">
         <div>
-            <h3 class="fw-bold mb-1">Chi tiết công việc</h3>
-            <div class="text-muted">#{{ $task->id }} • {{ $task->title }}</div>
+            <h3 class="tw:font-bold tw:mb-1">Chi tiết công việc</h3>
+            <div class="tw:text-[rgba(33,37,41,0.75)]">#{{ $task->id }} • {{ $task->title }}</div>
         </div>
 
-        <div class="d-flex gap-2">
-            <a href="{{ route('marketing.reports.weekly-tasks.edit', $task->id) }}" class="btn btn-ego-soft wt-btn">
+        <div class="tw:flex tw:gap-2">
+            <x-ui.button variant="none" size="none" class="btn-ego-soft wt-btn" href="{{ route('marketing.reports.weekly-tasks.edit', $task->id) }}">
                 <i class="bi bi-pencil-square"></i> Sửa
-            </a>
-            <a href="{{ route('marketing.reports.weekly-tasks') }}" class="btn btn-ego-soft wt-btn">
+            </x-ui.button>
+            <x-ui.button variant="none" size="none" class="btn-ego-soft wt-btn" href="{{ route('marketing.reports.weekly-tasks') }}">
                 <i class="bi bi-arrow-left"></i> Quay lại
-            </a>
+            </x-ui.button>
         </div>
     </div>
 
-    <div class="card wt-card">
-        <div class="card-body p-3 p-md-4">
+    <x-ui.card class="wt-card">
+        <x-ui.card-body class="tw:p-4">
 
-            <div class="row g-3">
+            <div class="tw:row tw:g-3">
 
-                <div class="col-lg-8">
+                <div class="tw:min-[62rem]:col12-8">
                     <div class="wt-block">
                         <div class="wt-title">Thông tin</div>
 
-                        <div class="row g-3 mt-1">
-                            <div class="col-md-6">
+                        <div class="tw:row tw:g-3 tw:mt-1">
+                            <div class="tw:md:col12-6">
                                 <div class="wt-k">Tên công việc</div>
                                 <div class="wt-v">{{ $task->title }}</div>
                             </div>
 
-                            <div class="col-md-3">
+                            <div class="tw:md:col12-3">
                                 <div class="wt-k">Priority</div>
-                                <div class="wt-v text-uppercase">{{ $task->priority ?? '-' }}</div>
+                                <div class="wt-v tw:uppercase">{{ $task->priority ?? '-' }}</div>
                             </div>
 
-                            <div class="col-md-3">
+                            <div class="tw:md:col12-3">
                                 <div class="wt-k">Hạng mục</div>
                                 <div class="wt-v">{{ $task->category ?? '-' }}</div>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="tw:md:col12-4">
                                 <div class="wt-k">Trạng thái</div>
-                                <div class="wt-v text-uppercase">{{ $task->status ?? '-' }}</div>
+                                <div class="wt-v tw:uppercase">{{ $task->status ?? '-' }}</div>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="tw:md:col12-4">
                                 <div class="wt-k">Tiến độ</div>
                                 <div class="wt-v">{{ (int)($task->progress ?? 0) }}%</div>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="tw:md:col12-4">
                                 <div class="wt-k">Người phụ trách</div>
                                 <div class="wt-v">
                                     @if(count($assignees))
@@ -88,29 +88,29 @@
                                 </div>
                             </div>
 
-                            <div class="col-md-6">
+                            <div class="tw:md:col12-6">
                                 <div class="wt-k">Ngày bắt đầu</div>
                                 <div class="wt-v">{{ $fmtDate($task->start_date) }}</div>
                             </div>
 
-                            <div class="col-md-6">
+                            <div class="tw:md:col12-6">
                                 <div class="wt-k">Hạn</div>
                                 <div class="wt-v">{{ $fmtDate($task->due_date) }}</div>
                             </div>
                         </div>
 
-                        <div class="mt-3">
+                        <div class="tw:mt-4">
                             <div class="wt-k">Ghi chú</div>
                             <div class="wt-note">{{ $task->note ?? '-' }}</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-lg-4">
-                    <div class="wt-block h-100">
+                <div class="tw:min-[62rem]:col12-4">
+                    <div class="wt-block tw:h-full">
                         <div class="wt-title">Link & File</div>
 
-                        <div class="mt-2">
+                        <div class="tw:mt-2">
                             <div class="wt-k">Links</div>
                             @if(count($links))
                                 <div class="wt-list">
@@ -121,11 +121,11 @@
                                     @endforeach
                                 </div>
                             @else
-                                <div class="text-muted small">Chưa có link.</div>
+                                <div class="tw:text-[rgba(33,37,41,0.75)] small">Chưa có link.</div>
                             @endif
                         </div>
 
-                        <div class="mt-3">
+                        <div class="tw:mt-4">
                             <div class="wt-k">Attachments</div>
                             @if(count($attachments))
                                 <div class="wt-list">
@@ -139,12 +139,12 @@
                                                 <i class="bi bi-paperclip"></i> {{ $name }}
                                             </a>
                                         @else
-                                            <div class="text-muted small">{{ $name }}</div>
+                                            <div class="tw:text-[rgba(33,37,41,0.75)] small">{{ $name }}</div>
                                         @endif
                                     @endforeach
                                 </div>
                             @else
-                                <div class="text-muted small">Chưa có file.</div>
+                                <div class="tw:text-[rgba(33,37,41,0.75)] small">Chưa có file.</div>
                             @endif
                         </div>
 
@@ -153,8 +153,8 @@
 
             </div>
 
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 
 </div>
 @endsection

@@ -61,50 +61,16 @@
     @media(max-width:760px){.rec-head{display:block}.rec-stats,.rec-grid,.rec-grid-2,.rec-report-grid{grid-template-columns:1fr}.rec-tab,.rec-btn,.rec-btn-outline,.rec-btn-danger{width:100%}.rec-tabs{display:grid;grid-template-columns:1fr}.rec-head-actions{margin-top:10px;justify-content:stretch}}
 </style>
 
-@php
-    $active = $active ?? 'reports';
-    $statusPill = [
-        'new' => 'gray',
-        'screening' => 'amber',
-        'contacted' => '',
-        'not_fit' => 'red',
-        'interview_scheduled' => 'amber',
-        'interviewing' => 'amber',
-        'interview_passed' => 'green',
-        'interview_failed' => 'red',
-        'offer' => '',
-        'hired' => 'green',
-        'onboarding' => 'green',
-        'archived' => 'gray',
-        'rejected' => 'red',
-    ];
-    $interviewPill = [
-        'scheduled' => 'amber',
-        'interviewing' => 'amber',
-        'rescheduled' => 'amber',
-        'done' => 'green',
-        'cancelled' => 'red',
-        'no_show' => 'red',
-    ];
-    $offerPill = [
-        'draft' => 'gray',
-        'sent' => 'amber',
-        'accepted' => 'green',
-        'rejected' => 'red',
-        'onboarded' => 'green',
-        'archived' => 'gray',
-    ];
-@endphp
 
 <div class="rec-wrap">
     <div class="rec-head">
         <div>
-            <h1 class="rec-title">Tuyển dụng ứng viên</h1>
+            <h1 class="rec-title">Quy trình tuyển dụng ứng viên</h1>
             <div class="rec-sub">Bám đúng 7 bước: yêu cầu tuyển dụng → tìm kiếm & sàng lọc → lịch phỏng vấn → đánh giá → mời nhận việc → tiếp nhận nhân sự mới → lưu hồ sơ & báo cáo.</div>
         </div>
         <div class="rec-head-actions">
             <a class="rec-btn-outline" href="{{ route('hr.operations.index') }}">← HC & Vận hành</a>
-            <a class="rec-btn-outline" href="{{ route('hr.office-supply-process.index') }}">Văn phòng phẩm</a>
+            <a class="rec-btn-outline" href="{{ route('hr.office-supply-process.index') }}">Quy trình phân bổ VPP</a>
         </div>
     </div>
 
@@ -661,11 +627,6 @@
     @endif
 
     @if($active === 'onboarding')
-        @php
-            $onboardingOffers = $offers->filter(function($offer){
-                return in_array($offer->status ?? '', ['accepted', 'onboarded'], true) || !empty($offer->onboarding_status);
-            });
-        @endphp
         <div class="rec-card">
             <div class="rec-card-head">
                 <div>
@@ -674,7 +635,7 @@
                 </div>
             </div>
             <div class="rec-card-body">
-                @if($onboardingOffers->count())
+                @if($onboardingOfferCount)
                     <div class="rec-table-wrap">
                         <table class="rec-table sm">
                             <thead><tr><th>Nhân sự</th><th>Ngày nhận việc</th><th>Lương offer</th><th>Tình trạng tiếp nhận</th><th>Ngày tiếp nhận</th><th>Ghi chú</th><th>Thao tác</th></tr></thead>
@@ -720,11 +681,6 @@
     @endif
 
     @if($active === 'archives')
-        @php
-            $archiveCandidates = $candidates->filter(function($candidate){
-                return in_array($candidate->status ?? '', ['archived', 'rejected', 'not_fit', 'interview_failed'], true);
-            });
-        @endphp
         <div class="rec-card">
             <div class="rec-card-head">
                 <div>
@@ -734,7 +690,7 @@
                 <a class="rec-btn-outline" href="{{ route('hr.recruitment.reports') }}">Xem báo cáo tổng</a>
             </div>
             <div class="rec-card-body">
-                @if($archiveCandidates->count())
+                @if($archiveCandidateCount)
                     <div class="rec-table-wrap">
                         <table class="rec-table sm">
                             <thead><tr><th>Ứng viên</th><th>Vị trí</th><th>Nguồn</th><th>Trạng thái</th><th>Lý do / ghi chú lưu</th><th>Lưu đến ngày</th><th>Thao tác</th></tr></thead>

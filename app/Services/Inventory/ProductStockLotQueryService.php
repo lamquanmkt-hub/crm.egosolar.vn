@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Inventory;
 
 use App\Models\Inventory\Catalog\Product;
+use App\Support\SchemaCache;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Truy vấn tồn kho theo lô FIFO (crm_product_stock_lots) cho màn sản phẩm:
@@ -42,12 +42,12 @@ class ProductStockLotQueryService
         | total_amount = tổng qty_remaining * giá vốn sau VAT của từng lô
         | Như vậy cùng SKU nhiều lô giá khác nhau vẫn ra đúng giá trị tồn.
         */
-        if (Schema::hasTable('crm_product_stock_lots')) {
+        if (SchemaCache::hasTable('crm_product_stock_lots')) {
             $q = DB::table('crm_product_stock_lots as l')
                 ->join($productTable.' as p', 'p.id', '=', 'l.product_id')
                 ->where('l.qty_remaining', '>', 0);
 
-            if (Schema::hasColumn($productTable, 'is_active')) {
+            if (SchemaCache::hasColumn($productTable, 'is_active')) {
                 $q->where(function ($activeQuery) {
                     $activeQuery->where('p.is_active', 1)->orWhereNull('p.is_active');
                 });
@@ -112,7 +112,7 @@ class ProductStockLotQueryService
         $q = DB::table($productTable)
             ->leftJoin('crm_product_stock as s', 's.product_id', '=', "{$productTable}.id");
 
-        if (Schema::hasColumn($productTable, 'is_active')) {
+        if (SchemaCache::hasColumn($productTable, 'is_active')) {
             $q->where(function ($activeQuery) use ($productTable) {
                 $activeQuery->where("{$productTable}.is_active", 1)->orWhereNull("{$productTable}.is_active");
             });
@@ -169,28 +169,11 @@ class ProductStockLotQueryService
         $productTable = (new Product)->getTable();
         $costAfterExpr = $this->stockLotActualCostExpr('l', 'p');
 
-        /*
-        |--------------------------------------------------------------------------
-        | EGO V10: catalog la bang goc, loc kho/cong ty ngay trong LEFT JOIN
-        |--------------------------------------------------------------------------
-        | Neu loc l.warehouse_id/l.company_id bang WHERE o ben duoi, cac san pham
-        | khong co lo con ton se co l.* = NULL va bi loai khoi ket qua. Do do san
-        | pham ton = 0 / chua tung co lo trong kho se "bien mat".
-        |
-        | Dua dieu kien vao ON cua LEFT JOIN giu lai moi san pham active trong
-        | catalog; san pham khong co lo phu hop se nhan stocks_sum_qty = 0.
-        */
         $q = Product::query()
             ->from($productTable.' as p')
-            ->leftJoin('crm_product_stock_lots as l', function ($join) use ($warehouseId, $companyId) {
+            ->leftJoin('crm_product_stock_lots as l', function ($join) {
                 $join->on('l.product_id', '=', 'p.id')
                     ->where('l.qty_remaining', '>', 0);
-
-                if ($warehouseId) {
-                    $join->where('l.warehouse_id', '=', $warehouseId);
-                } elseif ($companyId) {
-                    $join->where('l.company_id', '=', $companyId);
-                }
             })
             ->leftJoin('crm_warehouses as w', 'w.id', '=', 'l.warehouse_id')
             ->leftJoin('companies as c', 'c.id', '=', 'l.company_id');
@@ -204,7 +187,7 @@ class ProductStockLotQueryService
         } catch (\Throwable $e) {
         }
 
-        if (Schema::hasColumn($productTable, 'is_active')) {
+        if (SchemaCache::hasColumn($productTable, 'is_active')) {
             $q->where(function ($activeQuery) {
                 $activeQuery->where('p.is_active', 1)->orWhereNull('p.is_active');
             });
@@ -226,6 +209,12 @@ class ProductStockLotQueryService
 
         if ($brandId) {
             $q->where('p.brand_id', $brandId);
+        }
+
+        if ($warehouseId) {
+            $q->where('l.warehouse_id', $warehouseId);
+        } elseif ($companyId) {
+            $q->where('l.company_id', $companyId);
         }
 
         $q->select([
@@ -277,7 +266,7 @@ class ProductStockLotQueryService
      */
     public function attachLotAverageCostsToProducts($products, ?int $companyId = null, ?int $warehouseId = null): void
     {
-        if (! Schema::hasTable('crm_product_stock_lots')) {
+        if (! SchemaCache::hasTable('crm_product_stock_lots')) {
             return;
         }
 

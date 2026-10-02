@@ -43,7 +43,6 @@ class LeaveRequest extends Model
         return $this->belongsTo(User::class, 'approver_id');
     }
 
-
     public function attachments(): HasMany
     {
         return $this->hasMany(LeaveRequestAttachment::class);

@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -15,67 +15,10 @@ use Illuminate\Support\Facades\Storage;
 class AnnouncementController extends Controller
 {
     /**
-     * Tạo các bảng thông báo (announcements, files, reads) nếu chưa tồn tại.
-     */
-    private function ensureTables(): void
-    {
-        DB::statement("
-            CREATE TABLE IF NOT EXISTS hr_announcements (
-                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                title VARCHAR(255) NOT NULL,
-                body LONGTEXT NULL,
-                category VARCHAR(80) NOT NULL DEFAULT 'general',
-                target_type VARCHAR(50) NOT NULL DEFAULT 'all',
-                department_id BIGINT UNSIGNED NULL,
-                user_id BIGINT UNSIGNED NULL,
-                starts_at DATETIME NULL,
-                ends_at DATETIME NULL,
-                is_pinned TINYINT(1) NOT NULL DEFAULT 0,
-                status VARCHAR(50) NOT NULL DEFAULT 'published',
-                created_by BIGINT UNSIGNED NULL,
-                created_at TIMESTAMP NULL DEFAULT NULL,
-                updated_at TIMESTAMP NULL DEFAULT NULL,
-                INDEX hra_status_index (status),
-                INDEX hra_target_index (target_type, department_id, user_id),
-                INDEX hra_time_index (starts_at, ends_at),
-                INDEX hra_pinned_index (is_pinned)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ");
-
-        DB::statement('
-            CREATE TABLE IF NOT EXISTS hr_announcement_files (
-                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                announcement_id BIGINT UNSIGNED NOT NULL,
-                original_name VARCHAR(255) NOT NULL,
-                path VARCHAR(500) NOT NULL,
-                mime_type VARCHAR(150) NULL,
-                size BIGINT UNSIGNED NULL,
-                created_at TIMESTAMP NULL DEFAULT NULL,
-                updated_at TIMESTAMP NULL DEFAULT NULL,
-                INDEX hraf_announcement_id_index (announcement_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ');
-
-        DB::statement('
-            CREATE TABLE IF NOT EXISTS hr_announcement_reads (
-                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                announcement_id BIGINT UNSIGNED NOT NULL,
-                user_id BIGINT UNSIGNED NOT NULL,
-                read_at TIMESTAMP NULL DEFAULT NULL,
-                created_at TIMESTAMP NULL DEFAULT NULL,
-                updated_at TIMESTAMP NULL DEFAULT NULL,
-                UNIQUE KEY hra_reads_unique (announcement_id, user_id),
-                INDEX hra_reads_user_index (user_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ');
-    }
-
-    /**
      * Hiển thị danh sách thông báo (chế độ xem hoặc quản lý) với bộ lọc và số liệu tổng hợp.
      */
     public function index(Request $request)
     {
-        $this->ensureTables();
 
         $user = auth()->user();
         $canManage = $this->canManage();
@@ -122,13 +65,13 @@ class AnnouncementController extends Controller
             ->paginate(12)
             ->withQueryString();
 
-        $departments = Schema::hasTable('departments')
+        $departments = SchemaCache::hasTable('departments')
             ? DB::table('departments')->orderBy('name')->get()
             : collect();
 
-        $users = Schema::hasTable('users')
+        $users = SchemaCache::hasTable('users')
             ? DB::table('users')
-                ->when(Schema::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
+                ->when(SchemaCache::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', 1))
                 ->orderBy('name')
                 ->get(['id', 'name', 'email', 'department_id'])
             : collect();
@@ -155,7 +98,6 @@ class AnnouncementController extends Controller
      */
     public function store(Request $request)
     {
-        $this->ensureTables();
         abort_unless($this->canManage(), 403);
 
         $data = $this->validatedData($request);
@@ -190,7 +132,6 @@ class AnnouncementController extends Controller
      */
     public function show($announcement)
     {
-        $this->ensureTables();
 
         $item = DB::table('hr_announcements as a')
             ->leftJoin('users as creator', 'creator.id', '=', 'a.created_by')
@@ -229,7 +170,6 @@ class AnnouncementController extends Controller
      */
     public function update(Request $request, $announcement)
     {
-        $this->ensureTables();
         abort_unless($this->canManage(), 403);
 
         $item = DB::table('hr_announcements')->where('id', (int) $announcement)->first();
@@ -263,7 +203,6 @@ class AnnouncementController extends Controller
      */
     public function destroy($announcement)
     {
-        $this->ensureTables();
         abort_unless($this->canManage(), 403);
 
         $id = (int) $announcement;
@@ -286,7 +225,6 @@ class AnnouncementController extends Controller
      */
     public function markRead($announcement)
     {
-        $this->ensureTables();
         $this->markOneAsRead((int) $announcement);
 
         return back()->with('success', 'Đã đánh dấu đã đọc.');
@@ -297,7 +235,6 @@ class AnnouncementController extends Controller
      */
     public function markAllRead()
     {
-        $this->ensureTables();
 
         $this->visibleQuery()->select('a.id')->orderByDesc('a.id')->chunkById(100, function ($rows) {
             foreach ($rows as $row) {
@@ -313,7 +250,6 @@ class AnnouncementController extends Controller
      */
     public function unreadCount()
     {
-        $this->ensureTables();
 
         return response()->json([
             'count' => $this->unreadCountValue(),
@@ -325,7 +261,6 @@ class AnnouncementController extends Controller
      */
     public function jsonList(Request $request)
     {
-        $this->ensureTables();
 
         $limit = max(1, min(30, (int) $request->input('limit', 10)));
 

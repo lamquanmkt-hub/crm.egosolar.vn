@@ -8,14 +8,16 @@ class CreateConversationUserTable extends Migration
 {
     public function up(): void
     {
-        Schema::create('conversation_user', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('conversation_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->timestamps();
+        if (! Schema::hasTable('conversation_user')) {
+            Schema::create('conversation_user', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('conversation_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+                $table->timestamps();
 
-            $table->unique(['conversation_id', 'user_id']);
-        });
+                $table->unique(['conversation_id', 'user_id']);
+            });
+        }
     }
 
     public function down(): void

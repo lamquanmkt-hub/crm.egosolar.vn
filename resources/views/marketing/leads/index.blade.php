@@ -1,33 +1,33 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid py-3 ego-leads">
+<div class="container-fluid tw:py-4 ego-leads">
 
     {{-- Header --}}
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div class="tw:flex flex-wrap tw:items-center tw:justify-between tw:gap-2 tw:mb-4">
         <div>
-            <div class="d-flex align-items-center gap-2">
+            <div class="tw:flex tw:items-center tw:gap-2">
                 <div class="ego-dot"></div>
-                <h4 class="mb-0">Danh sách Lead</h4>
+                <h4 class="tw:mb-0">Danh sách Lead</h4>
                 <span class="badge ego-badge-soft">Marketing</span>
             </div>
-            <div class="text-muted small mt-1">
+            <div class="tw:text-[rgba(33,37,41,0.75)] small tw:mt-1">
                 Quản lý lead từ Ads, import theo tuần. Tìm kiếm, lọc, xem nhanh chỉ số.
             </div>
         </div>
 
-        <div class="d-flex align-items-center gap-2">
-            <a href="{{ route('marketing.leads.upload') }}" class="btn btn-primary ego-btn">
+        <div class="tw:flex tw:items-center tw:gap-2">
+            <x-ui.button href="{{ route('marketing.leads.upload') }}" variant="primary" class="ego-btn">
                 <i class="bi bi-upload me-1"></i> Upload Lead (CSV)
-            </a>
+            </x-ui.button>
         </div>
     </div>
 
     {{-- Flash --}}
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm">
+        <x-ui.alert variant="success" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)]">
             <i class="bi bi-check-circle me-1"></i> {{ session('success') }}
-        </div>
+        </x-ui.alert>
     @endif
 
     {{-- Stats (nhẹ, chạy ngay cả khi không có data) --}}
@@ -44,92 +44,90 @@
         }
     @endphp
 
-    <div class="row g-3 mb-3">
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card ego-card">
-                <div class="card-body">
+    <div class="tw:row tw:g-3 tw:mb-4">
+        <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
+            <x-ui.card class="ego-card">
+                <x-ui.card-body>
                     <div class="ego-kpi-title">Tổng lead</div>
                     <div class="ego-kpi-value">{{ number_format($total) }}</div>
                     <div class="ego-kpi-sub">Tổng bản ghi trong hệ thống</div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card ego-card">
-                <div class="card-body">
+        <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
+            <x-ui.card class="ego-card">
+                <x-ui.card-body>
                     <div class="ego-kpi-title">Mới (trang này)</div>
                     <div class="ego-kpi-value">{{ number_format($newCount) }}</div>
                     <div class="ego-kpi-sub">Đang hiển thị theo phân trang</div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card ego-card">
-                <div class="card-body">
+        <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
+            <x-ui.card class="ego-card">
+                <x-ui.card-body>
                     <div class="ego-kpi-title">Chốt / Hủy (trang này)</div>
                     <div class="ego-kpi-value">{{ number_format($wonCount) }} / {{ number_format($lostCount) }}</div>
                     <div class="ego-kpi-sub">Theo trạng thái</div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card ego-card">
-                <div class="card-body">
+        <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
+            <x-ui.card class="ego-card">
+                <x-ui.card-body>
                     <div class="ego-kpi-title">Gợi ý</div>
-                    <div class="ego-kpi-sub mb-0">
+                    <div class="ego-kpi-sub tw:mb-0">
                         Bạn có thể import theo tuần và dùng filter để xem theo nguồn/ngày.
                     </div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
     </div>
 
     {{-- Filter bar (UI trước – chưa cần controller filter vẫn chạy bình thường) --}}
-    <div class="card ego-card mb-3">
-        <div class="card-body">
-            <form class="row g-2 align-items-end" method="GET" action="{{ route('marketing.leads.index') }}">
-                <div class="col-12 col-md-4">
-                    <label class="form-label mb-1">Tìm kiếm</label>
+    <x-ui.card class="ego-card tw:mb-4">
+        <x-ui.card-body>
+            <form class="tw:row tw:g-2 tw:items-end" method="GET" action="{{ route('marketing.leads.index') }}">
+                <div class="tw:col12-12 tw:md:col12-4">
+                    <x-ui.label class="tw:mb-1">Tìm kiếm</x-ui.label>
                     <div class="input-group">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                        <input type="text" name="q" value="{{ request('q') }}" class="form-control"
-                               placeholder="Tên, email, SĐT, campaign...">
+                        <x-ui.input type="text" name="q" value="{{ request('q') }}" placeholder="Tên, email, SĐT, campaign..." />
                     </div>
                 </div>
 
-                <div class="col-12 col-md-3">
-                    <label class="form-label mb-1">Trạng thái</label>
-                    <select name="status" class="form-select">
+                <div class="tw:col12-12 tw:md:col12-3">
+                    <x-ui.label class="tw:mb-1">Trạng thái</x-ui.label>
+                    <x-ui.select name="status">
                         <option value="">Tất cả</option>
                         @foreach(\App\Models\Marketing\MarketingLead::statusOptions() as $k=>$v)
                             <option value="{{ $k }}" {{ request('status')===$k ? 'selected' : '' }}>{{ $v }}</option>
                         @endforeach
-                    </select>
+                    </x-ui.select>
                 </div>
 
-                <div class="col-12 col-md-3">
-                    <label class="form-label mb-1">Nguồn</label>
-                    <input type="text" name="source" value="{{ request('source') }}" class="form-control"
-                           placeholder="VD: Facebook Ads">
+                <div class="tw:col12-12 tw:md:col12-3">
+                    <x-ui.label class="tw:mb-1">Nguồn</x-ui.label>
+                    <x-ui.input type="text" name="source" value="{{ request('source') }}" placeholder="VD: Facebook Ads" />
                 </div>
 
-                <div class="col-12 col-md-2 d-flex gap-2">
-                    <button class="btn btn-dark ego-btn w-100">
+                <div class="tw:col12-12 tw:md:col12-2 tw:flex tw:gap-2">
+                    <x-ui.button variant="dark" type="submit" class="ego-btn tw:w-full">
                         <i class="bi bi-funnel me-1"></i> Lọc
-                    </button>
-                    <a href="{{ route('marketing.leads.index') }}" class="btn btn-outline-secondary ego-btn w-100">
+                    </x-ui.button>
+                    <x-ui.button href="{{ route('marketing.leads.index') }}" variant="outline-secondary" class="ego-btn tw:w-full">
                         Xóa
-                    </a>
+                    </x-ui.button>
                 </div>
             </form>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 
     {{-- Table --}}
-    <div class="card ego-card">
-        <div class="card-body p-0">
+    <x-ui.card class="ego-card">
+        <x-ui.card-body class="tw:p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle ego-table">
+                <table class="table table-hover tw:mb-0 align-middle ego-table">
                     <thead>
                         <tr>
                             <th style="width:90px">ID</th>
@@ -161,12 +159,12 @@
                             @endphp
 
                             <tr>
-                                <td class="text-muted fw-semibold">#{{ $lead->id }}</td>
+                                <td class="tw:text-[rgba(33,37,41,0.75)]! tw:font-semibold">#{{ $lead->id }}</td>
 
                                 <td>
-                                    <div class="fw-semibold">{{ $lead->name ?? '---' }}</div>
+                                    <div class="tw:font-semibold">{{ $lead->name ?? '---' }}</div>
                                     @if($lead->note)
-                                        <div class="text-muted small">{{ \Illuminate\Support\Str::limit($lead->note, 70) }}</div>
+                                        <div class="tw:text-[rgba(33,37,41,0.75)] small">{{ \Illuminate\Support\Str::limit($lead->note, 70) }}</div>
                                     @endif
                                 </td>
 
@@ -174,7 +172,7 @@
                                     @if($lead->phone)
                                         <span class="ego-mono">{{ $lead->phone }}</span>
                                     @else
-                                        <span class="text-muted">---</span>
+                                        <span class="tw:text-[rgba(33,37,41,0.75)]">---</span>
                                     @endif
                                 </td>
 
@@ -182,7 +180,7 @@
                                     @if($lead->email)
                                         <span class="ego-mono">{{ $lead->email }}</span>
                                     @else
-                                        <span class="text-muted">---</span>
+                                        <span class="tw:text-[rgba(33,37,41,0.75)]">---</span>
                                     @endif
                                 </td>
 
@@ -206,8 +204,8 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center text-muted py-5">
-                                    <div class="mb-2"><i class="bi bi-inbox fs-3"></i></div>
+                                <td colspan="9" class="tw:text-center tw:text-[rgba(33,37,41,0.75)]! py-5">
+                                    <div class="tw:mb-2"><i class="bi bi-inbox fs-3"></i></div>
                                     Chưa có lead nào. Bấm <b>Upload Lead (CSV)</b> để import.
                                 </td>
                             </tr>
@@ -215,14 +213,14 @@
                     </tbody>
                 </table>
             </div>
-        </div>
+        </x-ui.card-body>
 
         @if($leads->hasPages())
-            <div class="card-footer bg-white">
+            <x-ui.card-footer class="bg-white">
                 {{ $leads->links('pagination::bootstrap-5') }}
-            </div>
+            </x-ui.card-footer>
         @endif
-    </div>
+    </x-ui.card>
 </div>
 
 {{-- CSS xịn (scope .ego-leads để không ảnh hưởng chỗ khác) --}}

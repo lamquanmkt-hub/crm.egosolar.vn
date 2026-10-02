@@ -11,18 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-Schema::create('payment_request_approvals', function (Blueprint $table) {
-    $table->id();
+        if (! Schema::hasTable('payment_request_approvals')) {
+            Schema::create('payment_request_approvals', function (Blueprint $table) {
+                $table->id();
 
-    $table->foreignId('payment_request_id')->constrained()->cascadeOnDelete();
-    $table->foreignId('actor_id')->constrained('users');
+                $table->foreignId('payment_request_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('actor_id')->constrained('users');
 
-    $table->enum('step', ['submit','admin','accounting']);
-    $table->enum('action', ['submitted','approved','rejected']);
-    $table->text('note')->nullable();
+                $table->enum('step', ['submit', 'admin', 'accounting']);
+                $table->enum('action', ['submitted', 'approved', 'rejected']);
+                $table->text('note')->nullable();
 
-    $table->timestamps();
-});
+                $table->timestamps();
+            });
+        }
     }
 
     /**

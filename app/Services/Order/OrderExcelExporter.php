@@ -6,8 +6,8 @@ namespace App\Services\Order;
 
 use App\Models\CRM\Orders\Order;
 use App\Models\User;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Schema;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -69,7 +69,7 @@ class OrderExcelExporter
             });
         }
 
-        if (! empty($filters['company_id']) && Schema::hasColumn('crm_orders', 'company_id')) {
+        if (! empty($filters['company_id']) && SchemaCache::hasColumn('crm_orders', 'company_id')) {
             $query->where('company_id', $filters['company_id']);
         }
 

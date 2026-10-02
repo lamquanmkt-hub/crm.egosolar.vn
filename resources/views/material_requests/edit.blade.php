@@ -1,22 +1,10 @@
+{{-- Hai con số badge (đơn chờ duyệt, phiếu vật tư chờ duyệt) do
+     App\Services\System\SidebarStatusService cấp cho partials.sidebar qua view
+     composer. Trước đây đúng chỗ này có một khối 16 dòng CHÉP QUA 9 VIEW tự chạy
+     lại hai câu COUNT rồi nuốt lỗi bằng catch(Throwable). Giá trị nó tính ra bị
+     composer ghi đè nên không hiển thị ở đâu — chỉ tốn 2 câu truy vấn mỗi lần
+     dựng trang. --}}
 
-@php
-    $egoPendingOrdersCount = $egoPendingOrdersCount ?? 0;
-    $egoPendingMaterialRequestsCount = $egoPendingMaterialRequestsCount ?? 0;
-
-    try {
-        $egoPendingOrdersCount = (int) \Illuminate\Support\Facades\DB::table('crm_order_approvals')
-            ->where('status', 'pending')
-            ->distinct()
-            ->count('order_id');
-
-        $egoPendingMaterialRequestsCount = (int) \Illuminate\Support\Facades\DB::table('material_requests')
-            ->whereIn('status', ['SUBMITTED', 'ADMIN_APPROVED'])
-            ->count();
-    } catch (\Throwable $e) {
-        $egoPendingOrdersCount = 0;
-        $egoPendingMaterialRequestsCount = 0;
-    }
-@endphp
 
 @extends('layouts.app')
 
@@ -233,18 +221,18 @@
     ];
 @endphp
 
-<div class="container-fluid px-4 py-3 ego-mr-form">
+<div class="container-fluid tw:px-6 tw:py-4 ego-mr-form">
 
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3 ego-header">
+    <div class="tw:flex flex-wrap tw:justify-between tw:items-start tw:gap-2 tw:mb-4 ego-header">
         <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
+            <div class="tw:flex tw:items-center tw:gap-2 tw:mb-1">
                 <span class="page-icon">
                     <i class="bi bi-pencil-square"></i>
                 </span>
-                <h4 class="fw-bold mb-0">Sửa đơn vật tư #{{ $materialRequest->id }}</h4>
+                <h4 class="tw:font-bold tw:mb-0">Sửa đơn vật tư #{{ $materialRequest->id }}</h4>
             </div>
 
-            <div class="text-muted small">
+            <div class="tw:text-[rgba(33,37,41,0.75)] small">
                 Cập nhật thiết bị chính và vật tư phụ, trong kho và ngoài kho.
             </div>
         </div>
@@ -255,17 +243,17 @@
     </div>
 
     @if ($errors->any())
-        <div class="alert alert-danger border-0 shadow-sm" style="border-radius:16px;">
-            <div class="fw-semibold mb-1">
+        <x-ui.alert variant="danger" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)]" style="border-radius:16px;">
+            <div class="tw:font-semibold tw:mb-1">
                 <i class="bi bi-exclamation-triangle"></i> Vui lòng kiểm tra lại:
             </div>
 
-            <ul class="mb-0">
+            <ul class="tw:mb-0">
                 @foreach ($errors->all() as $e)
                     <li>{{ $e }}</li>
                 @endforeach
             </ul>
-        </div>
+        </x-ui.alert>
     @endif
 
     <form method="POST" action="{{ route('material-requests.update', $materialRequest->id) }}" id="materialRequestForm">
@@ -276,30 +264,30 @@
             <div class="col-lg-8">
 
                 {{-- CÔNG TRÌNH --}}
-                <div class="card border-0 shadow-ego ego-card" style="border-radius:18px;">
-                    <div class="card-header bg-white border-0 py-3" style="border-radius:18px 18px 0 0;">
-                        <div class="d-flex align-items-center gap-2">
+                <x-ui.card class="border-0 shadow-ego ego-card" style="border-radius:18px;">
+                    <x-ui.card-header class="bg-white border-0 tw:py-4" style="border-radius:18px 18px 0 0;">
+                        <div class="tw:flex tw:items-center tw:gap-2">
                             <span class="icon-pill">
                                 <i class="bi bi-buildings"></i>
                             </span>
 
                             <div>
-                                <div class="fw-bold">Công trình</div>
-                                <div class="text-muted small">
+                                <div class="tw:font-bold">Công trình</div>
+                                <div class="tw:text-[rgba(33,37,41,0.75)] small">
                                     Đơn vật tư sẽ link vào công trình để tính chi phí thực tế.
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </x-ui.card-header>
 
-                    <div class="card-body">
-                        <div class="row g-3 align-items-end">
+                    <x-ui.card-body>
+                        <div class="row g-3 tw:items-end">
                             <div class="col-md-8">
-                                <label class="form-label">
-                                    Chọn công trình <span class="text-danger">*</span>
-                                </label>
+                                <x-ui.label>
+                                    Chọn công trình <span class="tw:text-[#dc3545]">*</span>
+                                </x-ui.label>
 
-                                <select name="site_id" id="site_id" class="form-select" required>
+                                <x-ui.select name="site_id" id="site_id" class="mr-input" required>
                                     <option value="">-- Chọn công trình --</option>
 
                                     @foreach($sites as $site)
@@ -313,88 +301,83 @@
                                             #{{ $site->id }} - {{ $site->name }}
                                         </option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label">Ghi chú đơn</label>
+                                <x-ui.label>Ghi chú đơn</x-ui.label>
 
-                                <input name="note"
-                                       class="form-control"
+                                <x-ui.input name="note"
+                                       class="mr-input"
                                        value="{{ old('note', $materialRequest->note ?? '') }}"
-                                       placeholder="VD: Đợt 1, bổ sung vật tư...">
+                                       placeholder="VD: Đợt 1, bổ sung vật tư..." />
                             </div>
                         </div>
 
-                        <div class="site-preview mt-3" id="sitePreview">
-                            <div class="d-flex align-items-start gap-2">
+                        <div class="site-preview tw:mt-4" id="sitePreview">
+                            <div class="tw:flex tw:items-start tw:gap-2">
                                 <div class="preview-icon">
                                     <i class="bi bi-info-circle"></i>
                                 </div>
 
                                 <div>
-                                    <div class="fw-bold" id="sitePreviewName">Chưa chọn công trình</div>
-                                    <div class="small text-muted" id="sitePreviewAddress">
+                                    <div class="tw:font-bold" id="sitePreviewName">Chưa chọn công trình</div>
+                                    <div class="small tw:text-[rgba(33,37,41,0.75)]" id="sitePreviewAddress">
                                         Vui lòng chọn công trình để xem thông tin nhanh.
                                     </div>
-                                    <div class="small text-muted mt-1" id="sitePreviewContact"></div>
+                                    <div class="small tw:text-[rgba(33,37,41,0.75)] tw:mt-1" id="sitePreviewContact"></div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </x-ui.card-body>
+                </x-ui.card>
 
                 {{-- 4 PHẦN VẬT TƯ --}}
                 @foreach($sections as $section)
-                    <div class="card border-0 shadow-ego ego-card mt-3" style="border-radius:18px;">
-                        <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2"
-                             style="border-radius:18px 18px 0 0;">
+                    <x-ui.card class="border-0 shadow-ego ego-card tw:mt-4" style="border-radius:18px;">
+                        <x-ui.card-header class="bg-white border-0 tw:py-4 tw:flex flex-wrap tw:justify-between tw:items-center tw:gap-2" style="border-radius:18px 18px 0 0;">
                             <div>
-                                <div class="d-flex align-items-center gap-2">
+                                <div class="tw:flex tw:items-center tw:gap-2">
                                     <span class="icon-pill {{ $section['icon_class'] }}">
                                         <i class="bi {{ $section['icon'] }}"></i>
                                     </span>
 
-                                    <div class="fw-bold">{{ $section['title'] }}</div>
+                                    <div class="tw:font-bold">{{ $section['title'] }}</div>
                                 </div>
 
-                                <div class="text-muted small mt-1">
+                                <div class="tw:text-[rgba(33,37,41,0.75)] small tw:mt-1">
                                     {{ $section['desc'] }}
                                 </div>
                             </div>
 
                             @if($section['type'] === 'stock')
-                                <button type="button"
-                                        class="btn btn-outline-ego btnAddStock"
-                                        data-target="{{ $section['id'] }}">
+                                <x-ui.button variant="none" size="none" class="btn-outline-ego btnAddStock tw:py-[6px] tw:px-3" type="button" data-target="{{ $section['id'] }}">
                                     <i class="bi bi-plus-lg"></i> {{ $section['button'] }}
-                                </button>
+                                </x-ui.button>
                             @else
-                                <button type="button"
-                                        class="btn btn-outline-ego btnAddExternal"
-                                        data-target="{{ $section['id'] }}">
+                                <x-ui.button variant="none" size="none" class="btn-outline-ego btnAddExternal tw:py-[6px] tw:px-3" type="button" data-target="{{ $section['id'] }}">
                                     <i class="bi bi-plus-lg"></i> {{ $section['button'] }}
-                                </button>
+                                </x-ui.button>
                             @endif
-                        </div>
+                        </x-ui.card-header>
 
-                        <div class="card-body p-0">
+                        <x-ui.card-body class="tw:p-0">
                             <div class="table-responsive">
 
                                 @if($section['type'] === 'stock')
-                                    <table class="table table-hover align-middle mb-0 ego-table">
+                                    <table class="table table-hover align-middle tw:mb-0 ego-table">
                                         <thead class="table-light">
                                         <tr>
-                                            <th style="width:54px" class="text-center">#</th>
+                                            <th style="width:54px" class="tw:text-center">#</th>
                                             <th style="min-width:180px">Kho</th>
                                             <th style="min-width:300px">{{ $section['label'] }}</th>
-                                            <th style="width:110px" class="text-end">Tồn</th>
+                                            <th style="width:110px" class="tw:text-right">Tồn</th>
                                             <th style="width:110px">ĐVT</th>
-                                            <th style="width:150px" class="text-end">Giá vốn</th>
-                                            <th style="width:130px" class="text-end">Số lượng</th>
-                                            <th style="width:150px" class="text-end">Tạm tính</th>
+                                            <th style="width:150px" class="tw:text-right">Giá vốn</th>
+                                            <th style="width:130px" class="tw:text-right">Số lượng</th>
+                                            <th style="width:150px" class="tw:text-right">Tạm tính</th>
                                             <th style="min-width:190px">Ghi chú</th>
-                                            <th style="width:75px" class="text-end">Xóa</th>
+                                            <th style="width:75px" class="tw:text-right">Xóa</th>
                                         </tr>
                                         </thead>
 
@@ -404,10 +387,10 @@
                                                data-placeholder="{{ $section['placeholder'] }}">
                                         @foreach($section['rows'] as $row)
                                             <tr class="stock-row">
-                                                <td class="text-center stock-idx">1</td>
+                                                <td class="tw:text-center stock-idx">1</td>
 
                                                 <td>
-                                                    <select class="form-select stock-warehouse"
+                                                    <x-ui.select class="mr-input stock-warehouse"
                                                             data-old="{{ $row['warehouse_id'] ?? '' }}">
                                                         <option value="">-- Chọn kho --</option>
 
@@ -417,49 +400,49 @@
                                                                 {{ $warehouse->name }}
                                                             </option>
                                                         @endforeach
-                                                    </select>
+                                                    </x-ui.select>
                                                 </td>
 
                                                 <td>
-                                                    <input type="search" class="form-control stock-product-search mb-2"
-                                                           placeholder="Gõ tên hoặc SKU để tìm..." autocomplete="off">
-                                                    <select class="form-select stock-product"
+                                                    <x-ui.input type="search" class="mr-input stock-product-search tw:mb-2"
+                                                           placeholder="Gõ tên hoặc SKU để tìm..." autocomplete="off" />
+                                                    <x-ui.select class="mr-input stock-product"
                                                             data-old="{{ $row['product_id'] ?? '' }}">
                                                         <option value="">{{ $section['placeholder'] }}</option>
-                                                    </select>
+                                                    </x-ui.select>
                                                 </td>
 
-                                                <td class="text-end">
-                                                    <span class="stock-available badge bg-light text-dark border">—</span>
+                                                <td class="tw:text-right">
+                                                    <span class="stock-available badge bg-light tw:text-[#212529] border">—</span>
                                                 </td>
 
                                                 <td>
                                                     <span class="stock-unit pill-soft pill-muted">—</span>
                                                 </td>
 
-                                                <td class="text-end">
-                                                    <span class="stock-cost fw-bold text-success">0 đ</span>
+                                                <td class="tw:text-right">
+                                                    <span class="stock-cost tw:font-bold tw:text-[#198754]">0 đ</span>
                                                 </td>
 
                                                 <td>
-                                                    <input type="number"
+                                                    <x-ui.input type="number"
                                                            min="0"
                                                            step="any"
-                                                           class="form-control text-end stock-qty"
-                                                           value="{{ $row['qty'] ?? 1 }}">
+                                                           class="mr-input tw:text-right stock-qty"
+                                                           value="{{ $row['qty'] ?? 1 }}" />
                                                 </td>
 
-                                                <td class="text-end">
-                                                    <span class="stock-line-total fw-bold">0 đ</span>
+                                                <td class="tw:text-right">
+                                                    <span class="stock-line-total tw:font-bold">0 đ</span>
                                                 </td>
 
                                                 <td>
-                                                    <input class="form-control stock-note"
+                                                    <x-ui.input class="mr-input stock-note"
                                                            value="{{ $row['note'] ?? '' }}"
-                                                           placeholder="Ghi chú...">
+                                                           placeholder="Ghi chú..." />
                                                 </td>
 
-                                                <td class="text-end">
+                                                <td class="tw:text-right">
                                                     <x-ui.button type="button"
                                                             variant="outline-danger" size="sm" class="btnRemoveRow">
                                                         <i class="bi bi-trash"></i>
@@ -472,16 +455,16 @@
                                         </tbody>
                                     </table>
                                 @else
-                                    <table class="table table-hover align-middle mb-0 ego-table">
+                                    <table class="table table-hover align-middle tw:mb-0 ego-table">
                                         <thead class="table-light">
                                         <tr>
-                                            <th style="width:54px" class="text-center">#</th>
+                                            <th style="width:54px" class="tw:text-center">#</th>
                                             <th style="min-width:300px">{{ $section['label'] }}</th>
-                                            <th style="width:140px" class="text-end">Số lượng</th>
+                                            <th style="width:140px" class="tw:text-right">Số lượng</th>
                                             <th style="width:140px">Đơn vị</th>
-                                            <th style="width:160px" class="text-end">Giá vốn</th>
+                                            <th style="width:160px" class="tw:text-right">Giá vốn</th>
                                             <th style="min-width:240px">Ghi chú</th>
-                                            <th style="width:75px" class="text-end">Xóa</th>
+                                            <th style="width:75px" class="tw:text-right">Xóa</th>
                                         </tr>
                                         </thead>
 
@@ -490,39 +473,39 @@
                                                data-kind="{{ $section['kind'] }}">
                                         @foreach($section['rows'] as $row)
                                             <tr class="external-row">
-                                                <td class="text-center external-idx">1</td>
+                                                <td class="tw:text-center external-idx">1</td>
 
                                                 <td>
-                                                    <input class="form-control external-name"
+                                                    <x-ui.input class="mr-input external-name"
                                                            value="{{ $row['name'] ?? '' }}"
-                                                           placeholder="{{ $section['placeholder'] }}">
+                                                           placeholder="{{ $section['placeholder'] }}" />
                                                 </td>
 
                                                 <td>
-                                                    <input type="number"
+                                                    <x-ui.input type="number"
                                                            min="0"
                                                            step="any"
-                                                           class="form-control text-end external-qty"
-                                                           value="{{ $row['qty'] ?? 1 }}">
+                                                           class="mr-input tw:text-right external-qty"
+                                                           value="{{ $row['qty'] ?? 1 }}" />
                                                 </td>
 
                                                 <td>
-                                                    <input class="form-control external-unit"
+                                                    <x-ui.input class="mr-input external-unit"
                                                            value="{{ $row['unit'] ?? '' }}"
-                                                           placeholder="m/cái/bộ">
+                                                           placeholder="m/cái/bộ" />
                                                 </td>
 
-                                                <td class="text-end">
-                                                    <span class="text-muted small">Kho nhập khi duyệt</span>
+                                                <td class="tw:text-right">
+                                                    <span class="tw:text-[rgba(33,37,41,0.75)] small">Kho nhập khi duyệt</span>
                                                 </td>
 
                                                 <td>
-                                                    <input class="form-control external-note"
+                                                    <x-ui.input class="mr-input external-note"
                                                            value="{{ $row['note'] ?? '' }}"
-                                                           placeholder="Ghi chú...">
+                                                           placeholder="Ghi chú..." />
                                                 </td>
 
-                                                <td class="text-end">
+                                                <td class="tw:text-right">
                                                     <x-ui.button type="button"
                                                             variant="outline-danger" size="sm" class="btnRemoveRow">
                                                         <i class="bi bi-trash"></i>
@@ -538,16 +521,16 @@
                             </div>
 
                             @if($section['type'] === 'external')
-                                <div class="p-3 border-top">
+                                <div class="tw:p-4 border-top">
                                     <div class="rule-box warning">
-                                        <div class="d-flex gap-2 align-items-start">
+                                        <div class="tw:flex tw:gap-2 tw:items-start">
                                             <div class="rule-icon">
                                                 <i class="bi bi-exclamation-circle"></i>
                                             </div>
 
                                             <div>
-                                                <div class="fw-semibold">Lưu ý cho warehouse</div>
-                                                <div class="text-muted small">
+                                                <div class="tw:font-semibold">Lưu ý cho warehouse</div>
+                                                <div class="tw:text-[rgba(33,37,41,0.75)] small">
                                                     Hàng ngoài kho chưa có giá vốn ở bước sửa đơn.
                                                     Khi kho duyệt/xuất, warehouse phải nhập giá vốn để cộng chi phí về công trình.
                                                 </div>
@@ -556,8 +539,8 @@
                                     </div>
                                 </div>
                             @endif
-                        </div>
-                    </div>
+                        </x-ui.card-body>
+                    </x-ui.card>
                 @endforeach
 
                 <div id="payloadFields"></div>
@@ -566,99 +549,99 @@
             {{-- RIGHT --}}
             <div class="col-lg-4">
                 <div class="sticky-top" style="top:90px;">
-                    <div class="card border-0 shadow-ego ego-card mb-3" style="border-radius:18px;">
-                        <div class="card-header bg-white border-0 py-3" style="border-radius:18px 18px 0 0;">
-                            <div class="d-flex align-items-center gap-2">
+                    <x-ui.card class="border-0 shadow-ego ego-card tw:mb-4" style="border-radius:18px;">
+                        <x-ui.card-header class="bg-white border-0 tw:py-4" style="border-radius:18px 18px 0 0;">
+                            <div class="tw:flex tw:items-center tw:gap-2">
                                 <span class="icon-pill">
                                     <i class="bi bi-card-checklist"></i>
                                 </span>
 
                                 <div>
-                                    <div class="fw-bold">Tóm tắt đơn vật tư</div>
-                                    <div class="text-muted small">Kiểm tra nhanh trước khi lưu.</div>
+                                    <div class="tw:font-bold">Tóm tắt đơn vật tư</div>
+                                    <div class="tw:text-[rgba(33,37,41,0.75)] small">Kiểm tra nhanh trước khi lưu.</div>
                                 </div>
                             </div>
-                        </div>
+                        </x-ui.card-header>
 
-                        <div class="card-body">
+                        <x-ui.card-body>
                             <div class="summary-grid">
                                 <div class="summary-item">
-                                    <div class="text-muted small">Thiết bị trong kho</div>
-                                    <div class="fw-bold" id="mainStockCount">0</div>
+                                    <div class="tw:text-[rgba(33,37,41,0.75)] small">Thiết bị trong kho</div>
+                                    <div class="tw:font-bold" id="mainStockCount">0</div>
                                 </div>
 
                                 <div class="summary-item">
-                                    <div class="text-muted small">Thiết bị ngoài kho</div>
-                                    <div class="fw-bold" id="mainExternalCount">0</div>
+                                    <div class="tw:text-[rgba(33,37,41,0.75)] small">Thiết bị ngoài kho</div>
+                                    <div class="tw:font-bold" id="mainExternalCount">0</div>
                                 </div>
 
                                 <div class="summary-item">
-                                    <div class="text-muted small">Vật tư phụ trong kho</div>
-                                    <div class="fw-bold" id="subStockCount">0</div>
+                                    <div class="tw:text-[rgba(33,37,41,0.75)] small">Vật tư phụ trong kho</div>
+                                    <div class="tw:font-bold" id="subStockCount">0</div>
                                 </div>
 
                                 <div class="summary-item">
-                                    <div class="text-muted small">Vật tư phụ ngoài kho</div>
-                                    <div class="fw-bold" id="subExternalCount">0</div>
+                                    <div class="tw:text-[rgba(33,37,41,0.75)] small">Vật tư phụ ngoài kho</div>
+                                    <div class="tw:font-bold" id="subExternalCount">0</div>
                                 </div>
                             </div>
 
-                            <div class="finance-summary mt-3">
-                                <div class="d-flex justify-content-between gap-2">
-                                    <span class="text-muted">Giá vốn trong kho tạm tính</span>
+                            <div class="finance-summary tw:mt-4">
+                                <div class="tw:flex tw:justify-between tw:gap-2">
+                                    <span class="tw:text-[rgba(33,37,41,0.75)]">Giá vốn trong kho tạm tính</span>
                                     <strong id="stockCostTotal">0 đ</strong>
                                 </div>
 
-                                <div class="small text-muted mt-1">
+                                <div class="small tw:text-[rgba(33,37,41,0.75)] tw:mt-1">
                                     Vật tư ngoài kho chưa tính giá vốn ở bước này.
                                 </div>
                             </div>
 
-                            <div class="summary-hint mt-3">
-                                <div class="d-flex align-items-start gap-2">
+                            <div class="summary-hint tw:mt-4">
+                                <div class="tw:flex tw:items-start tw:gap-2">
                                     <div class="hint-ic">
                                         <i class="bi bi-diagram-3"></i>
                                     </div>
 
                                     <div>
-                                        <div class="fw-semibold">Luồng xử lý</div>
-                                        <div class="text-muted small">
+                                        <div class="tw:font-semibold">Luồng xử lý</div>
+                                        <div class="tw:text-[rgba(33,37,41,0.75)] small">
                                             Lưu nháp → gửi admin duyệt → admin duyệt → kho duyệt/xuất
                                             → cộng chi phí thực tế về công trình.
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </x-ui.card-body>
 
-                        <div class="card-footer bg-white border-0 p-3" style="border-radius:0 0 18px 18px;">
-                            <button class="btn btn-ego w-100" id="btnSubmitForm">
+                        <x-ui.card-footer class="bg-white border-0 tw:p-4" style="border-radius:0 0 18px 18px;">
+                            <x-ui.button variant="none" size="none" type="submit" class="btn-ego tw:w-full" id="btnSubmitForm">
                                 <i class="bi bi-save"></i> Lưu thay đổi
-                            </button>
+                            </x-ui.button>
 
-                            <x-ui.button href="{{ route('material-requests.index') }}" variant="outline-secondary" class="w-100 mt-2">
+                            <x-ui.button href="{{ route('material-requests.index') }}" variant="outline-secondary" class="tw:w-full tw:mt-2">
                                 Quay lại
                             </x-ui.button>
-                        </div>
-                    </div>
+                        </x-ui.card-footer>
+                    </x-ui.card>
 
-                    <div class="card border-0 shadow-ego ego-card" style="border-radius:18px;">
-                        <div class="card-body">
-                            <div class="d-flex gap-2 align-items-start">
+                    <x-ui.card class="border-0 shadow-ego ego-card" style="border-radius:18px;">
+                        <x-ui.card-body>
+                            <div class="tw:flex tw:gap-2 tw:items-start">
                                 <div class="mini-icon">
                                     <i class="bi bi-cash-coin"></i>
                                 </div>
 
                                 <div>
-                                    <div class="fw-bold">Quy tắc giá vốn</div>
-                                    <div class="text-muted small">
+                                    <div class="tw:font-bold">Quy tắc giá vốn</div>
+                                    <div class="tw:text-[rgba(33,37,41,0.75)] small">
                                         Hàng trong kho tự lấy giá vốn từ kho/catalog.
                                         Hàng ngoài kho warehouse nhập giá vốn lúc duyệt/xuất.
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </x-ui.card-body>
+                    </x-ui.card>
                 </div>
             </div>
         </div>
@@ -1213,21 +1196,16 @@
 })();
 </script>
 
-<style>
-    .ego-mr-form{
+<style> .ego-mr-form{
         background:
             radial-gradient(circle at top left, rgba(11,201,170,.13), transparent 26%),
             linear-gradient(180deg, rgba(11,201,170,.10), rgba(11,201,170,.05) 28%, rgba(255,255,255,0) 75%);
         border-radius: 22px;
         padding-top: 18px;
         padding-bottom: 18px;
-    }
-
-    .ego-header{
+    }.ego-header{
         margin-top: 6px;
-    }
-
-    .page-icon{
+    }.page-icon{
         width: 42px;
         height: 42px;
         border-radius: 16px;
@@ -1238,19 +1216,13 @@
         color:#0f766e;
         border:1px solid rgba(11,201,170,.22);
         box-shadow:0 12px 26px rgba(2,44,34,.08);
-    }
-
-    .ego-card{
+    }.ego-card{
         background: rgba(255,255,255,.96);
         backdrop-filter: blur(8px);
         border: 1px solid rgba(15,118,110,.07) !important;
-    }
-
-    .shadow-ego{
+    }.shadow-ego{
         box-shadow: 0 14px 38px rgba(2,44,34,.08) !important;
-    }
-
-    .btn-ego{
+    }.btn-ego{
         background: linear-gradient(135deg, #0BC9AA, #08b79b);
         border:0;
         color:#fff;
@@ -1258,29 +1230,21 @@
         padding:11px 14px;
         font-weight:800;
         box-shadow:0 10px 22px rgba(11,201,170,.26);
-    }
-
-    .btn-ego:hover{
+    }.btn-ego:hover{
         color:#fff;
         transform: translateY(-1px);
         box-shadow:0 14px 28px rgba(11,201,170,.32);
-    }
-
-    .btn-outline-ego{
+    }.btn-outline-ego{
         border-color: rgba(11,201,170,.55);
         color:#0f766e;
         background: rgba(11,201,170,.10);
         border-radius:13px;
         font-weight:700;
-    }
-
-    .btn-outline-ego:hover{
+    }.btn-outline-ego:hover{
         border-color: rgba(11,201,170,.75);
         background: rgba(11,201,170,.16);
         color:#0f766e;
-    }
-
-    .icon-pill{
+    }.icon-pill{
         width:36px;
         height:36px;
         border-radius:13px;
@@ -1291,46 +1255,30 @@
         color:#0f766e;
         border:1px solid rgba(0,0,0,.06);
         flex:0 0 auto;
-    }
-
-    .main-icon{
+    }.main-icon{
         background: rgba(59,130,246,.12);
         color:#1d4ed8;
-    }
-
-    .sub-icon{
+    }.sub-icon{
         background: rgba(11,201,170,.12);
         color:#0f766e;
-    }
-
-    .outside-main-icon,
+    }.outside-main-icon,
     .outside-sub-icon{
         background: rgba(245,158,11,.14);
         color:#b45309;
-    }
-
-    .form-control,
-    .form-select{
+    }.mr-input{
         border-radius:13px;
         padding-top:.58rem;
         padding-bottom:.58rem;
         border-color: rgba(15,23,42,.12);
-    }
-
-    .form-control:focus,
-    .form-select:focus{
+    }.mr-input:focus{
         border-color: rgba(11,201,170,.7);
         box-shadow: 0 0 0 .2rem rgba(11,201,170,.12);
-    }
-
-    .site-preview{
+    }.site-preview{
         border:1px solid rgba(11,201,170,.18);
         background: rgba(11,201,170,.06);
         border-radius:16px;
         padding:13px;
-    }
-
-    .preview-icon,
+    }.preview-icon,
     .rule-icon,
     .hint-ic,
     .mini-icon{
@@ -1344,58 +1292,39 @@
         color:#0f766e;
         border:1px solid rgba(0,0,0,.06);
         flex:0 0 auto;
-    }
-
-    .rule-box{
+    }.rule-box{
         border:1px solid rgba(11,201,170,.18);
         background: rgba(11,201,170,.06);
         border-radius:16px;
         padding:13px;
-    }
-
-    .rule-box.warning{
+    }.rule-box.warning{
         border-color: rgba(245,158,11,.22);
         background: rgba(245,158,11,.08);
-    }
-
-    .rule-box.warning .rule-icon{
+    }.rule-box.warning .rule-icon{
         background: rgba(245,158,11,.14);
         color:#b45309;
-    }
-
-    .ego-table thead th{
+    }.ego-table thead th{
         background:#f8fafc;
         color:#334155;
         font-size:.85rem;
         white-space:nowrap;
         vertical-align:middle;
         border-bottom:1px solid rgba(0,0,0,.06) !important;
-    }
-
-    .ego-table tbody td{
+    }.ego-table tbody td{
         padding-top:.8rem;
         padding-bottom:.8rem;
         vertical-align:middle;
         border-top:1px solid rgba(0,0,0,.04) !important;
-    }
-
-    .ego-table tbody tr:hover{
+    }.ego-table tbody tr:hover{
         background: rgba(11,201,170,.055);
-    }
-
-    .ego-table .form-control,
-    .ego-table .form-select{
+    }.ego-table .mr-input{
         min-height:42px;
         font-size:14px;
-    }
-
-    .btnRemoveRow{
+    }.btnRemoveRow{
         width:42px;
         height:42px;
         border-radius:12px;
-    }
-
-    .pill-soft{
+    }.pill-soft{
         display:inline-flex;
         align-items:center;
         gap:6px;
@@ -1406,49 +1335,33 @@
         line-height:1;
         white-space:nowrap;
         font-weight:700;
-    }
-
-    .pill-muted{
+    }.pill-muted{
         background:rgba(148,163,184,.12);
         color:#64748b;
         border-color:rgba(148,163,184,.22);
-    }
-
-    .summary-grid{
+    }.summary-grid{
         display:grid;
         grid-template-columns:1fr 1fr;
         gap:10px;
-    }
-
-    .summary-item{
+    }.summary-item{
         border:1px solid rgba(0,0,0,.06);
         background: rgba(11,201,170,.06);
         border-radius:15px;
         padding:12px;
-    }
-
-    .finance-summary{
+    }.finance-summary{
         border:1px solid rgba(11,201,170,.18);
         background: rgba(11,201,170,.06);
         border-radius:15px;
         padding:12px;
-    }
-
-    .summary-hint{
+    }.summary-hint{
         border:1px solid rgba(0,0,0,.06);
         background: rgba(255,255,255,.88);
         border-radius:15px;
         padding:12px;
-    }
-
-    @media (max-width: 991.98px){
-        .sticky-top{
+    }@media (max-width: 991.98px){.sticky-top{
             position: static !important;
         }
-    }
-
-    @media (max-width: 575.98px){
-        .summary-grid{
+    }@media (max-width: 575.98px){.summary-grid{
             grid-template-columns:1fr;
         }
     }

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Core\Warehouse;
 use App\Models\SolarWarrantyClaim;
 use App\Models\SolarWarrantyStockMovement;
-use App\Support\Synced\EgoCompanyScope;
+use App\Support\EgoCompanyScope;
 use App\Support\SchemaCache;
 use App\Support\SolarMaintenanceAccess;
 use Illuminate\Http\RedirectResponse;
@@ -29,18 +29,11 @@ class SolarWarrantyStockController extends Controller
             'related_serial_code' => ['nullable', 'string', 'max:190'],
             'quantity' => ['nullable', 'numeric', 'min:1', 'max:1'],
             'note' => ['nullable', 'string', 'max:5000'],
-            'return_to' => ['nullable', Rule::in(['warranty_exchange'])],
         ]);
 
         try {
             $claim = SolarWarrantyClaim::with('site')->findOrFail((int) $data['warranty_claim_id']);
             $this->assertCompany((int) ($claim->company_id ?: $claim->site?->company_id), $request);
-
-            if (\App\Support\Warranty\WarrantyFlow::isFlowType((string) $claim->claim_type)) {
-                throw ValidationException::withMessages([
-                    'warranty_claim_id' => 'Phiếu đổi hàng/sửa chữa dùng thao tác Kho riêng trong trang chi tiết phiếu (giữ hàng → xuất → thu hồi).',
-                ]);
-            }
 
             if (! in_array($claim->status, ['approved', 'waiting_stock', 'replacing', 'waiting_customer'], true)) {
                 throw ValidationException::withMessages([
@@ -110,11 +103,6 @@ class SolarWarrantyStockController extends Controller
                 return $movement;
             });
 
-            if (($data['return_to'] ?? null) === 'warranty_exchange') {
-                return redirect()->route('ky-thuat.warranty-exchange.show', ['claim' => $claim->id])
-                    ->with('success', 'Đã tạo phiếu kho '.$movement->movement_code.' cho đề xuất đổi hàng.');
-            }
-
             return redirect()->route('projects-unified.maintenance.index', ['view' => 'stock'])
                 ->with('success', 'Đã tạo phiếu kho '.$movement->movement_code.'.');
         } catch (ValidationException $exception) {
@@ -132,15 +120,6 @@ class SolarWarrantyStockController extends Controller
             'status' => ['required', Rule::in(array_keys(SolarWarrantyStockMovement::STATUSES))],
             'note' => ['nullable', 'string', 'max:5000'],
         ]);
-
-        $linked = SolarWarrantyClaim::find($movement->warranty_claim_id);
-        if ($linked && \App\Support\Warranty\WarrantyFlow::isFlowType((string) $linked->claim_type)) {
-            throw ValidationException::withMessages(['status' => 'Phiếu kho của đổi hàng/sửa chữa chỉ xử lý trong trang chi tiết phiếu.']);
-        }
-        if ($linked && in_array((string) $linked->status, ['cancelled', 'rejected', 'completed'], true)
-            && (string) $data['status'] === 'completed') {
-            throw ValidationException::withMessages(['status' => 'Phiếu bảo hành đã hủy/từ chối/hoàn tất — không được hoàn tất phiếu kho.']);
-        }
 
         $old = (string) $movement->status;
         $new = (string) $data['status'];

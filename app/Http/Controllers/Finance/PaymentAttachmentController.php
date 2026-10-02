@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Throwable;
@@ -27,6 +27,17 @@ class PaymentAttachmentController extends Controller
         $paymentRequestId = (int) $paymentRequest;
         $storedPaths = [];
 
+        /*
+         * Đã COMMIT hay chưa — quyết định khối catch có được phép xoá file không.
+         *
+         * Trước đây khối catch xoá sạch $storedPaths trong MỌI trường hợp, còn
+         * rollback thì lại có điều kiện `transactionLevel() > 0`. Nếu lỗi xảy ra
+         * SAU commit (ví dụ Log::info không ghi được vì hết quota đĩa) thì bản ghi
+         * ở lại còn file bị xoá -> đính kèm hỏng vĩnh viễn. Đã tìm thấy 5 bản ghi
+         * kiểu này trên production ngày 2026-09-03.
+         */
+        $committed = false;
+
         try {
             $user = auth()->user();
 
@@ -39,8 +50,8 @@ class PaymentAttachmentController extends Controller
             }
 
             if (
-                ! Schema::hasTable('payment_requests') ||
-                ! Schema::hasTable('payment_attachments')
+                ! SchemaCache::hasTable('payment_requests') ||
+                ! SchemaCache::hasTable('payment_attachments')
             ) {
                 return response()->json([
                     'ok' => false,
@@ -136,14 +147,6 @@ class PaymentAttachmentController extends Controller
                 )
             );
 
-            if (count($files) > 15) {
-                return response()->json([
-                    'ok' => false,
-                    'success' => false,
-                    'message' => 'Mỗi lần chỉ được tải tối đa 15 chứng từ.',
-                ], 422);
-            }
-
             if (count($files) === 0) {
                 $uploadErrors = [];
 
@@ -234,7 +237,7 @@ class PaymentAttachmentController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            $attachmentColumns = Schema::getColumnListing(
+            $attachmentColumns = SchemaCache::columns(
                 'payment_attachments'
             );
 
@@ -306,12 +309,21 @@ class PaymentAttachmentController extends Controller
             }
 
             DB::commit();
+            $committed = true;
 
-            Log::info('PAYMENT_ATTACHMENT_UPLOAD_SUCCESS', [
-                'payment_request_id' => $paymentRequestId,
-                'user_id' => $user->id,
-                'files' => $savedFiles,
-            ]);
+            /*
+             * Ghi log KHÔNG được phép làm hỏng một lần tải lên đã thành công.
+             * Khi hết quota đĩa, chính Log::info ném lỗi và trước đây lỗi đó rơi
+             * xuống khối catch, kéo theo việc xoá file vừa ghi.
+             */
+            try {
+                Log::info('PAYMENT_ATTACHMENT_UPLOAD_SUCCESS', [
+                    'payment_request_id' => $paymentRequestId,
+                    'user_id' => $user->id,
+                    'files' => $savedFiles,
+                ]);
+            } catch (Throwable $ignored) {
+            }
 
             /*
              * Luôn trả JSON.
@@ -320,7 +332,7 @@ class PaymentAttachmentController extends Controller
             return response()->json([
                 'ok' => true,
                 'success' => true,
-                'message' => 'Đã tải '.count($savedFiles).' chứng từ thành công.',
+                'message' => 'Đã tải chứng từ thành công.',
                 'payment_request_id' => $paymentRequestId,
                 'files' => $savedFiles,
             ], 201);
@@ -329,10 +341,16 @@ class PaymentAttachmentController extends Controller
                 DB::rollBack();
             }
 
-            foreach ($storedPaths as $path) {
-                try {
-                    Storage::disk('public')->delete($path);
-                } catch (Throwable $ignored) {
+            /*
+             * CHỈ dọn file khi bản ghi đã bị rollback. Nếu đã commit thì bản ghi
+             * còn sống, xoá file là tạo ra đính kèm hỏng — đúng lỗi đã xảy ra.
+             */
+            if (! $committed) {
+                foreach ($storedPaths as $path) {
+                    try {
+                        Storage::disk('public')->delete($path);
+                    } catch (Throwable $ignored) {
+                    }
                 }
             }
 
@@ -342,16 +360,39 @@ class PaymentAttachmentController extends Controller
                 '-'.
                 Str::upper(Str::random(5));
 
-            Log::error('PAYMENT_ATTACHMENT_UPLOAD_FAILED', [
-                'error_id' => $errorId,
-                'payment_request_id' => $paymentRequestId,
-                'user_id' => optional(auth()->user())->id,
-                'exception' => get_class($exception),
-                'message' => $exception->getMessage(),
-                'file' => $exception->getFile(),
-                'line' => $exception->getLine(),
-                'trace' => $exception->getTraceAsString(),
-            ]);
+            /*
+             * Ghi log cũng có thể ném lỗi khi hết quota. Nếu để nó thoát ra thì
+             * cả khối catch mất tác dụng.
+             */
+            try {
+                Log::error('PAYMENT_ATTACHMENT_UPLOAD_FAILED', [
+                    'error_id' => $errorId,
+                    'payment_request_id' => $paymentRequestId,
+                    'user_id' => optional(auth()->user())->id,
+                    'committed' => $committed,
+                    'exception' => get_class($exception),
+                    'message' => $exception->getMessage(),
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                    'trace' => $exception->getTraceAsString(),
+                ]);
+            } catch (Throwable $ignored) {
+            }
+
+            /*
+             * Đã commit: dữ liệu ĐÃ lưu và file vẫn còn. Báo lỗi ở đây sẽ khiến
+             * người dùng tải lại và tạo đính kèm trùng.
+             */
+            if ($committed) {
+                return response()->json([
+                    'ok' => true,
+                    'success' => true,
+                    'message' => 'Đã tải chứng từ thành công.',
+                    'payment_request_id' => $paymentRequestId,
+                    'files' => $savedFiles ?? [],
+                    'warning_id' => $errorId,
+                ], 201);
+            }
 
             return response()->json([
                 'ok' => false,

@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -23,8 +23,8 @@ class EgoCustomerProfileDocumentPreviewController extends Controller
         $profileId = (int) $customerProfile;
         $documentId = (int) $document;
 
-        abort_unless(Schema::hasTable('customer_profiles'), 404);
-        abort_unless(Schema::hasTable('customer_profile_documents'), 404);
+        abort_unless(SchemaCache::hasTable('customer_profiles'), 404);
+        abort_unless(SchemaCache::hasTable('customer_profile_documents'), 404);
 
         $profile = DB::table('customer_profiles')->where('id', $profileId)->first();
         abort_unless($profile, 404);

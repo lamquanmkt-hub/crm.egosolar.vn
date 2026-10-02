@@ -9,9 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('companies') && !Schema::hasColumn('companies', 'bank_accounts')) {
+        if (Schema::hasTable('companies') && ! Schema::hasColumn('companies', 'bank_accounts')) {
             Schema::table('companies', function (Blueprint $table) {
-                $table->longText('bank_accounts')->nullable()->after('bank_holder');
+                if (! Schema::hasColumn('companies', 'bank_accounts')) {
+                    $table->longText('bank_accounts')->nullable()->after('bank_holder');
+                }
             });
         }
 
@@ -19,7 +21,7 @@ return new class extends Migration
             $companies = DB::table('companies')->get();
 
             foreach ($companies as $company) {
-                if (!empty($company->bank_accounts)) {
+                if (! empty($company->bank_accounts)) {
                     continue;
                 }
 

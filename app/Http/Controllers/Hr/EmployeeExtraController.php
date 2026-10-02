@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -51,7 +51,7 @@ class EmployeeExtraController extends Controller
     {
         $this->allow();
 
-        abort_unless(Schema::hasTable('hr_employee_profiles'), 404);
+        abort_unless(SchemaCache::hasTable('hr_employee_profiles'), 404);
 
         $fields = [
             'employee_code',
@@ -119,7 +119,7 @@ class EmployeeExtraController extends Controller
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
-        abort_unless(Schema::hasTable('hr_employee_files'), 404);
+        abort_unless(SchemaCache::hasTable('hr_employee_files'), 404);
 
         $file = $request->file('file');
         $path = $file->store('hr/employee-files/'.(int) $employee, 'public');

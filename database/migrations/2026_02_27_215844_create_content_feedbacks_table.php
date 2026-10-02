@@ -10,22 +10,25 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    Schema::create('content_feedbacks', function (Blueprint $table) {
-        $table->id();
+    {
+        if (! Schema::hasTable('content_feedbacks')) {
+            Schema::create('content_feedbacks', function (Blueprint $table) {
+                $table->id();
 
-        $table->unsignedBigInteger('content_calendar_id');
-        $table->unsignedBigInteger('user_id');
+                $table->unsignedBigInteger('content_calendar_id');
+                $table->unsignedBigInteger('user_id');
 
-        $table->text('message');              // nội dung comment
-        $table->string('image_path')->nullable(); // ảnh (nếu có)
+                $table->text('message');              // nội dung comment
+                $table->string('image_path')->nullable(); // ảnh (nếu có)
 
-        $table->timestamps();
+                $table->timestamps();
 
-        $table->index('content_calendar_id');
-        $table->index('user_id');
-    });
-}
+                $table->index('content_calendar_id');
+                $table->index('user_id');
+            });
+        }
+    }
+
     /**
      * Reverse the migrations.
      */

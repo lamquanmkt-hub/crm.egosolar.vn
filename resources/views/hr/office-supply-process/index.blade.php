@@ -189,7 +189,7 @@
                                                 <div class="vpp-action-row">
                                                     <button class="vpp-btn-soft" type="button" data-vpp-open="modalEditProduct{{ $p->id }}">Sửa</button>
 
-                                                    <form method="POST" action="{{ url('/nhan-su/quy-trinh-phan-bo-vpp/xoa-vpp/'.$p->id) }}" onsubmit="return confirm('Xóa vật phẩm này? Lịch sử VPP riêng của vật phẩm này cũng sẽ bị xóa.')">
+                                                    <form method="POST" action="{{ url('/nhan-su/quy-trinh-phan-bo-vpp/san-pham/'.$p->id) }}" onsubmit="return confirm('Xóa vật phẩm này? Lịch sử VPP riêng của vật phẩm này cũng sẽ bị xóa.')">
                                                         @csrf
                                                         @method('DELETE')
                                                         <button class="vpp-btn-danger" type="submit">Xóa</button>
@@ -326,7 +326,7 @@
 
 <div class="vpp-modal-backdrop" id="modalAddProduct">
     <div class="vpp-modal">
-        <form method="POST" action="{{ url('/nhan-su/quy-trinh-phan-bo-vpp/them-vpp') }}">
+        <form method="POST" action="{{ url('/nhan-su/quy-trinh-phan-bo-vpp/san-pham') }}">
             @csrf
 
             <div class="vpp-modal-head">
@@ -493,7 +493,7 @@
 @foreach(($products ?? []) as $p)
 <div class="vpp-modal-backdrop" id="modalEditProduct{{ $p->id }}">
     <div class="vpp-modal">
-        <form method="POST" action="{{ url('/nhan-su/quy-trinh-phan-bo-vpp/sua-vpp/'.$p->id) }}">
+        <form method="POST" action="{{ url('/nhan-su/quy-trinh-phan-bo-vpp/san-pham/'.$p->id) }}">
             @csrf
             @method('PUT')
 

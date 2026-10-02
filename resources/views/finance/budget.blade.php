@@ -16,8 +16,7 @@
     $cashFlowNet = $cashFlow['net'] ?? 0;
 @endphp
 
-<style>
-    .budget-v2 {
+<style> .budget-v2{
         padding: 18px;
         background:
             radial-gradient(circle at top left, rgba(59, 130, 246, .08), transparent 28%),
@@ -25,9 +24,7 @@
             #f5f7fb;
         min-height: 100%;
         overflow-x: hidden;
-    }
-
-    .budget-v2-hero {
+    }.budget-v2-hero{
         border-radius: 28px;
         padding: 28px;
         color: #fff;
@@ -37,9 +34,7 @@
         box-shadow: 0 22px 55px rgba(15, 23, 42, .18);
         position: relative;
         overflow: hidden;
-    }
-
-    .budget-v2-hero::after {
+    }.budget-v2-hero::after{
         content: "";
         position: absolute;
         width: 360px;
@@ -48,14 +43,10 @@
         right: -150px;
         top: -120px;
         background: rgba(255, 255, 255, .08);
-    }
-
-    .budget-v2-hero-inner {
+    }.budget-v2-hero-inner{
         position: relative;
         z-index: 2;
-    }
-
-    .budget-v2-pill {
+    }.budget-v2-pill{
         display: inline-flex;
         align-items: center;
         gap: 8px;
@@ -66,57 +57,41 @@
         font-size: 12px;
         font-weight: 800;
         letter-spacing: .04em;
-    }
-
-    .budget-v2-title {
+    }.budget-v2-title{
         font-size: clamp(28px, 3vw, 42px);
         font-weight: 900;
         letter-spacing: -.04em;
         margin: 14px 0 8px;
-    }
-
-    .budget-v2-subtitle {
+    }.budget-v2-subtitle{
         max-width: 760px;
         opacity: .78;
         margin: 0;
-    }
-
-    .budget-v2-filter {
+    }.budget-v2-filter{
         margin-top: 22px;
         padding: 16px;
         border-radius: 22px;
         background: rgba(255,255,255,.1);
         border: 1px solid rgba(255,255,255,.18);
-    }
-
-    .budget-v2-filter label {
+    }.budget-v2-filter label{
         font-size: 12px;
         font-weight: 800;
         color: rgba(255,255,255,.75);
         margin-bottom: 7px;
-    }
-
-    .budget-v2-filter .form-control {
+    }.budget-v2-filter .fb-input{
         border: 0;
         border-radius: 15px;
         min-height: 45px;
-    }
-
-    .budget-v2-card {
+    }.budget-v2-card{
         background: #fff;
         border: 1px solid rgba(15, 23, 42, .06);
         border-radius: 24px;
         box-shadow: 0 16px 40px rgba(15, 23, 42, .065);
-    }
-
-    .budget-v2-stat {
+    }.budget-v2-stat{
         padding: 20px;
         height: 100%;
         position: relative;
         overflow: hidden;
-    }
-
-    .budget-v2-stat::after {
+    }.budget-v2-stat::after{
         content: "";
         position: absolute;
         width: 100px;
@@ -125,9 +100,7 @@
         bottom: -35px;
         border-radius: 999px;
         background: #eff6ff;
-    }
-
-    .budget-v2-icon {
+    }.budget-v2-icon{
         width: 46px;
         height: 46px;
         border-radius: 17px;
@@ -137,85 +110,55 @@
         font-size: 21px;
         background: #eff6ff;
         color: #2563eb;
-    }
-
-    .budget-v2-icon.green {
+    }.budget-v2-icon.green{
         background: #dcfce7;
         color: #16a34a;
-    }
-
-    .budget-v2-icon.red {
+    }.budget-v2-icon.red{
         background: #fee2e2;
         color: #dc2626;
-    }
-
-    .budget-v2-icon.amber {
+    }.budget-v2-icon.amber{
         background: #fef3c7;
         color: #d97706;
-    }
-
-    .budget-v2-icon.purple {
+    }.budget-v2-icon.purple{
         background: #ede9fe;
         color: #7c3aed;
-    }
-
-    .budget-v2-label {
+    }.budget-v2-label{
         color: #64748b;
         font-size: 13px;
         font-weight: 800;
         margin-bottom: 6px;
-    }
-
-    .budget-v2-number {
+    }.budget-v2-number{
         color: #0f172a;
         font-size: 25px;
         font-weight: 900;
         letter-spacing: -.04em;
         margin-bottom: 4px;
-    }
-
-    .budget-v2-hint {
+    }.budget-v2-hint{
         color: #64748b;
         font-size: 12px;
-    }
-
-    .budget-v2-section-title {
+    }.budget-v2-section-title{
         color: #0f172a;
         font-size: 18px;
         font-weight: 900;
         margin: 0;
-    }
-
-    .budget-v2-muted {
+    }.budget-v2-muted{
         color: #64748b;
         font-size: 13px;
-    }
-
-    .budget-v2-form label {
+    }.budget-v2-form label{
         color: #334155;
         font-size: 12px;
         font-weight: 800;
         margin-bottom: 7px;
-    }
-
-    .budget-v2-form .form-control,
-    .budget-v2-form .form-select {
+    }.budget-v2-form .fb-input{
         border-radius: 15px;
         border: 1px solid #e2e8f0;
         min-height: 45px;
-    }
-
-    .budget-v2-form .form-control:focus,
-    .budget-v2-form .form-select:focus {
+    }.budget-v2-form .fb-input:focus{
         border-color: #3b82f6;
         box-shadow: 0 0 0 .2rem rgba(59, 130, 246, .13);
-    }
-
-    .budget-v2-table {
+    }.budget-v2-table{
         margin-bottom: 0;
-    }
-
-    .budget-v2-table thead th {
+    }.budget-v2-table thead th{
         color: #64748b;
         font-size: 12px;
         font-weight: 900;
@@ -223,14 +166,10 @@
         letter-spacing: .04em;
         border-bottom: 1px solid #e2e8f0;
         white-space: nowrap;
-    }
-
-    .budget-v2-table tbody td {
+    }.budget-v2-table tbody td{
         vertical-align: middle;
         border-bottom: 1px solid #eef2f7;
-    }
-
-    .budget-v2-badge {
+    }.budget-v2-badge{
         display: inline-flex;
         align-items: center;
         gap: 7px;
@@ -239,74 +178,48 @@
         font-size: 12px;
         font-weight: 900;
         white-space: nowrap;
-    }
-
-    .budget-v2-badge.success {
+    }.budget-v2-badge.success{
         background: #dcfce7;
         color: #166534;
-    }
-
-    .budget-v2-badge.warning {
+    }.budget-v2-badge.warning{
         background: #fef3c7;
         color: #92400e;
-    }
-
-    .budget-v2-badge.danger {
+    }.budget-v2-badge.danger{
         background: #fee2e2;
         color: #991b1b;
-    }
-
-    .budget-v2-badge.primary {
+    }.budget-v2-badge.primary{
         background: #dbeafe;
         color: #1d4ed8;
-    }
-
-    .budget-v2-progress {
+    }.budget-v2-progress{
         height: 10px;
         border-radius: 999px;
         overflow: hidden;
         background: #eaf0f8;
         min-width: 120px;
-    }
-
-    .budget-v2-progress span {
+    }.budget-v2-progress span{
         display: block;
         height: 100%;
         border-radius: 999px;
         background: linear-gradient(90deg, #2563eb, #38bdf8);
-    }
-
-    .budget-v2-progress span.success {
+    }.budget-v2-progress span.success{
         background: linear-gradient(90deg, #16a34a, #86efac);
-    }
-
-    .budget-v2-progress span.warning {
+    }.budget-v2-progress span.warning{
         background: linear-gradient(90deg, #f59e0b, #fde68a);
-    }
-
-    .budget-v2-progress span.danger {
+    }.budget-v2-progress span.danger{
         background: linear-gradient(90deg, #dc2626, #fb7185);
-    }
-
-    .budget-v2-empty {
+    }.budget-v2-empty{
         border: 1px dashed #cbd5e1;
         border-radius: 20px;
         padding: 28px;
         background: #f8fafc;
         color: #64748b;
         text-align: center;
-    }
-
-    .budget-v2-action {
+    }.budget-v2-action{
         border-radius: 999px;
         font-weight: 800;
-    }
-
-    .budget-v2-chart {
+    }.budget-v2-chart{
         height: 285px;
-    }
-
-    .budget-v2-quick {
+    }.budget-v2-quick{
         display: block;
         text-decoration: none;
         padding: 14px;
@@ -316,36 +229,23 @@
         color: #0f172a;
         transition: all .18s ease;
         margin-bottom: 12px;
-    }
-
-    .budget-v2-quick:hover {
+    }.budget-v2-quick:hover{
         transform: translateY(-2px);
         border-color: #bfdbfe;
         background: #eff6ff;
         color: #1d4ed8;
-    }
-
-    .modal-content {
+    }.modal-content{
         border: 0;
         border-radius: 24px;
         box-shadow: 0 25px 80px rgba(15, 23, 42, .25);
-    }
-
-    .modal-header {
+    }.modal-header{
         border-bottom: 1px solid #eef2f7;
-    }
-
-    @media (max-width: 767.98px) {
-        .budget-v2 {
+    }@media (max-width: 767.98px){.budget-v2{
             padding: 12px;
-        }
-
-        .budget-v2-hero {
+        }.budget-v2-hero{
             padding: 22px;
             border-radius: 22px;
-        }
-
-        .budget-v2-chart {
+        }.budget-v2-chart{
             height: 240px;
         }
     }
@@ -353,27 +253,27 @@
 
 <div class="budget-v2">
     @if(session('success'))
-        <div class="alert alert-success border-0 rounded-4 shadow-sm mb-3">
-            <i class="bi bi-check-circle-fill me-2"></i>
+        <x-ui.alert variant="success" class="tw:border-0 tw:rounded-[1rem] tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mb-4">
+            <i class="bi bi-check-circle-fill tw:mr-2"></i>
             {{ session('success') }}
-        </div>
+        </x-ui.alert>
     @endif
 
     @if($errors->any())
-        <div class="alert alert-danger border-0 rounded-4 shadow-sm mb-3">
+        <x-ui.alert variant="danger" class="tw:border-0 tw:rounded-[1rem] tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:mb-4">
             <strong>Có lỗi:</strong>
-            <ul class="mb-0 mt-2">
+            <ul class="tw:mb-0 tw:mt-2">
                 @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
-        </div>
+        </x-ui.alert>
     @endif
 
     {{-- HERO --}}
-    <div class="budget-v2-hero mb-4">
+    <div class="budget-v2-hero tw:mb-6">
         <div class="budget-v2-hero-inner">
-            <div class="d-flex flex-column flex-xl-row justify-content-between gap-3">
+            <div class="tw:flex flex-column flex-xl-row tw:justify-between tw:gap-4">
                 <div>
                     <div class="budget-v2-pill">
                         <i class="bi bi-stars"></i>
@@ -388,47 +288,46 @@
                     </p>
                 </div>
 
-                <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
-                    <a href="{{ route('finance.index') }}" class="btn btn-light rounded-pill px-4 fw-bold">
+                <div class="tw:flex flex-wrap tw:gap-2 tw:items-start justify-content-xl-end">
+                    <x-ui.button variant="light" size="none" class="tw:px-6 tw:py-[6px] tw:text-[16px]/[24px] tw:font-bold tw:rounded-[50rem]" :href="route('finance.index')">
                         <i class="bi bi-speedometer2 me-1"></i>
                         Tổng quan
-                    </a>
+                    </x-ui.button>
 
-                    <a href="{{ route('finance.reports') }}" class="btn btn-outline-light rounded-pill px-4 fw-bold">
+                    <x-ui.button variant="outline-light" size="none" class="tw:px-6 tw:py-[6px] tw:text-[16px]/[24px] tw:font-bold tw:rounded-[50rem]" :href="route('finance.reports')">
                         <i class="bi bi-graph-up-arrow me-1"></i>
                         Báo cáo
-                    </a>
+                    </x-ui.button>
                 </div>
             </div>
 
             <form method="GET" action="{{ route('finance.budget') }}" class="budget-v2-filter">
-                <div class="row g-3 align-items-end">
-                    <div class="col-lg-4">
+                <div class="tw:row tw:g-3 tw:items-end">
+                    <div class="tw:min-[62rem]:col12-4">
                         <label>Tháng đang xem</label>
-                        <input type="month" name="month" class="form-control"
-                               value="{{ $month ?? now()->format('Y-m') }}">
+                        <x-ui.input type="month" name="month" class="fb-input"
+                               value="{{ $month ?? now()->format('Y-m') }}" />
                     </div>
 
-                    <div class="col-lg-4">
+                    <div class="tw:min-[62rem]:col12-4">
                         <label>Khoảng dữ liệu</label>
-                        <input type="text" class="form-control"
+                        <x-ui.input type="text" class="fb-input"
                                value="{{ isset($monthStart) ? date('d/m/Y', strtotime($monthStart)) : '' }} - {{ isset($monthEnd) ? date('d/m/Y', strtotime($monthEnd)) : '' }}"
-                               readonly>
+                               readonly />
                     </div>
 
-                    <div class="col-lg-2 d-grid">
-                        <button class="btn btn-warning rounded-pill fw-bold">
+                    <div class="tw:min-[62rem]:col12-2 d-grid">
+                        <x-ui.button variant="warning" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] tw:font-bold tw:rounded-[50rem]" type="submit">
                             <i class="bi bi-funnel me-1"></i>
                             Lọc tháng
-                        </button>
+                        </x-ui.button>
                     </div>
 
-                    <div class="col-lg-2 d-grid">
-                        <button type="button" class="btn btn-success rounded-pill fw-bold"
-                                data-bs-toggle="modal" data-bs-target="#createBudgetModal">
+                    <div class="tw:min-[62rem]:col12-2 d-grid">
+                        <x-ui.button variant="success" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] tw:font-bold tw:rounded-[50rem]" type="button" data-bs-toggle="modal" data-bs-target="#createBudgetModal">
                             <i class="bi bi-plus-circle me-1"></i>
                             Thêm
-                        </button>
+                        </x-ui.button>
                     </div>
                 </div>
             </form>
@@ -436,10 +335,10 @@
     </div>
 
     {{-- KPI --}}
-    <div class="row g-4 mb-4">
-        <div class="col-md-6 col-xl-3">
+    <div class="tw:row tw:g-4 tw:mb-6">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="budget-v2-card budget-v2-stat">
-                <div class="d-flex justify-content-between align-items-start position-relative" style="z-index: 2;">
+                <div class="tw:flex tw:justify-between tw:items-start position-relative" style="z-index: 2;">
                     <div>
                         <div class="budget-v2-label">Tổng ngân sách tháng</div>
                         <div class="budget-v2-number">{{ $money($totalBudget ?? 0) }}</div>
@@ -452,12 +351,12 @@
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="budget-v2-card budget-v2-stat">
-                <div class="d-flex justify-content-between align-items-start position-relative" style="z-index: 2;">
+                <div class="tw:flex tw:justify-between tw:items-start position-relative" style="z-index: 2;">
                     <div>
                         <div class="budget-v2-label">Đã chi theo ngân sách</div>
-                        <div class="budget-v2-number text-danger">{{ $money($totalSpent ?? 0) }}</div>
+                        <div class="budget-v2-number tw:text-[#dc3545]!">{{ $money($totalSpent ?? 0) }}</div>
                         <div class="budget-v2-hint">Khớp theo hạng mục phiếu chi</div>
                     </div>
                     <div class="budget-v2-icon red">
@@ -465,16 +364,16 @@
                     </div>
                 </div>
 
-                <div class="budget-v2-progress mt-3 position-relative" style="z-index: 2;">
+                <div class="budget-v2-progress tw:mt-4 position-relative" style="z-index: 2;">
                     <span class="{{ $safeUsageRate >= 100 ? 'danger' : ($safeUsageRate >= 80 ? 'warning' : 'success') }}"
                           style="width: {{ $safeUsageRate }}%"></span>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="budget-v2-card budget-v2-stat">
-                <div class="d-flex justify-content-between align-items-start position-relative" style="z-index: 2;">
+                <div class="tw:flex tw:justify-between tw:items-start position-relative" style="z-index: 2;">
                     <div>
                         <div class="budget-v2-label">Còn lại</div>
                         <div class="budget-v2-number {{ ($budgetRemain ?? 0) < 0 ? 'text-danger' : 'text-success' }}">
@@ -489,9 +388,9 @@
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="budget-v2-card budget-v2-stat">
-                <div class="d-flex justify-content-between align-items-start position-relative" style="z-index: 2;">
+                <div class="tw:flex tw:justify-between tw:items-start position-relative" style="z-index: 2;">
                     <div>
                         <div class="budget-v2-label">Tỷ lệ sử dụng</div>
                         <div class="budget-v2-number">{{ $percent($budgetUsageRate ?? 0) }}</div>
@@ -506,27 +405,27 @@
     </div>
 
     {{-- SECOND KPI --}}
-    <div class="row g-4 mb-4">
+    <div class="tw:row tw:g-4 tw:mb-6">
         
 
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="budget-v2-card budget-v2-stat">
                 <div class="budget-v2-label">Tổng thu trong tháng</div>
-                <div class="budget-v2-number text-success">{{ $money($totalReceipts ?? 0) }}</div>
+                <div class="budget-v2-number tw:text-[#198754]!">{{ $money($totalReceipts ?? 0) }}</div>
                 <div class="budget-v2-hint">Từ phiếu thu</div>
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="budget-v2-card budget-v2-stat">
                 <div class="budget-v2-label">Tổng chi trong tháng</div>
-                <div class="budget-v2-number text-danger">{{ $money($totalPayments ?? 0) }}</div>
+                <div class="budget-v2-number tw:text-[#dc3545]!">{{ $money($totalPayments ?? 0) }}</div>
                 <div class="budget-v2-hint">Từ phiếu chi</div>
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="tw:md:col12-6 tw:min-[75rem]:col12-3">
             <div class="budget-v2-card budget-v2-stat">
                 <div class="budget-v2-label">Đề nghị chờ xử lý</div>
                 <div class="budget-v2-number">{{ $pendingRequestsCount ?? 0 }}</div>
@@ -535,12 +434,12 @@
         </div>
     </div>
 
-    <div class="row g-4">
+    <div class="tw:row tw:g-4">
         {{-- MAIN LEFT --}}
-        <div class="col-xl-8">
+        <div class="tw:min-[75rem]:col12-8">
             {{-- FORM CREATE --}}
-            <div class="budget-v2-card p-4 mb-4">
-                <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+            <div class="budget-v2-card tw:p-6 tw:mb-6">
+                <div class="tw:flex flex-column flex-md-row tw:justify-between tw:gap-2 tw:mb-4">
                     <div>
                         <h3 class="budget-v2-section-title">Thêm ngân sách tháng</h3>
                         <div class="budget-v2-muted">
@@ -556,47 +455,47 @@
                 <form class="budget-v2-form" method="POST" action="{{ route('finance.budget.store') }}">
                     @csrf
 
-                    <div class="row g-3">
-                        <div class="col-md-3">
+                    <div class="tw:row tw:g-3">
+                        <div class="tw:md:col12-3">
                             <label>Tháng</label>
-                            <input type="month" name="month" class="form-control"
-                                   value="{{ old('month', $month ?? now()->format('Y-m')) }}" required>
+                            <x-ui.input type="month" name="month" class="fb-input"
+                                   value="{{ old('month', $month ?? now()->format('Y-m')) }}" required />
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="tw:md:col12-3">
                             <label>Hạng mục</label>
-                            <input type="text" name="category" class="form-control"
+                            <x-ui.input type="text" name="category" class="fb-input"
                                    placeholder="VD: Marketing, Lương, Vận hành"
-                                   value="{{ old('category') }}" required>
+                                   value="{{ old('category') }}" required />
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="tw:md:col12-3">
                             <label>Số tiền ngân sách</label>
-                            <input type="number" name="budget_amount" class="form-control"
+                            <x-ui.input type="number" name="budget_amount" class="fb-input"
                                    placeholder="VD: 20000000"
-                                   value="{{ old('budget_amount') }}" min="0" step="any" required>
+                                   value="{{ old('budget_amount') }}" min="0" step="any" required />
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="tw:md:col12-3">
                             <label>Ghi chú</label>
-                            <input type="text" name="note" class="form-control"
+                            <x-ui.input type="text" name="note" class="fb-input"
                                    placeholder="Ghi chú ngắn"
-                                   value="{{ old('note') }}">
+                                   value="{{ old('note') }}" />
                         </div>
 
-                        <div class="col-12 d-flex justify-content-end">
-                            <button class="btn btn-primary budget-v2-action px-4">
+                        <div class="tw:col12-12 tw:flex tw:justify-end">
+                            <x-ui.button variant="primary" size="none" class="tw:px-6 tw:py-[6px] tw:text-[16px]/[24px] tw:font-normal tw:rounded-[var(--bs-border-radius,.375rem)] budget-v2-action" type="submit">
                                 <i class="bi bi-save me-1"></i>
                                 Lưu ngân sách
-                            </button>
+                            </x-ui.button>
                         </div>
                     </div>
                 </form>
             </div>
 
             {{-- TABLE --}}
-            <div class="budget-v2-card p-4 mb-4">
-                <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+            <div class="budget-v2-card tw:p-6 tw:mb-6">
+                <div class="tw:flex flex-column flex-md-row tw:justify-between tw:gap-2 tw:mb-4">
                     <div>
                         <h3 class="budget-v2-section-title">Danh sách ngân sách tháng</h3>
                         <div class="budget-v2-muted">
@@ -604,10 +503,9 @@
                         </div>
                     </div>
 
-                    <a href="{{ route('finance.budget', ['month' => now()->format('Y-m')]) }}"
-                       class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                    <x-ui.button variant="outline-primary" size="none" class="tw:px-4 tw:py-1 tw:text-[14px]/[21px] tw:font-bold tw:rounded-[50rem]" :href="route('finance.budget', ['month' => now()->format('Y-m')])">
                         Tháng hiện tại
-                    </a>
+                    </x-ui.button>
                 </div>
 
                 @if($financeBudgets->count())
@@ -621,7 +519,7 @@
                                     <th>Còn lại</th>
                                     <th style="min-width: 185px;">Tiến độ</th>
                                     <th>Trạng thái</th>
-                                    <th class="text-end">Thao tác</th>
+                                    <th class="tw:text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -633,26 +531,26 @@
 
                                     <tr>
                                         <td>
-                                            <div class="fw-bold text-dark">{{ $item->category }}</div>
+                                            <div class="tw:font-bold tw:text-[#212529]">{{ $item->category }}</div>
                                             @if(!empty($item->note))
                                                 <div class="budget-v2-muted">{{ $item->note }}</div>
                                             @endif
                                         </td>
 
-                                        <td class="fw-bold">{{ $money($item->budget_amount ?? 0) }}</td>
+                                        <td class="tw:font-bold">{{ $money($item->budget_amount ?? 0) }}</td>
 
-                                        <td class="fw-bold text-danger">{{ $money($item->spent_amount ?? 0) }}</td>
+                                        <td class="tw:font-bold tw:text-[#dc3545]!">{{ $money($item->spent_amount ?? 0) }}</td>
 
-                                        <td class="fw-bold {{ ($item->remain_amount ?? 0) < 0 ? 'text-danger' : 'text-success' }}">
+                                        <td class="tw:font-bold {{ ($item->remain_amount ?? 0) < 0 ? 'text-danger' : 'text-success' }}">
                                             {{ $money($item->remain_amount ?? 0) }}
                                         </td>
 
                                         <td>
-                                            <div class="d-flex align-items-center gap-2">
+                                            <div class="tw:flex tw:items-center tw:gap-2">
                                                 <div class="budget-v2-progress flex-grow-1">
                                                     <span class="{{ $cls }}" style="width: {{ $rate }}%"></span>
                                                 </div>
-                                                <small class="fw-bold">{{ $percent($item->usage_rate ?? 0) }}</small>
+                                                <small class="tw:font-bold">{{ $percent($item->usage_rate ?? 0) }}</small>
                                             </div>
                                         </td>
 
@@ -663,22 +561,16 @@
                                             </span>
                                         </td>
 
-                                        <td class="text-end">
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-primary rounded-pill fw-bold"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#editBudgetModal{{ $item->id }}">
+                                        <td class="tw:text-right">
+                                            <x-ui.button variant="outline-primary" size="none" class="tw:px-2 tw:py-1 tw:text-[14px]/[21px] tw:font-bold tw:rounded-[50rem]" type="button" data-bs-toggle="modal" data-bs-target="#editBudgetModal{{ $item->id }}">
                                                 <i class="bi bi-pencil-square"></i>
                                                 Sửa
-                                            </button>
+                                            </x-ui.button>
 
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-danger rounded-pill fw-bold"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#deleteBudgetModal{{ $item->id }}">
+                                            <x-ui.button variant="outline-danger" size="none" class="tw:px-2 tw:py-1 tw:text-[14px]/[21px] tw:font-bold tw:rounded-[50rem]" type="button" data-bs-toggle="modal" data-bs-target="#deleteBudgetModal{{ $item->id }}">
                                                 <i class="bi bi-trash"></i>
                                                 Xóa
-                                            </button>
+                                            </x-ui.button>
                                         </td>
                                     </tr>
 
@@ -690,48 +582,48 @@
                                                 @method('PUT')
 
                                                 <div class="modal-header">
-                                                    <h5 class="modal-title fw-bold">
-                                                        <i class="bi bi-pencil-square me-2"></i>
+                                                    <h5 class="modal-title tw:font-bold">
+                                                        <i class="bi bi-pencil-square tw:mr-2"></i>
                                                         Sửa ngân sách
                                                     </h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    <x-ui.close-button in="modal" type="button" data-bs-dismiss="modal" />
                                                 </div>
 
                                                 <div class="modal-body">
-                                                    <div class="mb-3">
+                                                    <div class="tw:mb-4">
                                                         <label>Tháng</label>
-                                                        <input type="month" name="month" class="form-control"
+                                                        <x-ui.input type="month" name="month" class="fb-input"
                                                                value="{{ isset($item->month) ? date('Y-m', strtotime($item->month)) : ($month ?? now()->format('Y-m')) }}"
-                                                               required>
+                                                               required />
                                                     </div>
 
-                                                    <div class="mb-3">
+                                                    <div class="tw:mb-4">
                                                         <label>Hạng mục</label>
-                                                        <input type="text" name="category" class="form-control"
+                                                        <x-ui.input type="text" name="category" class="fb-input"
                                                                value="{{ $item->category }}"
-                                                               required>
+                                                               required />
                                                     </div>
 
-                                                    <div class="mb-3">
+                                                    <div class="tw:mb-4">
                                                         <label>Số tiền ngân sách</label>
-                                                        <input type="number" name="budget_amount" class="form-control"
+                                                        <x-ui.input type="number" name="budget_amount" class="fb-input"
                                                                value="{{ (float) $item->budget_amount }}"
-                                                               min="0" step="any" required>
+                                                               min="0" step="any" required />
                                                     </div>
 
                                                     <div>
                                                         <label>Ghi chú</label>
-                                                        <textarea name="note" rows="3" class="form-control">{{ $item->note }}</textarea>
+                                                        <x-ui.input as="textarea" name="note" rows="3" class="fb-input">{{ $item->note }}</x-ui.input>
                                                     </div>
                                                 </div>
 
                                                 <div class="modal-footer">
-                                                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">
+                                                    <x-ui.button variant="light" size="none" class="tw:px-6 tw:py-[6px] tw:text-[16px]/[24px] tw:font-normal tw:rounded-[50rem]" type="button" data-bs-dismiss="modal">
                                                         Hủy
-                                                    </button>
-                                                    <button class="btn btn-primary rounded-pill px-4 fw-bold">
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="primary" size="none" class="tw:px-6 tw:py-[6px] tw:text-[16px]/[24px] tw:font-bold tw:rounded-[50rem]" type="submit">
                                                         Lưu thay đổi
-                                                    </button>
+                                                    </x-ui.button>
                                                 </div>
                                             </form>
                                         </div>
@@ -745,11 +637,11 @@
                                                 @method('DELETE')
 
                                                 <div class="modal-header">
-                                                    <h5 class="modal-title fw-bold text-danger">
-                                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                                    <h5 class="modal-title tw:font-bold tw:text-[#dc3545]">
+                                                        <i class="bi bi-exclamation-triangle tw:mr-2"></i>
                                                         Xóa ngân sách?
                                                     </h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    <x-ui.close-button in="modal" type="button" data-bs-dismiss="modal" />
                                                 </div>
 
                                                 <div class="modal-body">
@@ -761,12 +653,12 @@
                                                 </div>
 
                                                 <div class="modal-footer">
-                                                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">
+                                                    <x-ui.button variant="light" size="none" class="tw:px-6 tw:py-[6px] tw:text-[16px]/[24px] tw:font-normal tw:rounded-[50rem]" type="button" data-bs-dismiss="modal">
                                                         Hủy
-                                                    </button>
-                                                    <button class="btn btn-danger rounded-pill px-4 fw-bold">
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="danger" size="none" class="tw:px-6 tw:py-[6px] tw:text-[16px]/[24px] tw:font-bold tw:rounded-[50rem]" type="submit">
                                                         Xóa
-                                                    </button>
+                                                    </x-ui.button>
                                                 </div>
                                             </form>
                                         </div>
@@ -777,8 +669,8 @@
                     </div>
                 @else
                     <div class="budget-v2-empty">
-                        <i class="bi bi-folder-plus fs-1 d-block mb-2"></i>
-                        <div class="fw-bold mb-1">Chưa có ngân sách cho tháng này</div>
+                        <i class="bi bi-folder-plus fs-1 tw:block tw:mb-2"></i>
+                        <div class="tw:font-bold tw:mb-1">Chưa có ngân sách cho tháng này</div>
                         <div>Hãy nhập ngân sách đầu tiên bằng form phía trên.</div>
                     </div>
                 @endif
@@ -786,9 +678,9 @@
         </div>
 
         {{-- RIGHT --}}
-        <div class="col-xl-4">
-            <div class="budget-v2-card p-4 mb-4">
-                <div class="d-flex justify-content-between align-items-start mb-3">
+        <div class="tw:min-[75rem]:col12-4">
+            <div class="budget-v2-card tw:p-6 tw:mb-6">
+                <div class="tw:flex tw:justify-between tw:items-start tw:mb-4">
                     <div>
                         <h3 class="budget-v2-section-title">Biểu đồ ngân sách</h3>
                         <div class="budget-v2-muted">So sánh ngân sách và đã chi.</div>
@@ -803,56 +695,56 @@
                 </div>
             </div>
 
-            <div class="budget-v2-card p-4 mb-4">
-                <h3 class="budget-v2-section-title mb-3">Tóm tắt nhanh</h3>
+            <div class="budget-v2-card tw:p-6 tw:mb-6">
+                <h3 class="budget-v2-section-title tw:mb-4">Tóm tắt nhanh</h3>
 
-                <div class="d-flex justify-content-between border-bottom py-2">
+                <div class="tw:flex tw:justify-between border-bottom tw:py-2">
                     <span class="budget-v2-muted">Dòng tiền ròng</span>
                     <strong class="{{ $cashFlowNet >= 0 ? 'text-success' : 'text-danger' }}">
                         {{ $money($cashFlowNet) }}
                     </strong>
                 </div>
 
-                <div class="d-flex justify-content-between border-bottom py-2">
+                <div class="tw:flex tw:justify-between border-bottom tw:py-2">
                     <span class="budget-v2-muted">Tổng thu</span>
-                    <strong class="text-success">{{ $money($totalReceipts ?? 0) }}</strong>
+                    <strong class="tw:text-[#198754]">{{ $money($totalReceipts ?? 0) }}</strong>
                 </div>
 
-                <div class="d-flex justify-content-between border-bottom py-2">
+                <div class="tw:flex tw:justify-between border-bottom tw:py-2">
                     <span class="budget-v2-muted">Tổng chi</span>
-                    <strong class="text-danger">{{ $money($totalPayments ?? 0) }}</strong>
+                    <strong class="tw:text-[#dc3545]">{{ $money($totalPayments ?? 0) }}</strong>
                 </div>
 
-                <div class="d-flex justify-content-between py-2">
+                <div class="tw:flex tw:justify-between tw:py-2">
                     <span class="budget-v2-muted">Số hạng mục ngân sách</span>
                     <strong>{{ $financeBudgets->count() }}</strong>
                 </div>
             </div>
 
-            <div class="budget-v2-card p-4">
-                <h3 class="budget-v2-section-title mb-3">Liên kết tài chính</h3>
+            <div class="budget-v2-card tw:p-6">
+                <h3 class="budget-v2-section-title tw:mb-4">Liên kết tài chính</h3>
 
                 <a href="{{ route('finance.index') }}" class="budget-v2-quick">
-                    <strong><i class="bi bi-speedometer2 me-2"></i>Tổng quan tài chính</strong>
-                    <div class="budget-v2-muted mt-1">Xem dashboard tổng quan.</div>
+                    <strong><i class="bi bi-speedometer2 tw:mr-2"></i>Tổng quan tài chính</strong>
+                    <div class="budget-v2-muted tw:mt-1">Xem dashboard tổng quan.</div>
                 </a>
 
                 
 
 
                 <a href="{{ url('/finance/receipts') }}" class="budget-v2-quick">
-                    <strong><i class="bi bi-arrow-down-circle me-2"></i>Phiếu thu</strong>
-                    <div class="budget-v2-muted mt-1">Theo dõi nguồn tiền vào.</div>
+                    <strong><i class="bi bi-arrow-down-circle tw:mr-2"></i>Phiếu thu</strong>
+                    <div class="budget-v2-muted tw:mt-1">Theo dõi nguồn tiền vào.</div>
                 </a>
 
                 <a href="{{ url('/finance/payments') }}" class="budget-v2-quick">
-                    <strong><i class="bi bi-arrow-up-circle me-2"></i>Phiếu chi</strong>
-                    <div class="budget-v2-muted mt-1">Theo dõi khoản chi thực tế.</div>
+                    <strong><i class="bi bi-arrow-up-circle tw:mr-2"></i>Phiếu chi</strong>
+                    <div class="budget-v2-muted tw:mt-1">Theo dõi khoản chi thực tế.</div>
                 </a>
 
-                <a href="{{ route('finance.reports') }}" class="budget-v2-quick mb-0">
-                    <strong><i class="bi bi-graph-up-arrow me-2"></i>Báo cáo tài chính</strong>
-                    <div class="budget-v2-muted mt-1">Xem báo cáo tổng hợp.</div>
+                <a href="{{ route('finance.reports') }}" class="budget-v2-quick tw:mb-0">
+                    <strong><i class="bi bi-graph-up-arrow tw:mr-2"></i>Báo cáo tài chính</strong>
+                    <div class="budget-v2-muted tw:mt-1">Xem báo cáo tổng hợp.</div>
                 </a>
             </div>
         </div>
@@ -866,46 +758,46 @@
             @csrf
 
             <div class="modal-header">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-plus-circle me-2"></i>
+                <h5 class="modal-title tw:font-bold">
+                    <i class="bi bi-plus-circle tw:mr-2"></i>
                     Thêm ngân sách
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <x-ui.close-button in="modal" type="button" data-bs-dismiss="modal" />
             </div>
 
             <div class="modal-body">
-                <div class="mb-3">
+                <div class="tw:mb-4">
                     <label>Tháng</label>
-                    <input type="month" name="month" class="form-control"
-                           value="{{ $month ?? now()->format('Y-m') }}" required>
+                    <x-ui.input type="month" name="month" class="fb-input"
+                           value="{{ $month ?? now()->format('Y-m') }}" required />
                 </div>
 
-                <div class="mb-3">
+                <div class="tw:mb-4">
                     <label>Hạng mục</label>
-                    <input type="text" name="category" class="form-control"
-                           placeholder="VD: Marketing, Lương, Vận hành" required>
+                    <x-ui.input type="text" name="category" class="fb-input"
+                           placeholder="VD: Marketing, Lương, Vận hành" required />
                 </div>
 
-                <div class="mb-3">
+                <div class="tw:mb-4">
                     <label>Số tiền ngân sách</label>
-                    <input type="number" name="budget_amount" class="form-control"
-                           placeholder="VD: 20000000" min="0" step="any" required>
+                    <x-ui.input type="number" name="budget_amount" class="fb-input"
+                           placeholder="VD: 20000000" min="0" step="any" required />
                 </div>
 
                 <div>
                     <label>Ghi chú</label>
-                    <textarea name="note" rows="3" class="form-control"
-                              placeholder="Ghi chú thêm nếu cần"></textarea>
+                    <x-ui.input as="textarea" name="note" rows="3" class="fb-input"
+                              placeholder="Ghi chú thêm nếu cần"></x-ui.input>
                 </div>
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">
+                <x-ui.button variant="light" size="none" class="tw:px-6 tw:py-[6px] tw:text-[16px]/[24px] tw:font-normal tw:rounded-[50rem]" type="button" data-bs-dismiss="modal">
                     Hủy
-                </button>
-                <button class="btn btn-success rounded-pill px-4 fw-bold">
+                </x-ui.button>
+                <x-ui.button variant="success" size="none" class="tw:px-6 tw:py-[6px] tw:text-[16px]/[24px] tw:font-bold tw:rounded-[50rem]" type="submit">
                     Thêm ngân sách
-                </button>
+                </x-ui.button>
             </div>
         </form>
     </div>

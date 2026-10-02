@@ -5,11 +5,11 @@ namespace App\Http\Controllers\CRM;
 use App\Http\Controllers\Controller;
 use App\Models\SalesQuotation;
 use App\Models\SalesQuotationItem;
+use App\Support\SchemaCache;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller quản lý báo giá bán hàng: CRUD, xuất PDF/Excel.
@@ -369,14 +369,14 @@ class SalesQuotationController extends Controller
      */
     private function products()
     {
-        if (! Schema::hasTable('crm_product_catalog')) {
+        if (! SchemaCache::hasTable('crm_product_catalog')) {
             return collect();
         }
 
         return DB::table('crm_product_catalog')
             ->select('*')
             ->where(function ($q) {
-                if (Schema::hasColumn('crm_product_catalog', 'is_active')) {
+                if (SchemaCache::hasColumn('crm_product_catalog', 'is_active')) {
                     $q->where('is_active', 1);
                 }
             })
@@ -402,7 +402,7 @@ class SalesQuotationController extends Controller
      */
     private function customers()
     {
-        $table = Schema::hasTable('crm_customers') ? 'crm_customers' : (Schema::hasTable('customers') ? 'customers' : null);
+        $table = SchemaCache::hasTable('crm_customers') ? 'crm_customers' : (SchemaCache::hasTable('customers') ? 'customers' : null);
 
         if (! $table) {
             return collect();

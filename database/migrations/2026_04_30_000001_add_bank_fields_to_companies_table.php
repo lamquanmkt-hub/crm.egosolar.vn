@@ -8,19 +8,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('companies', function (Blueprint $table) {
-            if (!Schema::hasColumn('companies', 'bank_account')) {
-                $table->string('bank_account', 100)->nullable()->after('logo');
-            }
+        if (Schema::hasTable('companies')) {
+            Schema::table('companies', function (Blueprint $table) {
+                if (! Schema::hasColumn('companies', 'bank_account')) {
+                    $table->string('bank_account', 100)->nullable()->after('logo');
+                }
 
-            if (!Schema::hasColumn('companies', 'bank_name')) {
-                $table->string('bank_name')->nullable()->after('bank_account');
-            }
+                if (! Schema::hasColumn('companies', 'bank_name')) {
+                    $table->string('bank_name')->nullable()->after('bank_account');
+                }
 
-            if (!Schema::hasColumn('companies', 'bank_holder')) {
-                $table->string('bank_holder')->nullable()->after('bank_name');
-            }
-        });
+                if (! Schema::hasColumn('companies', 'bank_holder')) {
+                    $table->string('bank_holder')->nullable()->after('bank_name');
+                }
+            });
+        }
     }
 
     public function down(): void
@@ -33,10 +35,12 @@ return new class extends Migration
             }
         }
 
-        if (!empty($columns)) {
-            Schema::table('companies', function (Blueprint $table) use ($columns) {
-                $table->dropColumn($columns);
-            });
+        if (! empty($columns)) {
+            if (Schema::hasTable('companies')) {
+                Schema::table('companies', function (Blueprint $table) use ($columns) {
+                    $table->dropColumn($columns);
+                });
+            }
         }
     }
 };

@@ -1,37 +1,37 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid py-4 hr-dashboard-page">
+<div class="container-fluid tw:py-6 hr-dashboard-page">
 
     {{-- Header --}}
-    <div class="hr-hero-card mb-4">
-        <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div class="hr-hero-card tw:mb-6">
+        <div class="tw:flex tw:items-start tw:justify-between flex-wrap tw:gap-4">
             <div>
-                <div class="hr-page-kicker mb-2">
+                <div class="hr-page-kicker tw:mb-2">
                     <span class="hr-page-kicker-dot"></span>
                     HR Dashboard
                 </div>
-                <h1 class="hr-page-title mb-2">Nhân sự</h1>
+                <h1 class="hr-page-title tw:mb-2">Nhân sự</h1>
                 <div class="hr-page-subtitle">
                     Tổng quan nhân sự • Nghỉ phép • Chấm công • Theo dõi hiệu suất đội ngũ
                 </div>
             </div>
 
-            <div class="d-flex gap-2 flex-wrap">
-                <a href="{{ route('hr.departments.index') }}" class="btn hr-action-btn hr-action-btn-light">
+            <div class="tw:flex tw:gap-2 flex-wrap">
+                <x-ui.button variant="none" size="none" class="hr-action-btn hr-action-btn-light" href="{{ route('hr.departments.index') }}">
                     <i class="bi bi-diagram-3 me-1"></i> Phòng ban
-                </a>
-                <a href="{{ route('hr.positions.index') }}" class="btn hr-action-btn hr-action-btn-light">
+                </x-ui.button>
+                <x-ui.button variant="none" size="none" class="hr-action-btn hr-action-btn-light" href="{{ route('hr.positions.index') }}">
                     <i class="bi bi-award me-1"></i> Chức vụ
-                </a>
-                <a href="{{ route('hr.employees.index') }}" class="btn hr-action-btn hr-action-btn-primary">
+                </x-ui.button>
+                <x-ui.button variant="none" size="none" class="hr-action-btn hr-action-btn-primary" href="{{ route('hr.employees.index') }}">
                     <i class="bi bi-people me-1"></i> Nhân viên
-                </a>
+                </x-ui.button>
             </div>
         </div>
 
-        <div class="row g-3 mt-2">
-            <div class="col-12 col-md-4">
+        <div class="tw:row tw:g-3 tw:mt-2">
+            <div class="tw:col12-12 tw:md:col12-4">
                 <div class="hr-hero-mini-card">
                     <div class="hr-hero-mini-label">Khoảng lọc</div>
                     <div class="hr-hero-mini-value">
@@ -42,72 +42,72 @@
                 </div>
             </div>
 
-            <div class="col-12 col-md-4">
+            <div class="tw:col12-12 tw:md:col12-4">
                 <div class="hr-hero-mini-card">
                     <div class="hr-hero-mini-label">Tỷ lệ check-in hôm nay</div>
                     <div class="hr-hero-mini-value">{{ $checkInRate ?? 0 }}%</div>
                 </div>
             </div>
 
-            <div class="col-12 col-md-4">
+            <div class="tw:col12-12 tw:md:col12-4">
                 <div class="hr-hero-mini-card">
                     <div class="hr-hero-mini-label">Trạng thái hệ thống</div>
-                    <div class="hr-hero-mini-value text-success">Đang hoạt động ổn định</div>
+                    <div class="hr-hero-mini-value tw:text-[#198754]!">Đang hoạt động ổn định</div>
                 </div>
             </div>
         </div>
     </div>
 
     {{-- Filters --}}
-    <div class="card hr-glass-card mb-4">
-        <div class="card-body p-3 p-lg-4">
+    <x-ui.card class="hr-glass-card tw:mb-6">
+        {{-- `p-lg-4` (Bootstrap, `padding:1.5rem!important` từ ≥992px) ĐÃ BỎ: ở HEAD
+             `tw:p-4!` luôn thắng nên nó chưa bao giờ có tác dụng. --}}
+        <x-ui.card-body class="tw:p-4">
             <form method="GET" action="{{ route('hr.dashboard') }}">
-                <div class="row g-3 align-items-end">
-                    <div class="col-12 col-md-3">
-                        <label class="form-label hr-form-label">Từ ngày</label>
-                        <input
+                <div class="tw:row tw:g-3 tw:items-end">
+                    <div class="tw:col12-12 tw:md:col12-3">
+                        <x-ui.label class="hr-form-label">Từ ngày</x-ui.label>
+                        <x-ui.input
                             type="date"
                             name="from_date"
-                            class="form-control hr-input"
-                            value="{{ request('from_date', now()->startOfMonth()->toDateString()) }}"
-                        >
+                            class="hr-input"
+                            value="{{ request('from_date', now()->startOfMonth()->toDateString()) }}" />
                     </div>
 
-                    <div class="col-12 col-md-3">
-                        <label class="form-label hr-form-label">Đến ngày</label>
-                        <input
+                    <div class="tw:col12-12 tw:md:col12-3">
+                        <x-ui.label class="hr-form-label">Đến ngày</x-ui.label>
+                        <x-ui.input
                             type="date"
                             name="to_date"
-                            class="form-control hr-input"
-                            value="{{ request('to_date', now()->toDateString()) }}"
-                        >
+                            class="hr-input"
+                            value="{{ request('to_date', now()->toDateString()) }}" />
                     </div>
 
-                    <div class="col-12 col-md-4">
-                        <label class="form-label hr-form-label">Theo kỳ</label>
-                        <select class="form-select hr-input" name="period">
+                    <div class="tw:col12-12 tw:md:col12-4">
+                        <x-ui.label class="hr-form-label">Theo kỳ</x-ui.label>
+                        <x-ui.select class="hr-input" name="period">
                             <option value="">-- Tuỳ chọn --</option>
                             <option value="this_month" {{ request('period') == 'this_month' ? 'selected' : '' }}>Tháng này</option>
                             <option value="last_month" {{ request('period') == 'last_month' ? 'selected' : '' }}>Tháng trước</option>
                             <option value="this_year" {{ request('period') == 'this_year' ? 'selected' : '' }}>Năm nay</option>
-                        </select>
+                        </x-ui.select>
                     </div>
 
-                    <div class="col-12 col-md-2 d-grid">
-                        <button type="submit" class="btn hr-action-btn hr-action-btn-cyan">
+                    <div class="tw:col12-12 tw:md:col12-2 d-grid">
+                        <x-ui.button variant="none" size="none" class="hr-action-btn hr-action-btn-cyan" type="submit">
                             <i class="bi bi-funnel me-1"></i> Lọc dữ liệu
-                        </button>
+                        </x-ui.button>
                     </div>
                 </div>
             </form>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 
     {{-- KPI Cards --}}
-    <div class="row g-3 mb-4">
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card hr-kpi-card hr-kpi-blue h-100">
-                <div class="card-body">
+    <div class="tw:row tw:g-3 tw:mb-6">
+        <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
+            <x-ui.card class="hr-kpi-card hr-kpi-blue tw:h-full">
+                <x-ui.card-body>
                     <div class="hr-kpi-top">
                         <div>
                             <div class="hr-kpi-label">Tổng nhân sự</div>
@@ -121,13 +121,13 @@
                     <div class="hr-kpi-progress">
                         <span style="width: 78%;"></span>
                     </div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
 
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card hr-kpi-card hr-kpi-orange h-100">
-                <div class="card-body">
+        <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
+            <x-ui.card class="hr-kpi-card hr-kpi-orange tw:h-full">
+                <x-ui.card-body>
                     <div class="hr-kpi-top">
                         <div>
                             <div class="hr-kpi-label">Nghỉ phép chờ duyệt</div>
@@ -141,13 +141,13 @@
                     <div class="hr-kpi-progress">
                         <span style="width: {{ min((($pendingLeaves ?? 0) * 12), 100) }}%;"></span>
                     </div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
 
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card hr-kpi-card hr-kpi-green h-100">
-                <div class="card-body">
+        <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
+            <x-ui.card class="hr-kpi-card hr-kpi-green tw:h-full">
+                <x-ui.card-body>
                     <div class="hr-kpi-top">
                         <div>
                             <div class="hr-kpi-label">Chấm công hôm nay</div>
@@ -161,13 +161,13 @@
                     <div class="hr-kpi-progress">
                         <span style="width: {{ min(($checkInRate ?? 0), 100) }}%;"></span>
                     </div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
 
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card hr-kpi-card hr-kpi-purple h-100">
-                <div class="card-body">
+        <div class="tw:col12-12 tw:md:col12-6 tw:min-[75rem]:col12-3">
+            <x-ui.card class="hr-kpi-card hr-kpi-purple tw:h-full">
+                <x-ui.card-body>
                     <div class="hr-kpi-top">
                         <div>
                             <div class="hr-kpi-label">Đi muộn</div>
@@ -181,27 +181,27 @@
                     <div class="hr-kpi-progress">
                         <span style="width: {{ min((($lateCount ?? 0) * 10), 100) }}%;"></span>
                     </div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
     </div>
 
     {{-- Main panels --}}
-    <div class="row g-4 mb-4">
-        <div class="col-12 col-xl-8">
-            <div class="card hr-glass-card h-100">
-                <div class="card-header hr-card-header border-0 bg-transparent">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <div class="fw-bold">
-                            <i class="bi bi-bar-chart-line me-2"></i>Tổng quan nhanh
+    <div class="tw:row tw:g-4 tw:mb-6">
+        <div class="tw:col12-12 tw:min-[75rem]:col12-8">
+            <x-ui.card class="hr-glass-card tw:h-full">
+                <x-ui.card-header class="hr-card-header border-0 bg-transparent">
+                    <div class="tw:flex tw:items-center tw:justify-between flex-wrap tw:gap-2">
+                        <div class="tw:font-bold">
+                            <i class="bi bi-bar-chart-line tw:mr-2"></i>Tổng quan nhanh
                         </div>
                         <span class="hr-chip">HR Overview</span>
                     </div>
-                </div>
+                </x-ui.card-header>
 
-                <div class="card-body pt-0">
-                    <div class="row g-3 mb-3">
-                        <div class="col-12 col-md-4">
+                <x-ui.card-body class="pt-0">
+                    <div class="tw:row tw:g-3 tw:mb-4">
+                        <div class="tw:col12-12 tw:md:col12-4">
                             <div class="hr-stat-tile">
                                 <div class="hr-stat-title">Nhân sự hoạt động</div>
                                 <div class="hr-stat-value">{{ $totalEmployees ?? 0 }}</div>
@@ -209,7 +209,7 @@
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-4">
+                        <div class="tw:col12-12 tw:md:col12-4">
                             <div class="hr-stat-tile">
                                 <div class="hr-stat-title">Check-in hôm nay</div>
                                 <div class="hr-stat-value">{{ $todayAttendance ?? 0 }}</div>
@@ -217,7 +217,7 @@
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-4">
+                        <div class="tw:col12-12 tw:md:col12-4">
                             <div class="hr-stat-tile">
                                 <div class="hr-stat-title">Đơn chờ duyệt</div>
                                 <div class="hr-stat-value">{{ $pendingLeaves ?? 0 }}</div>
@@ -229,15 +229,15 @@
                     <div class="hr-chart-box">
                         <div class="hr-chart-grid"></div>
                         <div class="hr-chart-content">
-                            <div class="row g-3 h-100 align-items-center">
-                                <div class="col-12 col-lg-5">
+                            <div class="tw:row tw:g-3 tw:h-full tw:items-center">
+                                <div class="tw:col12-12 tw:min-[62rem]:col12-5">
                                     <div class="hr-chart-side">
-                                        <div class="hr-mini-kpi mb-3">
+                                        <div class="hr-mini-kpi tw:mb-4">
                                             <div class="hr-mini-kpi-label">Tỷ lệ đi làm đúng giờ</div>
                                             <div class="hr-mini-kpi-value">{{ 100 - min(($lateCount ?? 0) * 5, 100) }}%</div>
                                         </div>
 
-                                        <div class="hr-mini-kpi mb-3">
+                                        <div class="hr-mini-kpi tw:mb-4">
                                             <div class="hr-mini-kpi-label">Hiệu suất check-in</div>
                                             <div class="hr-mini-kpi-value">{{ $checkInRate ?? 0 }}%</div>
                                         </div>
@@ -253,7 +253,7 @@
                                     </div>
                                 </div>
 
-                                <div class="col-12 col-lg-7">
+                                <div class="tw:col12-12 tw:min-[62rem]:col12-7">
                                     <div class="hr-fake-chart">
                                         <div class="hr-bar-wrap">
                                             <div class="hr-bar-label">Check-in</div>
@@ -293,16 +293,16 @@
                     </div>
 
                     @if(isset($employeeAttendanceStats) && $employeeAttendanceStats->count())
-                        <div class="mt-4">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <div class="fw-bold">
-                                    <i class="bi bi-table me-2"></i>Thống kê chấm công nhân viên
+                        <div class="tw:mt-6">
+                            <div class="tw:flex tw:items-center tw:justify-between flex-wrap tw:gap-2 tw:mb-4">
+                                <div class="tw:font-bold">
+                                    <i class="bi bi-table tw:mr-2"></i>Thống kê chấm công nhân viên
                                 </div>
                                 <span class="hr-chip">Manager View</span>
                             </div>
 
                             <div class="table-responsive hr-table-wrap">
-                                <table class="table align-middle hr-modern-table mb-0">
+                                <table class="table align-middle hr-modern-table tw:mb-0">
                                     <thead>
                                         <tr>
                                             <th>Nhân viên</th>
@@ -321,7 +321,7 @@
                                         @foreach($employeeAttendanceStats as $item)
                                             <tr>
                                                 <td>
-                                                    <div class="fw-semibold">{{ $item->employee_name }}</div>
+                                                    <div class="tw:font-semibold">{{ $item->employee_name }}</div>
                                                 </td>
                                                 <td>{{ $item->department_name }}</td>
                                                 <td>{{ $item->total_checkin_days }}</td>
@@ -331,7 +331,7 @@
                                                 <td>{{ $item->incomplete_days }}</td>
                                                 <td>{{ $item->total_hours }} giờ</td>
                                                 <td>
-                                                    <span class="fw-semibold">{{ $item->ontime_rate }}%</span>
+                                                    <span class="tw:font-semibold">{{ $item->ontime_rate }}%</span>
                                                 </td>
                                                 <td>
                                                     <span class="badge bg-{{ $item->performance_badge }}">
@@ -345,54 +345,54 @@
                             </div>
                         </div>
                     @endif
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
 
-        <div class="col-12 col-xl-4">
-            <div class="card hr-glass-card h-100">
-                <div class="card-header hr-card-header border-0 bg-transparent">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div class="fw-bold">
-                            <i class="bi bi-lightning-charge me-2"></i>Việc cần xử lý
+        <div class="tw:col12-12 tw:min-[75rem]:col12-4">
+            <x-ui.card class="hr-glass-card tw:h-full">
+                <x-ui.card-header class="hr-card-header border-0 bg-transparent">
+                    <div class="tw:flex tw:items-center tw:justify-between">
+                        <div class="tw:font-bold">
+                            <i class="bi bi-lightning-charge tw:mr-2"></i>Việc cần xử lý
                         </div>
-                        <a class="small text-decoration-none fw-semibold" href="{{ route('hr.leave.index') }}">Xem tất cả</a>
+                        <a class="small tw:no-underline tw:font-semibold" href="{{ route('hr.leave.index') }}">Xem tất cả</a>
                     </div>
-                </div>
+                </x-ui.card-header>
 
-                <div class="card-body pt-0">
-                    <div class="hr-task-box mb-3">
-                        <div class="d-flex gap-3">
+                <x-ui.card-body class="pt-0">
+                    <div class="hr-task-box tw:mb-4">
+                        <div class="tw:flex tw:gap-4">
                             <div class="hr-task-icon">
                                 <i class="bi bi-inbox"></i>
                             </div>
 
                             <div class="flex-grow-1">
                                 @if(($pendingLeaves ?? 0) > 0)
-                                    <div class="fw-bold fs-5 mb-1">Có {{ $pendingLeaves }} đơn đang chờ duyệt</div>
-                                    <div class="text-muted small mb-3">
+                                    <div class="tw:font-bold fs-5 tw:mb-1">Có {{ $pendingLeaves }} đơn đang chờ duyệt</div>
+                                    <div class="tw:text-[rgba(33,37,41,0.75)] small tw:mb-4">
                                         Bạn nên kiểm tra và duyệt các yêu cầu nghỉ phép/làm online để tránh tồn đọng.
                                     </div>
-                                    <div class="d-flex gap-2 flex-wrap">
-                                        <a href="{{ route('hr.leave.index') }}" class="btn hr-action-btn hr-action-btn-primary btn-sm">
+                                    <div class="tw:flex tw:gap-2 flex-wrap">
+                                        <x-ui.button variant="none" size="sm" class="hr-action-btn hr-action-btn-primary" href="{{ route('hr.leave.index') }}">
                                             <i class="bi bi-eye me-1"></i> Xem đơn nghỉ
-                                        </a>
-                                        <a href="{{ route('hr.attendance.index') }}" class="btn hr-action-btn hr-action-btn-light btn-sm">
+                                        </x-ui.button>
+                                        <x-ui.button variant="none" size="sm" class="hr-action-btn hr-action-btn-light" href="{{ route('hr.attendance.index') }}">
                                             <i class="bi bi-calendar-check me-1"></i> Chấm công
-                                        </a>
+                                        </x-ui.button>
                                     </div>
                                 @else
-                                    <div class="fw-bold fs-5 mb-1">Mọi thứ đang ổn</div>
-                                    <div class="text-muted small mb-3">
+                                    <div class="tw:font-bold fs-5 tw:mb-1">Mọi thứ đang ổn</div>
+                                    <div class="tw:text-[rgba(33,37,41,0.75)] small tw:mb-4">
                                         Hiện chưa có yêu cầu nào tồn đọng. Bạn có thể tạo mới đơn hoặc kiểm tra bảng chấm công.
                                     </div>
-                                    <div class="d-flex gap-2 flex-wrap">
-                                        <a href="{{ route('hr.leave.create') }}" class="btn hr-action-btn hr-action-btn-primary btn-sm">
+                                    <div class="tw:flex tw:gap-2 flex-wrap">
+                                        <x-ui.button variant="none" size="sm" class="hr-action-btn hr-action-btn-primary" href="{{ route('hr.leave.create') }}">
                                             <i class="bi bi-plus-circle me-1"></i> Tạo đơn nghỉ
-                                        </a>
-                                        <a href="{{ route('hr.attendance.index') }}" class="btn hr-action-btn hr-action-btn-light btn-sm">
+                                        </x-ui.button>
+                                        <x-ui.button variant="none" size="sm" class="hr-action-btn hr-action-btn-light" href="{{ route('hr.attendance.index') }}">
                                             <i class="bi bi-calendar-check me-1"></i> Chấm công
-                                        </a>
+                                        </x-ui.button>
                                     </div>
                                 @endif
                             </div>
@@ -404,55 +404,55 @@
                             <div class="hr-side-item-left">
                                 <div class="hr-side-bullet hr-bullet-cyan"></div>
                                 <div>
-                                    <div class="fw-semibold">Tỷ lệ check-in</div>
-                                    <div class="small text-muted">Theo dữ liệu hôm nay</div>
+                                    <div class="tw:font-semibold">Tỷ lệ check-in</div>
+                                    <div class="small tw:text-[rgba(33,37,41,0.75)]">Theo dữ liệu hôm nay</div>
                                 </div>
                             </div>
-                            <div class="fw-bold">{{ $checkInRate ?? 0 }}%</div>
+                            <div class="tw:font-bold">{{ $checkInRate ?? 0 }}%</div>
                         </div>
 
                         <div class="hr-side-item">
                             <div class="hr-side-item-left">
                                 <div class="hr-side-bullet hr-bullet-green"></div>
                                 <div>
-                                    <div class="fw-semibold">Nhân sự hoạt động</div>
-                                    <div class="small text-muted">Tổng headcount</div>
+                                    <div class="tw:font-semibold">Nhân sự hoạt động</div>
+                                    <div class="small tw:text-[rgba(33,37,41,0.75)]">Tổng headcount</div>
                                 </div>
                             </div>
-                            <div class="fw-bold">{{ $totalEmployees ?? 0 }}</div>
+                            <div class="tw:font-bold">{{ $totalEmployees ?? 0 }}</div>
                         </div>
 
                         <div class="hr-side-item">
                             <div class="hr-side-item-left">
                                 <div class="hr-side-bullet hr-bullet-orange"></div>
                                 <div>
-                                    <div class="fw-semibold">Đơn chờ duyệt</div>
-                                    <div class="small text-muted">Yêu cầu xử lý</div>
+                                    <div class="tw:font-semibold">Đơn chờ duyệt</div>
+                                    <div class="small tw:text-[rgba(33,37,41,0.75)]">Yêu cầu xử lý</div>
                                 </div>
                             </div>
-                            <div class="fw-bold">{{ $pendingLeaves ?? 0 }}</div>
+                            <div class="tw:font-bold">{{ $pendingLeaves ?? 0 }}</div>
                         </div>
 
                         <div class="hr-side-item">
                             <div class="hr-side-item-left">
                                 <div class="hr-side-bullet hr-bullet-purple"></div>
                                 <div>
-                                    <div class="fw-semibold">Đi muộn</div>
-                                    <div class="small text-muted">Trong kỳ lọc</div>
+                                    <div class="tw:font-semibold">Đi muộn</div>
+                                    <div class="small tw:text-[rgba(33,37,41,0.75)]">Trong kỳ lọc</div>
                                 </div>
                             </div>
-                            <div class="fw-bold">{{ $lateCount ?? 0 }}</div>
+                            <div class="tw:font-bold">{{ $lateCount ?? 0 }}</div>
                         </div>
                     </div>
 
-                    <div class="hr-tip-box mt-3">
-                        <div class="fw-semibold mb-1">Gợi ý nâng cấp tiếp</div>
-                        <div class="small text-muted">
+                    <div class="hr-tip-box tw:mt-4">
+                        <div class="tw:font-semibold tw:mb-1">Gợi ý nâng cấp tiếp</div>
+                        <div class="small tw:text-[rgba(33,37,41,0.75)]">
                             Bước sau mình có thể làm tiếp biểu đồ thật, bảng duyệt đẹp hơn, và thống kê KPI theo phòng ban.
                         </div>
                     </div>
-                </div>
-            </div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
     </div>
 
@@ -615,7 +615,8 @@
     overflow:hidden;
     box-shadow:0 14px 40px rgba(15,23,42,.07) !important;
 }
-.hr-kpi-card .card-body{
+.hr-kpi-card .card-body,
+    .hr-kpi-card [data-ego-card-body]{
     padding:22px;
 }
 .hr-kpi-top{

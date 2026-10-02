@@ -35,6 +35,48 @@
             visibleCheckboxes().forEach((input) => { input.checked = false; });
         });
 
+        /*
+         | Ma trận CRUD: nút "tất cả" ở đầu mỗi HÀNG (một trang) và mỗi CỘT
+         | (một thao tác). Trước đây markup có nút nhưng chưa có xử lý nên bấm
+         | không có gì xảy ra — với 60+ trang × 4 thao tác thì tick tay là cực hình.
+         |
+         | Quy tắc: nếu còn ô nào chưa tick thì tick hết; đã tick đủ thì bỏ hết.
+         | Chỉ đụng vào ô đang HIỆN (không bị bộ lọc tìm kiếm ẩn đi) và không bị
+         | khoá — bấm "tất cả" mà lại bật cả những dòng người dùng vừa lọc ra
+         | ngoài tầm nhìn là chuyện bất ngờ khó chịu.
+         */
+        const crudCells = (selector) => [...form.querySelectorAll(selector)]
+            .filter((input) => !input.disabled && input.closest('[data-permission-item]')?.style.display !== 'none');
+
+        const toggleCells = (cells) => {
+            if (!cells.length) return;
+            const turnOn = cells.some((input) => !input.checked);
+            cells.forEach((input) => { input.checked = turnOn; });
+        };
+
+        form.querySelectorAll('[data-crud-row]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const row = CSS.escape(button.dataset.crudRow);
+                toggleCells(crudCells(`[data-crud-cell][data-crud-cell-row="${row}"]`));
+            });
+        });
+
+        form.querySelectorAll('[data-crud-column]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const column = CSS.escape(button.dataset.crudColumn);
+                toggleCells(crudCells(`[data-crud-cell][data-crud-cell-column="${column}"]`));
+            });
+        });
+
+        // Vai trò admin khoá toàn bộ ô tick -> nút "tất cả" cũng vô nghĩa, ẩn đi
+        // thay vì để người dùng bấm mãi không thấy gì.
+        if (form.querySelector('[data-crud-cell]') && !form.querySelector('[data-crud-cell]:not(:disabled)')) {
+            form.querySelectorAll('[data-crud-row], [data-crud-column]').forEach((button) => {
+                button.hidden = true;
+            });
+            form.querySelector('.ego-crud-matrix-wrap')?.classList.add('is-locked');
+        }
+
         form.addEventListener('submit', () => {
             const button = form.querySelector('button[type="submit"], button:not([type])');
             if (!button) return;

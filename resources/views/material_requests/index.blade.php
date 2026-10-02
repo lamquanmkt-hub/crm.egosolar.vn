@@ -12,12 +12,7 @@
     $fmtMoney = fn ($value) => number_format((float) ($value ?? 0), 0, ',', '.').' đ';
 @endphp
 <main class="mrw-page">
-    <header class="mrw-header">
-        <div><span class="mrw-eyebrow">CÔNG TRÌNH · BẢO TRÌ · BẢO HÀNH</span><h1>Yêu cầu vật tư</h1><p>Danh sách phiếu kỹ thuật chuyển Kho xử lý.</p></div>
-        @if(auth()->user()?->hasAnyRole(['admin', 'technical', 'ky_thuat', 'sales', 'warehouse', 'kho']))
-            <a class="mrw-btn primary" href="{{ route('material-requests.create') }}"><i class="bi bi-plus-circle"></i> Tạo đơn vật tư</a>
-        @endif
-    </header>
+    <header class="mrw-header"><div><span class="mrw-eyebrow">CÔNG TRÌNH · BẢO TRÌ · BẢO HÀNH</span><h1>Yêu cầu vật tư</h1><p>Danh sách phiếu kỹ thuật chuyển Kho xử lý.</p></div></header>
     @if(session('success'))<div class="mrw-alert success">{{ session('success') }}</div>@endif
     @if(session('error'))<div class="mrw-alert danger">{{ session('error') }}</div>@endif
 

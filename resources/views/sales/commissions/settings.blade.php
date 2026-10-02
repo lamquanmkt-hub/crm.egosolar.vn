@@ -1,70 +1,6 @@
 @extends('layouts.app')
 
 @section('content')
-@php
-    $fmtMoney = function ($v) {
-        return number_format((float)($v ?? 0), 0, ',', '.') . ' đ';
-    };
-
-    $fmtPercent = function ($v) {
-        return number_format((float)($v ?? 0), 2, ',', '.') . '%';
-    };
-
-    $rules = collect($rules ?? [])->values();
-    $salesUsers = collect($salesUsers ?? [])->values();
-    $salarySettings = collect($salarySettings ?? []);
-    $kpiTiers = collect($kpiTiers ?? [])->values();
-
-    $salesNameMap = $salesUsers->mapWithKeys(fn($u) => [(int)$u->id => $u->name])->toArray();
-
-    $typeLabel = [
-        'project' => 'Công trình',
-        'trade_product' => 'Thương mại',
-        'solar_panel' => 'Tấm pin',
-    ];
-
-    $customerStatusLabel = [
-        'all' => 'Tất cả khách',
-        'lead' => 'Lead / Khách ADS',
-        'member' => 'Member / Tự phát triển',
-        'retail' => 'Khách lẻ',
-    ];
-
-    $targetLabel = [
-        'all' => 'Tất cả',
-        'customer_status' => 'Trạng thái khách',
-        'product' => 'Sản phẩm',
-        'category' => 'Danh mục',
-        'brand' => 'Thương hiệu',
-        'keyword' => 'Từ khóa / model',
-    ];
-
-    $calcLabel = [
-        'percent' => '% doanh thu',
-        'fixed_per_item' => 'Tiền / sản phẩm',
-        'fixed_per_kwp' => 'Tiền / kWp',
-        'fixed_per_order' => 'Cố định / đơn',
-    ];
-
-    $baseLabel = [
-        'revenue_before_vat' => 'Doanh thu trước VAT',
-        'revenue_after_vat' => 'Doanh thu sau VAT',
-        'gross_profit' => 'Lợi nhuận gộp',
-        'quantity' => 'Số lượng',
-        'kwp' => 'kWp',
-    ];
-
-    $bonusTypeLabel = [
-        'fixed' => 'Thưởng cố định',
-        'percent_revenue' => '% doanh số',
-        'percent_commission' => '% hoa hồng',
-        'salary_percent' => '% lương cứng',
-    ];
-
-    $activeRules = $rules->where('is_active', 1)->count();
-    $totalBaseSalary = $salarySettings->where('is_active', 1)->sum('base_salary');
-    $totalTargetRevenue = $salarySettings->where('is_active', 1)->sum('target_revenue');
-@endphp
 
 <style>
 .sales-policy-pro{
@@ -600,24 +536,27 @@
 }
 </style>
 
-<div class="container-fluid sales-policy-pro">
+{{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+     thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+     quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+<div class="container-fluid sales-policy-pro tw:py-4">
     @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
+        <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
     @endif
 
     @if(session('error'))
-        <div class="alert alert-danger">{{ session('error') }}</div>
+        <x-ui.alert variant="danger">{{ session('error') }}</x-ui.alert>
     @endif
 
     @if($errors->any())
-        <div class="alert alert-danger">
+        <x-ui.alert variant="danger">
             <strong>Có lỗi:</strong>
-            <ul class="mb-0 mt-2">
+            <ul class="tw:mb-0 tw:mt-2">
                 @foreach($errors->all() as $e)
                     <li>{{ $e }}</li>
                 @endforeach
             </ul>
-        </div>
+        </x-ui.alert>
     @endif
 
     <div class="spp-hero">
@@ -665,8 +604,8 @@
     <div class="spp-stat-grid">
         <div class="spp-stat"><span>Tháng áp dụng</span><b id="policyMonthText">{{ $policy->period_month ?? $month }}</b></div>
         <div class="spp-stat"><span>Sales áp dụng</span><b>{{ $salesUsers->count() }}</b></div>
-        <div class="spp-stat"><span>Tổng lương cứng</span><b id="totalBaseSalaryText">{{ $fmtMoney($totalBaseSalary) }}</b></div>
-        <div class="spp-stat"><span>Target doanh số</span><b id="totalTargetRevenueText">{{ $fmtMoney($totalTargetRevenue) }}</b></div>
+        <div class="spp-stat"><span>Tổng lương cứng</span><b id="totalBaseSalaryText">{{ $totalBaseSalaryText }}</b></div>
+        <div class="spp-stat"><span>Target doanh số</span><b id="totalTargetRevenueText">{{ $totalTargetRevenueText }}</b></div>
         <div class="spp-stat"><span>Bậc KPI</span><b id="kpiCountText">{{ $kpiTiers->count() }}</b></div>
         <div class="spp-stat dark"><span>Rule hoa hồng bật</span><b id="activeRuleCount">{{ $activeRules }}</b></div>
     </div>
@@ -709,19 +648,19 @@
                     <div class="spp-quick-grid">
                         <div class="spp-quick-card">
                             <span>Công trình mặc định</span>
-                            <b id="policyProjectCard">{{ $fmtPercent($policy->project_rate_percent ?? 4) }}</b>
+                            <b id="policyProjectCard">{{ $policyProjectRateText }}</b>
                             <small>Thường dùng 3% - 5%</small>
                         </div>
 
                         <div class="spp-quick-card">
                             <span>Thương mại mặc định</span>
-                            <b id="policyTradeCard">{{ $fmtPercent($policy->trade_rate_percent ?? 1) }}</b>
+                            <b id="policyTradeCard">{{ $policyTradeRateText }}</b>
                             <small>Thường dùng 0.3% - 2%</small>
                         </div>
 
                         <div class="spp-quick-card">
                             <span>Tấm pin mặc định</span>
-                            <b id="policyPanelCard">{{ $fmtMoney($policy->panel_fixed_amount ?? 15000) }}</b>
+                            <b id="policyPanelCard">{{ $policyPanelFixedText }}</b>
                             <small>Tính theo từng sản phẩm / model</small>
                         </div>
                     </div>
@@ -780,94 +719,60 @@
                             </thead>
 
                             <tbody id="ruleList">
-                            @forelse($rules as $idx => $rule)
-                                @php
-                                    $targetText = $rule->target_text ?: ($rule->target_id ? '#'.$rule->target_id : '');
-                                    $customerStatus = ($rule->target_type ?? '') === 'customer_status' ? ($targetText ?: 'all') : 'all';
-                                    $applyText = ($rule->target_type ?? 'all') === 'customer_status'
-                                        ? 'Theo trạng thái khách'
-                                        : (($targetLabel[$rule->target_type ?? 'all'] ?? 'Tất cả') . ($targetText ? ': ' . $targetText : ''));
-
-                                    $fromAmount = $rule->from_amount ?? '';
-                                    $toAmount = $rule->to_amount ?? '';
-
-                                    if ($fromAmount !== '' && $toAmount !== '') {
-                                        $revenueRange = $fmtMoney($fromAmount) . ' - ' . $fmtMoney($toAmount);
-                                    } elseif ($fromAmount !== '') {
-                                        $revenueRange = 'Từ ' . $fmtMoney($fromAmount);
-                                    } elseif ($toAmount !== '') {
-                                        $revenueRange = 'Đến ' . $fmtMoney($toAmount);
-                                    } else {
-                                        $revenueRange = 'Không giới hạn';
-                                    }
-
-                                    $fixedAmount = (float)($rule->fixed_amount ?: ($rule->amount_per_unit ?? 0));
-                                    $calc = $rule->calculation_type ?? 'percent';
-                                    if ($calc === 'fixed_per_item') {
-                                        $valueText = $fmtMoney($fixedAmount) . '/SP';
-                                    } elseif ($calc === 'fixed_per_kwp') {
-                                        $valueText = $fmtMoney($rule->amount_per_kwp ?? 0) . '/kWp';
-                                    } elseif ($calc === 'fixed_per_order') {
-                                        $valueText = $fmtMoney($fixedAmount) . '/đơn';
-                                    } else {
-                                        $valueText = $fmtPercent($rule->rate_percent ?? 0);
-                                    }
-
-                                    $isActive = !empty($rule->is_active);
-                                @endphp
+                            @forelse($ruleRows as $idx => $row)
 
                                 <tr class="js-rule-row" data-rule-index="{{ $idx }}">
                                     <td>
                                         <div class="spp-hidden">
-                                            <input data-field="commission_type" name="rules[{{ $idx }}][commission_type]" value="{{ $rule->commission_type ?? 'trade_product' }}">
-                                            <input data-field="target_type" name="rules[{{ $idx }}][target_type]" value="{{ $rule->target_type ?? 'all' }}">
-                                            <input data-field="target_text" name="rules[{{ $idx }}][target_text]" value="{{ $targetText }}">
-                                            <input data-field="target_id" name="rules[{{ $idx }}][target_id]" value="{{ $rule->target_id ?? '' }}">
-                                            <input data-field="base_type" name="rules[{{ $idx }}][base_type]" value="{{ $rule->base_type ?? 'revenue_before_vat' }}">
-                                            <input data-field="calculation_type" name="rules[{{ $idx }}][calculation_type]" value="{{ $calc }}">
-                                            <input data-field="rate_percent" name="rules[{{ $idx }}][rate_percent]" value="{{ $rule->rate_percent ?? 0 }}">
-                                            <input data-field="fixed_amount" name="rules[{{ $idx }}][fixed_amount]" value="{{ $fixedAmount }}">
-                                            <input data-field="amount_per_unit" name="rules[{{ $idx }}][amount_per_unit]" value="{{ $rule->amount_per_unit ?: $fixedAmount }}">
-                                            <input data-field="amount_per_kwp" name="rules[{{ $idx }}][amount_per_kwp]" value="{{ $rule->amount_per_kwp ?? 0 }}">
-                                            <input data-field="from_amount" name="rules[{{ $idx }}][from_amount]" value="{{ $rule->from_amount ?? '' }}">
-                                            <input data-field="to_amount" name="rules[{{ $idx }}][to_amount]" value="{{ $rule->to_amount ?? '' }}">
-                                            <input data-field="from_qty" name="rules[{{ $idx }}][from_qty]" value="{{ $rule->from_qty ?? '' }}">
-                                            <input data-field="to_qty" name="rules[{{ $idx }}][to_qty]" value="{{ $rule->to_qty ?? '' }}">
-                                            <input data-field="priority" name="rules[{{ $idx }}][priority]" value="{{ $rule->priority ?? 10 }}">
-                                            <input data-field="is_active" name="rules[{{ $idx }}][is_active]" value="{{ $isActive ? 1 : 0 }}">
-                                            <input data-field="note" name="rules[{{ $idx }}][note]" value="{{ $rule->note ?? '' }}">
+                                            <input data-field="commission_type" name="rules[{{ $idx }}][commission_type]" value="{{ $row->rule->commission_type ?? 'trade_product' }}">
+                                            <input data-field="target_type" name="rules[{{ $idx }}][target_type]" value="{{ $row->rule->target_type ?? 'all' }}">
+                                            <input data-field="target_text" name="rules[{{ $idx }}][target_text]" value="{{ $row->targetText }}">
+                                            <input data-field="target_id" name="rules[{{ $idx }}][target_id]" value="{{ $row->rule->target_id ?? '' }}">
+                                            <input data-field="base_type" name="rules[{{ $idx }}][base_type]" value="{{ $row->rule->base_type ?? 'revenue_before_vat' }}">
+                                            <input data-field="calculation_type" name="rules[{{ $idx }}][calculation_type]" value="{{ $row->calc }}">
+                                            <input data-field="rate_percent" name="rules[{{ $idx }}][rate_percent]" value="{{ $row->rule->rate_percent ?? 0 }}">
+                                            <input data-field="fixed_amount" name="rules[{{ $idx }}][fixed_amount]" value="{{ $row->fixedAmount }}">
+                                            <input data-field="amount_per_unit" name="rules[{{ $idx }}][amount_per_unit]" value="{{ $row->rule->amount_per_unit ?: $row->fixedAmount }}">
+                                            <input data-field="amount_per_kwp" name="rules[{{ $idx }}][amount_per_kwp]" value="{{ $row->rule->amount_per_kwp ?? 0 }}">
+                                            <input data-field="from_amount" name="rules[{{ $idx }}][from_amount]" value="{{ $row->rule->from_amount ?? '' }}">
+                                            <input data-field="to_amount" name="rules[{{ $idx }}][to_amount]" value="{{ $row->rule->to_amount ?? '' }}">
+                                            <input data-field="from_qty" name="rules[{{ $idx }}][from_qty]" value="{{ $row->rule->from_qty ?? '' }}">
+                                            <input data-field="to_qty" name="rules[{{ $idx }}][to_qty]" value="{{ $row->rule->to_qty ?? '' }}">
+                                            <input data-field="priority" name="rules[{{ $idx }}][priority]" value="{{ $row->rule->priority ?? 10 }}">
+                                            <input data-field="is_active" name="rules[{{ $idx }}][is_active]" value="{{ $row->isActive ? 1 : 0 }}">
+                                            <input data-field="note" name="rules[{{ $idx }}][note]" value="{{ $row->rule->note ?? '' }}">
                                         </div>
 
-                                        <span class="spp-chip js-rule-type">{{ $typeLabel[$rule->commission_type ?? 'trade_product'] ?? 'Thương mại' }}</span>
+                                        <span class="spp-chip js-rule-type">{{ $row->typeText }}</span>
                                     </td>
 
                                     <td>
-                                        <div class="spp-name js-rule-customer">{{ $customerStatusLabel[$customerStatus] ?? $customerStatus }}</div>
+                                        <div class="spp-name js-rule-customer">{{ $row->customerStatusText }}</div>
                                         <div class="spp-meta">Điều kiện khách hàng</div>
                                     </td>
 
                                     <td>
-                                        <div class="spp-name js-rule-apply">{{ $applyText }}</div>
-                                        <div class="spp-meta js-rule-base">{{ $baseLabel[$rule->base_type ?? 'revenue_before_vat'] ?? 'Doanh thu trước VAT' }}</div>
+                                        <div class="spp-name js-rule-apply">{{ $row->applyText }}</div>
+                                        <div class="spp-meta js-rule-base">{{ $row->baseText }}</div>
                                     </td>
 
                                     <td>
-                                        <div class="spp-name js-rule-revenue">{{ $revenueRange }}</div>
+                                        <div class="spp-name js-rule-revenue">{{ $row->revenueRange }}</div>
                                         <div class="spp-meta js-rule-qty">
-                                            @if(($rule->from_qty ?? '') !== '' || ($rule->to_qty ?? '') !== '')
-                                                SL: {{ $rule->from_qty ?? 0 }} - {{ $rule->to_qty ?? '∞' }}
+                                            @if(($row->rule->from_qty ?? '') !== '' || ($row->rule->to_qty ?? '') !== '')
+                                                SL: {{ $row->rule->from_qty ?? 0 }} - {{ $row->rule->to_qty ?? '∞' }}
                                             @else
                                                 Không giới hạn SL
                                             @endif
                                         </div>
                                     </td>
 
-                                    <td><span class="spp-chip amber js-rule-calc">{{ $calcLabel[$calc] ?? '%' }}</span></td>
-                                    <td><div class="spp-name js-rule-value">{{ $valueText }}</div></td>
-                                    <td><div class="spp-name js-rule-priority">{{ $rule->priority ?? 10 }}</div></td>
-                                    <td><span class="spp-chip {{ $isActive ? 'green' : 'gray' }} js-rule-status">{{ $isActive ? 'Đang bật' : 'Tắt' }}</span></td>
+                                    <td><span class="spp-chip amber js-rule-calc">{{ $row->calcText }}</span></td>
+                                    <td><div class="spp-name js-rule-value">{{ $row->valueText }}</div></td>
+                                    <td><div class="spp-name js-rule-priority">{{ $row->rule->priority ?? 10 }}</div></td>
+                                    <td><span class="spp-chip {{ $row->isActive ? 'green' : 'gray' }} js-rule-status">{{ $row->isActive ? 'Đang bật' : 'Tắt' }}</span></td>
                                     <td>
-                                        <div class="d-flex gap-2">
+                                        <div class="tw:flex tw:gap-2">
                                             <button type="button" class="spp-btn spp-btn-dark js-edit-rule">Sửa</button>
                                             <button type="button" class="spp-btn spp-btn-soft js-clone-rule">Nhân bản</button>
                                             <button type="button" class="spp-btn spp-btn-red js-delete-rule">Xóa</button>
@@ -908,34 +813,27 @@
                             </thead>
 
                             <tbody id="employeeList">
-                            @forelse($salesUsers as $u)
-                                @php
-                                    $salary = $salarySettings->get((int)$u->id);
-                                    $baseSalary = (float)($salary->base_salary ?? 7000000);
-                                    $targetRevenue = (float)($salary->target_revenue ?? 500000000);
-                                    $targetCommission = (float)($salary->target_commission ?? 0);
-                                    $isActive = !empty($salary->is_active);
-                                @endphp
+                            @forelse($salaryRows as $row)
 
-                                <tr class="js-employee-row" data-sales-id="{{ $u->id }}">
+                                <tr class="js-employee-row" data-sales-id="{{ $row->user->id }}">
                                     <td>
                                         <div class="spp-hidden">
-                                            <input data-field="sales_id" name="salary_settings[{{ $u->id }}][sales_id]" value="{{ $u->id }}">
-                                            <input data-field="base_salary" name="salary_settings[{{ $u->id }}][base_salary]" value="{{ $baseSalary }}">
-                                            <input data-field="target_revenue" name="salary_settings[{{ $u->id }}][target_revenue]" value="{{ $targetRevenue }}">
-                                            <input data-field="target_commission" name="salary_settings[{{ $u->id }}][target_commission]" value="{{ $targetCommission }}">
-                                            <input data-field="is_active" name="salary_settings[{{ $u->id }}][is_active]" value="{{ $isActive ? 1 : 0 }}">
-                                            <input data-field="note" name="salary_settings[{{ $u->id }}][note]" value="{{ $salary->note ?? '' }}">
+                                            <input data-field="sales_id" name="salary_settings[{{ $row->user->id }}][sales_id]" value="{{ $row->user->id }}">
+                                            <input data-field="base_salary" name="salary_settings[{{ $row->user->id }}][base_salary]" value="{{ $row->baseSalary }}">
+                                            <input data-field="target_revenue" name="salary_settings[{{ $row->user->id }}][target_revenue]" value="{{ $row->targetRevenue }}">
+                                            <input data-field="target_commission" name="salary_settings[{{ $row->user->id }}][target_commission]" value="{{ $row->targetCommission }}">
+                                            <input data-field="is_active" name="salary_settings[{{ $row->user->id }}][is_active]" value="{{ $row->isActive ? 1 : 0 }}">
+                                            <input data-field="note" name="salary_settings[{{ $row->user->id }}][note]" value="{{ $row->note }}">
                                         </div>
 
-                                        <div class="spp-name js-employee-name">{{ $u->name }}</div>
-                                        <div class="spp-meta">{{ $u->email ?? '' }}</div>
+                                        <div class="spp-name js-employee-name">{{ $row->user->name }}</div>
+                                        <div class="spp-meta">{{ $row->user->email ?? '' }}</div>
                                     </td>
 
-                                    <td><div class="spp-name js-base-salary">{{ $fmtMoney($baseSalary) }}</div></td>
-                                    <td><div class="spp-name js-target-revenue">{{ $fmtMoney($targetRevenue) }}</div></td>
-                                    <td><div class="spp-name js-target-commission">{{ $fmtMoney($targetCommission) }}</div></td>
-                                    <td><span class="spp-chip {{ $isActive ? 'green' : 'gray' }} js-employee-status">{{ $isActive ? 'Đang tính' : 'Tắt' }}</span></td>
+                                    <td><div class="spp-name js-base-salary">{{ $row->baseSalaryText }}</div></td>
+                                    <td><div class="spp-name js-target-revenue">{{ $row->targetRevenueText }}</div></td>
+                                    <td><div class="spp-name js-target-commission">{{ $row->targetCommissionText }}</div></td>
+                                    <td><span class="spp-chip {{ $row->isActive ? 'green' : 'gray' }} js-employee-status">{{ $row->isActive ? 'Đang tính' : 'Tắt' }}</span></td>
                                     <td><button type="button" class="spp-btn spp-btn-dark js-edit-employee">Sửa</button></td>
                                 </tr>
                             @empty
@@ -975,47 +873,33 @@
                             </thead>
 
                             <tbody id="kpiList">
-                            @forelse($kpiTiers as $idx => $tier)
-                                @php
-                                    $isActive = !empty($tier->is_active);
-                                    $salesName = !empty($tier->sales_id) ? ($salesNameMap[(int)$tier->sales_id] ?? ('Sales #' . $tier->sales_id)) : 'Tất cả Sales';
-
-                                    if (!empty($tier->to_revenue)) {
-                                        $range = $fmtMoney($tier->from_revenue ?? 0) . ' - ' . $fmtMoney($tier->to_revenue);
-                                    } else {
-                                        $range = 'Từ ' . $fmtMoney($tier->from_revenue ?? 0);
-                                    }
-
-                                    $bonusValue = ($tier->bonus_type ?? 'fixed') === 'fixed'
-                                        ? $fmtMoney($tier->bonus_amount ?? 0)
-                                        : $fmtPercent($tier->bonus_amount ?? 0);
-                                @endphp
+                            @forelse($tierRows as $idx => $row)
 
                                 <tr class="js-kpi-row" data-kpi-index="{{ $idx }}">
                                     <td>
                                         <div class="spp-hidden">
-                                            <input data-field="sales_id" name="kpi_tiers[{{ $idx }}][sales_id]" value="{{ $tier->sales_id ?? '' }}">
-                                            <input data-field="tier_name" name="kpi_tiers[{{ $idx }}][tier_name]" value="{{ $tier->tier_name ?? '' }}">
-                                            <input data-field="from_revenue" name="kpi_tiers[{{ $idx }}][from_revenue]" value="{{ $tier->from_revenue ?? 0 }}">
-                                            <input data-field="to_revenue" name="kpi_tiers[{{ $idx }}][to_revenue]" value="{{ $tier->to_revenue ?? '' }}">
-                                            <input data-field="bonus_type" name="kpi_tiers[{{ $idx }}][bonus_type]" value="{{ $tier->bonus_type ?? 'fixed' }}">
-                                            <input data-field="bonus_amount" name="kpi_tiers[{{ $idx }}][bonus_amount]" value="{{ $tier->bonus_amount ?? 0 }}">
-                                            <input data-field="priority" name="kpi_tiers[{{ $idx }}][priority]" value="{{ $tier->priority ?? 10 }}">
-                                            <input data-field="is_active" name="kpi_tiers[{{ $idx }}][is_active]" value="{{ $isActive ? 1 : 0 }}">
-                                            <input data-field="note" name="kpi_tiers[{{ $idx }}][note]" value="{{ $tier->note ?? '' }}">
+                                            <input data-field="sales_id" name="kpi_tiers[{{ $idx }}][sales_id]" value="{{ $row->tier->sales_id ?? '' }}">
+                                            <input data-field="tier_name" name="kpi_tiers[{{ $idx }}][tier_name]" value="{{ $row->tier->tier_name ?? '' }}">
+                                            <input data-field="from_revenue" name="kpi_tiers[{{ $idx }}][from_revenue]" value="{{ $row->tier->from_revenue ?? 0 }}">
+                                            <input data-field="to_revenue" name="kpi_tiers[{{ $idx }}][to_revenue]" value="{{ $row->tier->to_revenue ?? '' }}">
+                                            <input data-field="bonus_type" name="kpi_tiers[{{ $idx }}][bonus_type]" value="{{ $row->tier->bonus_type ?? 'fixed' }}">
+                                            <input data-field="bonus_amount" name="kpi_tiers[{{ $idx }}][bonus_amount]" value="{{ $row->tier->bonus_amount ?? 0 }}">
+                                            <input data-field="priority" name="kpi_tiers[{{ $idx }}][priority]" value="{{ $row->tier->priority ?? 10 }}">
+                                            <input data-field="is_active" name="kpi_tiers[{{ $idx }}][is_active]" value="{{ $row->isActive ? 1 : 0 }}">
+                                            <input data-field="note" name="kpi_tiers[{{ $idx }}][note]" value="{{ $row->tier->note ?? '' }}">
                                         </div>
 
-                                        <div class="spp-name js-kpi-name">{{ $tier->tier_name ?? 'Bậc KPI' }}</div>
-                                        <div class="spp-meta js-kpi-note">{{ $tier->note ?? '' }}</div>
+                                        <div class="spp-name js-kpi-name">{{ $row->tier->tier_name ?? 'Bậc KPI' }}</div>
+                                        <div class="spp-meta js-kpi-note">{{ $row->tier->note ?? '' }}</div>
                                     </td>
 
-                                    <td><span class="spp-chip js-kpi-sales">{{ $salesName }}</span></td>
-                                    <td><div class="spp-name js-kpi-range">{{ $range }}</div></td>
-                                    <td><span class="spp-chip amber js-kpi-type">{{ $bonusTypeLabel[$tier->bonus_type ?? 'fixed'] ?? 'Thưởng cố định' }}</span></td>
-                                    <td><div class="spp-name js-kpi-bonus">{{ $bonusValue }}</div></td>
-                                    <td><span class="spp-chip {{ $isActive ? 'green' : 'gray' }} js-kpi-status">{{ $isActive ? 'Đang bật' : 'Tắt' }}</span></td>
+                                    <td><span class="spp-chip js-kpi-sales">{{ $row->salesName }}</span></td>
+                                    <td><div class="spp-name js-kpi-range">{{ $row->range }}</div></td>
+                                    <td><span class="spp-chip amber js-kpi-type">{{ $row->bonusTypeText }}</span></td>
+                                    <td><div class="spp-name js-kpi-bonus">{{ $row->bonusValue }}</div></td>
+                                    <td><span class="spp-chip {{ $row->isActive ? 'green' : 'gray' }} js-kpi-status">{{ $row->isActive ? 'Đang bật' : 'Tắt' }}</span></td>
                                     <td>
-                                        <div class="d-flex gap-2">
+                                        <div class="tw:flex tw:gap-2">
                                             <button type="button" class="spp-btn spp-btn-dark js-edit-kpi">Sửa</button>
                                             <button type="button" class="spp-btn spp-btn-red js-delete-kpi">Xóa</button>
                                         </div>
@@ -1057,7 +941,7 @@
                         </div>
                     </div>
 
-                    <div class="p-3 d-grid gap-2">
+                    <div class="tw:p-4 d-grid tw:gap-2">
                         <button type="button" class="spp-btn spp-btn-soft js-add-rule" data-type="lead_trade">+ Lead sản phẩm 0.5%</button>
                         <button type="button" class="spp-btn spp-btn-soft js-add-rule" data-type="lead_project">+ Lead công trình 3%</button>
                         <button type="button" class="spp-btn spp-btn-soft js-add-rule" data-type="trade_product">+ Thương mại 1%</button>
@@ -1081,7 +965,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Sửa chính sách chung</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <x-ui.close-button in="modal" white type="button" data-bs-dismiss="modal" />
             </div>
 
             <div class="modal-body">
@@ -1140,7 +1024,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Sửa rule hoa hồng</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <x-ui.close-button in="modal" white type="button" data-bs-dismiss="modal" />
             </div>
 
             <div class="modal-body">
@@ -1236,9 +1120,9 @@
                         </div>
                     </div>
 
-                    <div class="alert alert-info spp-span-12 mb-0">
+                    <x-ui.alert variant="info" class="spp-span-12 tw:mb-0">
                         <strong>Lưu ý:</strong> Nếu chọn “Trạng thái khách” khác “Tất cả”, hệ thống sẽ ưu tiên rule theo trạng thái khách như Lead / Member / Khách lẻ. Nếu muốn rule theo model sản phẩm như JA Solar thì để trạng thái khách là “Tất cả khách”, rồi chọn “Từ khóa / model”.
-                    </div>
+                    </x-ui.alert>
                 </div>
             </div>
 
@@ -1256,7 +1140,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Sửa lương cứng & target Sales</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <x-ui.close-button in="modal" white type="button" data-bs-dismiss="modal" />
             </div>
 
             <div class="modal-body">
@@ -1290,7 +1174,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Sửa bậc KPI doanh số</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <x-ui.close-button in="modal" white type="button" data-bs-dismiss="modal" />
             </div>
 
             <div class="modal-body">
@@ -1372,7 +1256,7 @@
         <td><div class="spp-name js-rule-priority">20</div></td>
         <td><span class="spp-chip green js-rule-status">Đang bật</span></td>
         <td>
-            <div class="d-flex gap-2">
+            <div class="tw:flex tw:gap-2">
                 <button type="button" class="spp-btn spp-btn-dark js-edit-rule">Sửa</button>
                 <button type="button" class="spp-btn spp-btn-soft js-clone-rule">Nhân bản</button>
                 <button type="button" class="spp-btn spp-btn-red js-delete-rule">Xóa</button>
@@ -1404,7 +1288,7 @@
         <td><div class="spp-name js-kpi-bonus">1.000.000 đ</div></td>
         <td><span class="spp-chip green js-kpi-status">Đang bật</span></td>
         <td>
-            <div class="d-flex gap-2">
+            <div class="tw:flex tw:gap-2">
                 <button type="button" class="spp-btn spp-btn-dark js-edit-kpi">Sửa</button>
                 <button type="button" class="spp-btn spp-btn-red js-delete-kpi">Xóa</button>
             </div>

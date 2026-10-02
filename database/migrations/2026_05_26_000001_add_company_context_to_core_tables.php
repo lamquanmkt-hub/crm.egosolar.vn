@@ -84,7 +84,7 @@ return new class extends Migration
                 ->whereNull('company_id')
                 ->where(function ($q) {
                     $q->where('company', 'like', '%Việt Nam%')
-                      ->orWhere('company', 'like', '%Viet Nam%');
+                        ->orWhere('company', 'like', '%Viet Nam%');
                 })
                 ->update([
                     'company_id' => $egoVn,
@@ -97,8 +97,8 @@ return new class extends Migration
                 ->whereNull('company_id')
                 ->where(function ($q) {
                     $q->where('company', 'like', '%Quốc Tế%')
-                      ->orWhere('company', 'like', '%Quoc Te%')
-                      ->orWhere('company', 'like', '%TMKT%');
+                        ->orWhere('company', 'like', '%Quoc Te%')
+                        ->orWhere('company', 'like', '%TMKT%');
                 })
                 ->update([
                     'company_id' => $egoQt,

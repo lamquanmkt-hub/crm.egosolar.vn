@@ -91,11 +91,8 @@
     }
 
     /* Alerts */
-    .alert{
-        border-radius: 16px;
-        border: 1px solid rgba(15,23,42,.08);
-        box-shadow: var(--shadow2);
-    }
+    /* Luật .alert ĐÃ XOÁ: mọi hộp đã sang component x-ui.alert, giá trị chép vào
+       lớp Tailwind của từng nơi gọi. Giá trị cũ: .alert{ border-radius: 16px; border: 1px solid rgba(15,23,42,.08); box-shadow: var(--shadow2); } */
 
     /* ======= Modern table ======= */
     .table-wrap{
@@ -163,7 +160,7 @@
     .cell-actions{ width: 180px; text-align:center; }
 </style>
 
-<div class="container-fluid px-4 py-3">
+<div class="container-fluid tw:px-6 tw:py-4">
     <div class="page-shell">
 
         <div class="page-head">
@@ -176,21 +173,21 @@
             </div>
 
             @can('create', App\Models\User::class)
-                <a href="{{ route('users.create') }}" class="btn btn-ego">
+                <x-ui.button variant="none" size="none" class="btn-ego" href="{{ route('users.create') }}">
                     <i class="bi bi-plus-lg"></i> Add User
-                </a>
+                </x-ui.button>
             @endcan
         </div>
 
         @if(session('success'))
-            <div class="alert alert-success mx-1">
+            <x-ui.alert variant="success" class="tw:rounded-[16px] tw:border tw:border-[rgba(15,23,42,0.08)] tw:shadow-[0_10px_30px_rgba(15,23,42,0.08)] tw:mx-1">
                 <i class="bi bi-check-circle"></i> {{ session('success') }}
-            </div>
+            </x-ui.alert>
         @endif
         @if(session('error'))
-            <div class="alert alert-danger mx-1">
+            <x-ui.alert variant="danger" class="tw:rounded-[16px] tw:border tw:border-[rgba(15,23,42,0.08)] tw:shadow-[0_10px_30px_rgba(15,23,42,0.08)] tw:mx-1">
                 <i class="bi bi-exclamation-triangle-fill"></i> {{ session('error') }}
-            </div>
+            </x-ui.alert>
         @endif
 
         <div class="card-glass">
@@ -214,13 +211,13 @@
                                 <tr>
                                     <td class="cell-id">{{ $user->id }}</td>
 
-                                    <td class="fw-semibold">
-                                        <i class="bi bi-person-circle me-1 text-muted"></i>
+                                    <td class="tw:font-semibold">
+                                        <i class="bi bi-person-circle me-1 tw:text-[rgba(33,37,41,0.75)]"></i>
                                         {{ $user->name }}
                                     </td>
 
                                     <td>
-                                        <i class="bi bi-envelope me-1 text-muted"></i>
+                                        <i class="bi bi-envelope me-1 tw:text-[rgba(33,37,41,0.75)]"></i>
                                         {{ $user->email }}
                                     </td>
 
@@ -231,19 +228,19 @@
                                                     <i class="bi bi-shield-lock"></i> {{ $role->name }}
                                                 </span>
                                             @empty
-                                                <span class="text-muted">—</span>
+                                                <span class="tw:text-[rgba(33,37,41,0.75)]">—</span>
                                             @endforelse
                                         </td>
                                     @endrole
 
                                     <td class="cell-actions">
-                                        <div class="d-flex gap-1 justify-content-center">
+                                        <div class="tw:flex tw:gap-1 tw:justify-center">
                                             @can('update', $user)
-                                                <a class="btn btn-outline-warning btn-icon"
+                                                <x-ui.button variant="outline-warning" size="none" class="btn-icon tw:text-[16px]/[24px] tw:font-normal"
                                                    href="{{ route('users.edit', $user) }}"
                                                    title="Edit">
                                                     <i class="bi bi-pencil"></i>
-                                                </a>
+                                                </x-ui.button>
                                             @endcan
 
                                             @can('delete', $user)
@@ -253,9 +250,9 @@
                                                       onsubmit="return confirm('Delete this user?');">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button class="btn btn-outline-danger btn-icon" title="Delete">
+                                                    <x-ui.button variant="outline-danger" type="submit" size="none" class="btn-icon tw:text-[16px]/[24px] tw:font-normal" title="Delete">
                                                         <i class="bi bi-trash"></i>
-                                                    </button>
+                                                    </x-ui.button>
                                                 </form>
                                             @endcan
                                         </div>
@@ -263,7 +260,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="@role('admin')5 @else 4 @endrole" class="text-center py-4 text-muted">
+                                    <td colspan="@role('admin')5 @else 4 @endrole" class="tw:text-center tw:py-6 tw:text-[rgba(33,37,41,0.75)]!">
                                         No users found.
                                     </td>
                                 </tr>
@@ -273,7 +270,7 @@
                 </div>
             </div>
 
-            <div class="px-3 py-3 d-flex justify-content-end">
+            <div class="tw:px-4 tw:py-4 tw:flex tw:justify-end">
                 {{ $users->links('pagination::bootstrap-5') }}
             </div>
         </div>

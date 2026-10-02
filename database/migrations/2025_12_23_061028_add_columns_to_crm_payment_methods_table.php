@@ -11,18 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('crm_payment_methods', function (Blueprint $table) {
-            // Thêm cột code, cho phép null trước để không lỗi dữ liệu cũ
-            $table->string('code', 50)->nullable()->after('method_name');
+        if (Schema::hasTable('crm_payment_methods')) {
+            Schema::table('crm_payment_methods', function (Blueprint $table) {
+                // Thêm cột code, cho phép null trước để không lỗi dữ liệu cũ
+                $table->string('code', 50)->nullable()->after('method_name');
 
-            // Thêm cột is_active, mặc định là true (đang hoạt động)
-            $table->boolean('is_active')->default(true)->after('method_name');
+                // Thêm cột is_active, mặc định là true (đang hoạt động)
+                $table->boolean('is_active')->default(true)->after('method_name');
 
-            // Nếu bảng cũ chưa có description thì thêm luôn
-            if (!Schema::hasColumn('crm_payment_methods', 'description')) {
-                $table->text('description')->nullable()->after('method_name');
-            }
-        });
+                // Nếu bảng cũ chưa có description thì thêm luôn
+                if (! Schema::hasColumn('crm_payment_methods', 'description')) {
+                    $table->text('description')->nullable()->after('method_name');
+                }
+            });
+        }
 
         // DATA MIGRATION: Cập nhật code cho các dòng dữ liệu cũ (nếu có)
         // Đây là bước quan trọng để đảm bảo tính toàn vẹn dữ liệu
@@ -36,9 +38,13 @@ return new class extends Migration
         }
 
         // Sau khi đã điền dữ liệu, ta sửa lại cột code thành UNIQUE và NOT NULL
-        Schema::table('crm_payment_methods', function (Blueprint $table) {
-            $table->string('code', 50)->nullable(false)->unique()->change();
-        });
+        if (Schema::hasTable('crm_payment_methods')) {
+            Schema::table('crm_payment_methods', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_payment_methods', 'code')) {
+                    $table->string('code', 50)->nullable(false)->unique()->change();
+                }
+            });
+        }
     }
 
     /**
@@ -46,8 +52,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('crm_payment_methods', function (Blueprint $table) {
-            $table->dropColumn(['code', 'is_active', 'description']);
-        });
+        if (Schema::hasTable('crm_payment_methods')) {
+            Schema::table('crm_payment_methods', function (Blueprint $table) {
+                $table->dropColumn(['code', 'is_active', 'description']);
+            });
+        }
     }
 };

@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class EgoSidebarStatus
 {
@@ -18,7 +17,7 @@ class EgoSidebarStatus
 
         if ($debug) {
             $data['debug'] = [
-                'users_has_last_seen_at' => Schema::hasTable('users') && Schema::hasColumn('users', 'last_seen_at'),
+                'users_has_last_seen_at' => SchemaCache::hasTable('users') && SchemaCache::hasColumn('users', 'last_seen_at'),
                 'attendance_detected' => self::detectAttendanceConfig(),
                 'employee_detected' => self::detectEmployeeConfig(),
                 'note' => 'working = số user đã check-in hôm nay: work_date hôm nay + check_in_at không rỗng',
@@ -31,7 +30,7 @@ class EgoSidebarStatus
     public static function onlineCount(): int
     {
         try {
-            if (! Schema::hasTable('users') || ! Schema::hasColumn('users', 'last_seen_at')) {
+            if (! SchemaCache::hasTable('users') || ! SchemaCache::hasColumn('users', 'last_seen_at')) {
                 return auth()->check() ? 1 : 0;
             }
 
@@ -49,11 +48,11 @@ class EgoSidebarStatus
                 ->whereNotNull('last_seen_at')
                 ->where('last_seen_at', '>=', now()->subMinutes(5));
 
-            if (Schema::hasColumn('users', 'is_active')) {
+            if (SchemaCache::hasColumn('users', 'is_active')) {
                 $query->where('is_active', 1);
             }
 
-            if (Schema::hasColumn('users', 'deleted_at')) {
+            if (SchemaCache::hasColumn('users', 'deleted_at')) {
                 $query->whereNull('deleted_at');
             }
 
@@ -63,6 +62,8 @@ class EgoSidebarStatus
             // ép tối thiểu = 1 để đúng thực tế có bạn đang online.
             return auth()->check() ? max($count, 1) : $count;
         } catch (\Throwable $e) {
+            ProbeFailureLog::warn('EgoSidebarStatus::onlineCount', $e);
+
             return auth()->check() ? 1 : 0;
         }
     }
@@ -145,12 +146,14 @@ class EgoSidebarStatus
                 }
             }
 
-            if (Schema::hasColumn($config['table'], 'deleted_at')) {
+            if (SchemaCache::hasColumn($config['table'], 'deleted_at')) {
                 $query->whereNull('deleted_at');
             }
 
             return (int) $query->count();
         } catch (\Throwable $e) {
+            ProbeFailureLog::warn('EgoSidebarStatus::employeesCount', $e);
+
             return 0;
         }
     }
@@ -197,7 +200,7 @@ class EgoSidebarStatus
             'type',
         ];
 
-        $table = collect($tables)->first(fn ($table) => Schema::hasTable($table));
+        $table = collect($tables)->first(fn ($table) => SchemaCache::hasTable($table));
 
         if (! $table) {
             return [
@@ -211,10 +214,10 @@ class EgoSidebarStatus
 
         return [
             'table' => $table,
-            'date_column' => collect($dateColumns)->first(fn ($col) => Schema::hasColumn($table, $col)),
-            'check_in_column' => collect($checkInColumns)->first(fn ($col) => Schema::hasColumn($table, $col)),
-            'person_column' => collect($personColumns)->first(fn ($col) => Schema::hasColumn($table, $col)),
-            'status_column' => collect($statusColumns)->first(fn ($col) => Schema::hasColumn($table, $col)),
+            'date_column' => collect($dateColumns)->first(fn ($col) => SchemaCache::hasColumn($table, $col)),
+            'check_in_column' => collect($checkInColumns)->first(fn ($col) => SchemaCache::hasColumn($table, $col)),
+            'person_column' => collect($personColumns)->first(fn ($col) => SchemaCache::hasColumn($table, $col)),
+            'status_column' => collect($statusColumns)->first(fn ($col) => SchemaCache::hasColumn($table, $col)),
         ];
     }
 
@@ -234,7 +237,7 @@ class EgoSidebarStatus
             'employee_status',
         ];
 
-        $table = collect($tables)->first(fn ($table) => Schema::hasTable($table));
+        $table = collect($tables)->first(fn ($table) => SchemaCache::hasTable($table));
 
         if (! $table) {
             return [
@@ -245,7 +248,7 @@ class EgoSidebarStatus
 
         return [
             'table' => $table,
-            'status_column' => collect($statusColumns)->first(fn ($col) => Schema::hasColumn($table, $col)),
+            'status_column' => collect($statusColumns)->first(fn ($col) => SchemaCache::hasColumn($table, $col)),
         ];
     }
 }

@@ -11,11 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('crm_serial_units', function (Blueprint $table) {
-            if (!Schema::hasColumn('crm_serial_units', 'deleted_at')) {
-                $table->softDeletes()->after('updated_at'); // tạo cột deleted_at
-            }
-        });
+        if (Schema::hasTable('crm_serial_units')) {
+            Schema::table('crm_serial_units', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_serial_units', 'deleted_at')) {
+                    $table->softDeletes()->after('updated_at'); // tạo cột deleted_at
+                }
+            });
+        }
     }
 
     /**
@@ -23,10 +25,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('crm_serial_units', function (Blueprint $table) {
-            if (Schema::hasColumn('crm_serial_units', 'deleted_at')) {
-                $table->dropSoftDeletes();
-            }
-        });
+        if (Schema::hasTable('crm_serial_units')) {
+            Schema::table('crm_serial_units', function (Blueprint $table) {
+                if (Schema::hasColumn('crm_serial_units', 'deleted_at')) {
+                    $table->dropSoftDeletes();
+                }
+            });
+        }
     }
 };

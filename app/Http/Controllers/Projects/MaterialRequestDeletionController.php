@@ -54,7 +54,7 @@ final class MaterialRequestDeletionController extends Controller
      *
      * @var list<string>
      */
-    private const ALLOWED_ROLES = ['admin', 'technical', 'ky_thuat'];
+    private const ALLOWED_ROLES = ['admin', 'technical'];
 
     public function __invoke(Request $request, int $materialRequest): RedirectResponse
     {

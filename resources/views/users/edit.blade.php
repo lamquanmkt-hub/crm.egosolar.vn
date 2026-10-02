@@ -1,13 +1,15 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="container">
+    {{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+         thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+         quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+    <div class="container tw:py-4">
         <h3>Edit User</h3>
         @if(session('error'))
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <x-ui.alert variant="danger" :dismissible="true">
                 {{ session('error') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
+            </x-ui.alert>
         @endif
         @include('users._form', [
             'action' => route('users.update', $user),

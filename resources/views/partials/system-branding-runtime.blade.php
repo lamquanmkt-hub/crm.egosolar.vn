@@ -1,92 +1,16 @@
-@php
-    $egoThemeDefaults = [
-        'brand_name' => 'EGO Solar CRM',
-        'brand_short_name' => 'EGO Solar',
-        'logo_light' => 'images/ego-logo.png',
-        'logo_sidebar' => 'logo/ego-solar-white.png',
-        'favicon' => '',
-        'primary_color' => '#12ABC6',
-        'secondary_color' => '#0D988C',
-        'sidebar_color' => '#06182A',
-        'topbar_color' => '#FFFFFF',
-        'page_background' => '#F4F8FB',
-        'card_radius' => '16',
-        'ui_density' => 'comfortable',
-    ];
 
-    try {
-        $egoTheme = \Illuminate\Support\Facades\Cache::remember(
-            'ego.system.branding.v2',
-            600,
-            function () use ($egoThemeDefaults): array {
-                if (! \Illuminate\Support\Facades\Schema::hasTable('ego_system_settings')) {
-                    return $egoThemeDefaults;
-                }
-
-                $stored = \Illuminate\Support\Facades\DB::table('ego_system_settings')
-                    ->whereIn('key', array_keys($egoThemeDefaults))
-                    ->pluck('value', 'key')
-                    ->map(fn ($value): string => (string) $value)
-                    ->all();
-
-                return array_merge($egoThemeDefaults, $stored);
-            }
-        );
-    } catch (\Throwable $egoThemeException) {
-        $egoTheme = $egoThemeDefaults;
-    }
-
-
-    /*
-     * Luôn bổ sung các giá trị mặc định để tránh lỗi 500
-     * khi cache thương hiệu cũ bị thiếu trường.
-     */
-    $egoTheme = array_merge(
-        $egoThemeDefaults,
-        is_array($egoTheme) ? $egoTheme : []
-    );
-    /* EGO_BRANDING_DEFAULT_GUARD_V3 */
-    $egoTheme = array_merge(
-        $egoThemeDefaults,
-        is_array($egoTheme ?? null) ? $egoTheme : []
-    );
-    $egoSafeHex = static function ($value, string $fallback): string {
-        $value = strtoupper(trim((string) $value));
-        return preg_match('/^#[0-9A-F]{6}$/', $value) ? $value : $fallback;
-    };
-
-    $egoTheme['primary_color'] = $egoSafeHex($egoTheme['primary_color'], '#12ABC6');
-    $egoTheme['secondary_color'] = $egoSafeHex($egoTheme['secondary_color'], '#0D988C');
-    $egoTheme['sidebar_color'] = $egoSafeHex($egoTheme['sidebar_color'], '#06182A');
-    $egoTheme['topbar_color'] = $egoSafeHex($egoTheme['topbar_color'], '#FFFFFF');
-    $egoTheme['page_background'] = $egoSafeHex($egoTheme['page_background'], '#F4F8FB');
-    $egoTheme['card_radius'] = (string) max(8, min(30, (int) $egoTheme['card_radius']));
-    $egoTheme['ui_density'] = in_array($egoTheme['ui_density'], ['comfortable', 'compact'], true)
-        ? $egoTheme['ui_density']
-        : 'comfortable';
-
-    $egoThemeRuntime = json_encode([
-        'brandName' => $egoTheme['brand_name'],
-        'brandShortName' => $egoTheme['brand_short_name'],
-        'logoLight' => asset($egoTheme['logo_light'] ?: 'images/ego-logo.png'),
-        'logoSidebar' => asset($egoTheme['logo_sidebar'] ?: 'logo/ego-solar-white.png'),
-        'density' => $egoTheme['ui_density'],
-        'sidebarColor' => $egoTheme['sidebar_color'],
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-@endphp
-
-@if(! empty($egoTheme['favicon']))
-    <link rel="icon" href="{{ asset($egoTheme['favicon']) }}">
+@if($branding->faviconUrl !== '')
+    <link rel="icon" href="{{ $branding->faviconUrl }}">
 @endif
 
 <style id="ego-system-branding-v2">
     :root {
-        --ego-brand-primary: {{ $egoTheme['primary_color'] }};
-        --ego-brand-secondary: {{ $egoTheme['secondary_color'] }};
-        --ego-theme-sidebar: {{ $egoTheme['sidebar_color'] }};
-        --ego-theme-topbar: {{ $egoTheme['topbar_color'] }};
-        --ego-theme-page: {{ $egoTheme['page_background'] }};
-        --ego-theme-radius: {{ (int) $egoTheme['card_radius'] }}px;
+        --ego-brand-primary: {{ $branding->primaryColor }};
+        --ego-brand-secondary: {{ $branding->secondaryColor }};
+        --ego-theme-sidebar: {{ $branding->sidebarColor }};
+        --ego-theme-topbar: {{ $branding->topbarColor }};
+        --ego-theme-page: {{ $branding->pageBackground }};
+        --ego-theme-radius: {{ $branding->cardRadius }}px;
         --bg: var(--ego-theme-page);
         --radius: var(--ego-theme-radius);
     }
@@ -141,12 +65,14 @@
     html body .cx-panel,
     html body .dashboard-card,
     html body .content-card,
-    html body .modal-content {
+    html body .modal-content,
+    html body [data-ego-card] {
         border-radius: var(--ego-theme-radius) !important;
     }
 
     html[data-ego-density="compact"] .card-body,
-    html[data-ego-density="compact"] .cx-card-body {
+    html[data-ego-density="compact"] .cx-card-body,
+    html[data-ego-density="compact"] [data-ego-card-body] {
         padding-top: .72rem !important;
         padding-bottom: .72rem !important;
     }
@@ -159,7 +85,7 @@
     }
 </style>
 
-<script id="ego-system-branding-data" type="application/json">{!! $egoThemeRuntime ?: '{}' !!}</script>
+<script id="ego-system-branding-data" type="application/json">{!! $branding->runtimeJson ?: '{}' !!}</script>
 <script>
     (() => {
         const applyEgoBranding = () => {

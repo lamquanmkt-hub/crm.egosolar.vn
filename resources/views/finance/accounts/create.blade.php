@@ -1,57 +1,57 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4">
-    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
-        <div class="card-body p-0">
-            <div class="p-4 text-white" style="background: linear-gradient(135deg, #0f172a, #1d4ed8);">
-                <h3 class="mb-1 fw-bold">{{ isset($account) ? 'Cập nhật tài khoản' : 'Tạo quỹ / tài khoản' }}</h3>
+<div class="container tw:py-6">
+    <x-ui.card class="border-0 shadow-lg rounded-4 overflow-hidden">
+        <x-ui.card-body class="tw:p-0">
+            <div class="tw:p-6 tw:text-[#ffffff]" style="background: linear-gradient(135deg, #0f172a, #1d4ed8);">
+                <h3 class="tw:mb-1 tw:font-bold">{{ isset($account) ? 'Cập nhật tài khoản' : 'Tạo quỹ / tài khoản' }}</h3>
                 <div class="opacity-75">Thiết lập quỹ tiền mặt, ngân hàng hoặc ví điện tử để quản lý số dư thật</div>
             </div>
 
-            <div class="p-4">
+            <div class="tw:p-6">
                 <form action="{{ isset($account) ? route('finance.accounts.update', $account) : route('finance.accounts.store') }}" method="POST">
                     @csrf
                     @if(isset($account))
                         @method('PUT')
                     @endif
 
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Tên tài khoản</label>
-                            <input type="text" name="name" class="form-control rounded-pill" value="{{ old('name', $account->name ?? '') }}" required>
+                    <div class="tw:row tw:g-3">
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Tên tài khoản</x-ui.label>
+                            <x-ui.input type="text" name="name" class="rounded-pill" value="{{ old('name', $account->name ?? '') }}" required />
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Mã tài khoản</label>
-                            <input type="text" name="code" class="form-control rounded-pill" value="{{ old('code', $account->code ?? '') }}">
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Mã tài khoản</x-ui.label>
+                            <x-ui.input type="text" name="code" class="rounded-pill" value="{{ old('code', $account->code ?? '') }}" />
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Loại</label>
-                            <select name="type" class="form-select rounded-pill" required>
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Loại</x-ui.label>
+                            <x-ui.select name="type" class="rounded-pill" required>
                                 <option value="cash" @selected(old('type', $account->type ?? '') == 'cash')>Tiền mặt</option>
                                 <option value="bank" @selected(old('type', $account->type ?? '') == 'bank')>Ngân hàng</option>
                                 <option value="ewallet" @selected(old('type', $account->type ?? '') == 'ewallet')>Ví điện tử</option>
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Số dư ban đầu</label>
-                            <input type="number" step="0.01" min="0" name="opening_balance" class="form-control rounded-pill"
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Số dư ban đầu</x-ui.label>
+                            <x-ui.input type="number" step="0.01" min="0" name="opening_balance" class="rounded-pill"
                                    value="{{ old('opening_balance', $account->opening_balance ?? 0) }}"
-                                   {{ isset($account) ? 'disabled' : '' }}>
+                                   :disabled="isset($account)" />
                             @if(isset($account))
-                                <small class="text-muted">Số dư đầu chỉ thiết lập khi tạo mới.</small>
+                                <small class="tw:text-[rgba(33,37,41,0.75)]">Số dư đầu chỉ thiết lập khi tạo mới.</small>
                             @endif
                         </div>
 
-                        <div class="col-12">
-                            <label class="form-label">Ghi chú</label>
-                            <textarea name="note" rows="4" class="form-control rounded-4">{{ old('note', $account->note ?? '') }}</textarea>
+                        <div class="tw:col12-12">
+                            <x-ui.label>Ghi chú</x-ui.label>
+                            <x-ui.input as="textarea" name="note" rows="4" class="rounded-4">{{ old('note', $account->note ?? '') }}</x-ui.input>
                         </div>
 
-                        <div class="col-12">
+                        <div class="tw:col12-12">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="is_active" value="1" id="is_active"
                                        @checked(old('is_active', $account->is_active ?? true))>
@@ -61,28 +61,28 @@
                             </div>
                         </div>
 
-                        <div class="col-12 d-flex gap-2">
-                            <button class="btn btn-primary rounded-pill px-4">
+                        <div class="tw:col12-12 tw:flex tw:gap-2">
+                            <x-ui.button variant="primary" type="submit" class="rounded-pill tw:px-6">
                                 {{ isset($account) ? 'Cập nhật' : 'Tạo tài khoản' }}
-                            </button>
-                            <a href="{{ route('finance.accounts.index') }}" class="btn btn-light rounded-pill px-4">
+                            </x-ui.button>
+                            <x-ui.button href="{{ route('finance.accounts.index') }}" variant="light" class="rounded-pill tw:px-6">
                                 Quay lại
-                            </a>
+                            </x-ui.button>
                         </div>
                     </div>
                 </form>
 
                 @if($errors->any())
-                    <div class="alert alert-danger mt-4 rounded-4">
-                        <ul class="mb-0 ps-3">
+                    <x-ui.alert variant="danger" class="tw:mt-6 tw:rounded-[1rem]">
+                        <ul class="tw:mb-0 ps-3">
                             @foreach($errors->all() as $error)
                                 <li>{{ $error }}</li>
                             @endforeach
                         </ul>
-                    </div>
+                    </x-ui.alert>
                 @endif
             </div>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 </div>
 @endsection

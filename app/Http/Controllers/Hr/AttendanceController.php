@@ -11,12 +11,13 @@ use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\Hr\AttendanceCorrectionAccessService;
 use App\Services\Hr\LeaveApprovalAccessService;
+use App\Support\SchemaCache;
+use App\View\Presenters\Hr\MyAttendancePresenter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -28,6 +29,10 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
  */
 class AttendanceController extends Controller
 {
+    public function __construct(
+        private readonly MyAttendancePresenter $myAttendancePresenter,
+    ) {}
+
     /**
      * Hiển thị bảng chấm công cá nhân theo tháng kèm bản ghi hôm nay.
      */
@@ -90,7 +95,7 @@ class AttendanceController extends Controller
             ? AttendanceCorrectionRequest::query()->where('status', 'pending')->count()
             : 0;
 
-        return view('hr.attendance.my', compact(
+        return view('hr.attendance.my', array_merge(compact(
             'records',
             'todayRecord',
             'month',
@@ -104,7 +109,7 @@ class AttendanceController extends Controller
             'canReviewCorrections',
             'myPendingCorrectionCount',
             'pendingCorrectionApprovalCount'
-        ));
+        ), $this->myAttendancePresenter->viewData($records)));
     }
 
     /**
@@ -112,6 +117,7 @@ class AttendanceController extends Controller
      */
     public function index(Request $request)
     {
+        $this->assertCanViewCompanyAttendance($request);
         $month = $request->input('month', now()->format('Y-m'));
         $userId = $request->input('user_id');
         $status = $request->input('status');
@@ -131,7 +137,7 @@ class AttendanceController extends Controller
             ->with(['department', 'position'])
             ->orderBy('name');
 
-        if (Schema::hasColumn('users', 'is_active')) {
+        if (SchemaCache::hasColumn('users', 'is_active')) {
             $employeesQuery->where('is_active', 1);
         }
 
@@ -180,7 +186,7 @@ class AttendanceController extends Controller
             ->withQueryString();
 
         $departments = collect();
-        if (class_exists(Department::class) && Schema::hasTable('departments')) {
+        if (class_exists(Department::class) && SchemaCache::hasTable('departments')) {
             $departments = Department::orderBy('name')->get();
         }
 
@@ -514,6 +520,7 @@ class AttendanceController extends Controller
      */
     public function exportExcel(Request $request)
     {
+        $this->assertCanViewCompanyAttendance($request);
         $month = $request->input('month', now()->format('Y-m'));
         $userId = $request->input('user_id');
         $status = $request->input('status');
@@ -533,7 +540,7 @@ class AttendanceController extends Controller
             ->with(['department', 'position'])
             ->orderBy('name');
 
-        if (Schema::hasColumn('users', 'is_active')) {
+        if (SchemaCache::hasColumn('users', 'is_active')) {
             $employeesQuery->where('is_active', 1);
         }
 
@@ -550,7 +557,7 @@ class AttendanceController extends Controller
 
         $holidays = collect();
 
-        if (Schema::hasTable('attendance_holidays')) {
+        if (SchemaCache::hasTable('attendance_holidays')) {
             $holidays = DB::table('attendance_holidays')
                 ->whereBetween('holiday_date', [$start->toDateString(), $end->toDateString()])
                 ->orderBy('holiday_date')
@@ -1038,6 +1045,7 @@ class AttendanceController extends Controller
      */
     public function exportPdf(Request $request)
     {
+        $this->assertCanViewCompanyAttendance($request);
         $month = $request->input('month', now()->format('Y-m'));
         $userId = $request->input('user_id');
         $status = $request->input('status');
@@ -1056,7 +1064,7 @@ class AttendanceController extends Controller
             ->with(['department', 'position'])
             ->orderBy('name');
 
-        if (Schema::hasColumn('users', 'is_active')) {
+        if (SchemaCache::hasColumn('users', 'is_active')) {
             $employeesQuery->where('is_active', 1);
         }
 
@@ -1099,5 +1107,26 @@ class AttendanceController extends Controller
         ))->setPaper('a4', 'landscape');
 
         return $pdf->download('bang-cong-'.$month.'.pdf');
+    }
+
+    /**
+     * Chỉ nhóm quản trị/HR/kế toán/BGĐ được xem bảng công toàn công ty và xuất file.
+     * Nhân viên các phòng ban dùng myAttendance().
+     */
+    private function assertCanViewCompanyAttendance(Request $request): void
+    {
+        $user = $request->user();
+
+        abort_unless($user, 403);
+
+        $canManageAll = app(LeaveApprovalAccessService::class)->canManageAll($user);
+        $hasManagementRole = method_exists($user, 'hasAnyRole')
+            && $user->hasAnyRole(['admin', 'management', 'hr', 'accounting']);
+
+        abort_unless(
+            $canManageAll || $hasManagementRole,
+            403,
+            'Bạn chỉ được xem chấm công cá nhân. Bảng công toàn công ty dành cho HR/Kế toán/Ban Giám đốc.'
+        );
     }
 }

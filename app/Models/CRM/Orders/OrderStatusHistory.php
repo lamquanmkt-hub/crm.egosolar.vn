@@ -2,6 +2,7 @@
 
 namespace App\Models\CRM\Orders;
 
+use App\Enums\OrderDepartment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -55,14 +56,6 @@ class OrderStatusHistory extends Model
 
     public function getDepartmentName(): string
     {
-        return match ($this->to_department) {
-            'sales' => 'Sales',
-            'ketoan' => 'Kế toán',
-            'duyet1' => 'Duyệt cấp 1',
-            'duyet2' => 'Giám đốc',
-            'kho' => 'Kho',
-            'completed' => 'Hoàn tất',
-            default => $this->to_department,
-        };
+        return OrderDepartment::fromLegacy((string) $this->to_department)?->label() ?? (string) $this->to_department;
     }
 }

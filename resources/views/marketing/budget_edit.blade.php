@@ -1,61 +1,61 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid px-4 mt-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+<div class="container-fluid tw:px-6 tw:mt-4">
+    <div class="tw:flex tw:justify-between tw:items-center tw:mb-4">
         <div>
-            <h4 class="fw-bold mb-0">Sửa ngân sách</h4>
-            <small class="text-muted">Marketing / Ngân sách</small>
+            <h4 class="tw:font-bold tw:mb-0">Sửa ngân sách</h4>
+            <small class="tw:text-[rgba(33,37,41,0.75)]">Marketing / Ngân sách</small>
         </div>
 
-        <div class="d-flex gap-2">
+        <div class="tw:flex tw:gap-2">
             @hasanyrole('marketing_manager|admin')
             <form method="POST" action="{{ route('marketing.budget.clone_next', $row->id) }}" class="d-inline">
                 @csrf
-                <button class="btn btn-outline-primary">+ Tạo dòng tháng sau</button>
+                <x-ui.button variant="outline-primary" type="submit">+ Tạo dòng tháng sau</x-ui.button>
             </form>
             @endhasanyrole
 
-            <a href="{{ route('marketing.budget') }}" class="btn btn-outline-secondary">Quay lại</a>
+            <x-ui.button href="{{ route('marketing.budget') }}" variant="outline-secondary">Quay lại</x-ui.button>
         </div>
     </div>
 
     @if (session('success'))
-        <div class="alert alert-success py-2">{{ session('success') }}</div>
+        <x-ui.alert variant="success" class="tw:py-2">{{ session('success') }}</x-ui.alert>
     @endif
 
     @if ($errors->any())
-        <div class="alert alert-danger">
-            <div class="fw-semibold mb-1">Có lỗi dữ liệu:</div>
-            <ul class="mb-0">
+        <x-ui.alert variant="danger">
+            <div class="tw:font-semibold tw:mb-1">Có lỗi dữ liệu:</div>
+            <ul class="tw:mb-0">
                 @foreach($errors->all() as $e)
                     <li>{{ $e }}</li>
                 @endforeach
             </ul>
-        </div>
+        </x-ui.alert>
     @endif
 
-    <div class="card border-0 shadow-sm">
-        <div class="card-body">
-            <form method="POST" action="{{ route('marketing.budget.update', $row->id) }}" class="row g-2">
+    <x-ui.card class="border-0 shadow-sm">
+        <x-ui.card-body>
+            <form method="POST" action="{{ route('marketing.budget.update', $row->id) }}" class="tw:row tw:g-2">
                 @csrf
                 @method('PUT')
 
-                <div class="col-md-2">
-                    <label class="form-label small text-muted">Tháng</label>
-                    <input type="month" name="month" class="form-control" required
-                           value="{{ old('month', optional($row->month)->format('Y-m')) }}">
+                <div class="tw:md:col12-2">
+                    <x-ui.label class="small tw:text-[rgba(33,37,41,0.75)]">Tháng</x-ui.label>
+                    <x-ui.input type="month" name="month" required
+                           value="{{ old('month', optional($row->month)->format('Y-m')) }}" />
                 </div>
 
-                <div class="col-md-2">
-                    <label class="form-label small text-muted">Kênh</label>
-                    <input type="text" name="platform" class="form-control" required
-                           value="{{ old('platform', $row->platform) }}">
+                <div class="tw:md:col12-2">
+                    <x-ui.label class="small tw:text-[rgba(33,37,41,0.75)]">Kênh</x-ui.label>
+                    <x-ui.input type="text" name="platform" required
+                           value="{{ old('platform', $row->platform) }}" />
                 </div>
 
-                <div class="col-md-3">
-                    <label class="form-label small text-muted">Chiến dịch</label>
-                    <select name="campaign_id" class="form-select" required>
+                <div class="tw:md:col12-3">
+                    <x-ui.label class="small tw:text-[rgba(33,37,41,0.75)]">Chiến dịch</x-ui.label>
+                    <x-ui.select name="campaign_id" required>
                         <option value="">-- Chọn chiến dịch --</option>
                         @foreach($campaigns as $c)
                             <option value="{{ $c->id }}"
@@ -63,32 +63,31 @@
                                 {{ $c->name }}
                             </option>
                         @endforeach
-                    </select>
+                    </x-ui.select>
                 </div>
 
-                <div class="col-md-2">
-                    <label class="form-label small text-muted">Ngân sách (đ)</label>
-                    <input type="number" name="budget" class="form-control" min="0" required
-                           value="{{ old('budget', $row->budget) }}">
+                <div class="tw:md:col12-2">
+                    <x-ui.label class="small tw:text-[rgba(33,37,41,0.75)]">Ngân sách (đ)</x-ui.label>
+                    <x-ui.input type="number" name="budget" min="0" required
+                           value="{{ old('budget', $row->budget) }}" />
                 </div>
 
-                <div class="col-md-2">
-                    <label class="form-label small text-muted">Đã chi (đ)</label>
-                    <input type="number" name="actual_spent" class="form-control" min="0"
-                           value="{{ old('actual_spent', $row->actual_spent) }}">
+                <div class="tw:md:col12-2">
+                    <x-ui.label class="small tw:text-[rgba(33,37,41,0.75)]">Đã chi (đ)</x-ui.label>
+                    <x-ui.input type="number" name="actual_spent" min="0"
+                           value="{{ old('actual_spent', $row->actual_spent) }}" />
                 </div>
 
-                <div class="col-md-1 d-flex align-items-end">
-                    <button class="btn btn-success w-100">Lưu</button>
+                <div class="tw:md:col12-1 tw:flex tw:items-end">
+                    <x-ui.button variant="success" type="submit" class="tw:w-full">Lưu</x-ui.button>
                 </div>
 
-                <div class="col-12">
-                    <label class="form-label small text-muted">Ghi chú</label>
-                    <input type="text" name="note" class="form-control"
-                           value="{{ old('note', $row->note) }}">
+                <div class="tw:col12-12">
+                    <x-ui.label class="small tw:text-[rgba(33,37,41,0.75)]">Ghi chú</x-ui.label>
+                    <x-ui.input type="text" name="note" value="{{ old('note', $row->note) }}" />
                 </div>
             </form>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 </div>
 @endsection

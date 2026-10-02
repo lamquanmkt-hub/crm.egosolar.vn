@@ -9,26 +9,27 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-   public function up(): void
-{
-    Schema::create('content_calendars', function (Blueprint $table) {
-        $table->id();
+    public function up(): void
+    {
+        if (! Schema::hasTable('content_calendars')) {
+            Schema::create('content_calendars', function (Blueprint $table) {
+                $table->id();
 
-        $table->date('publish_date');
-        $table->string('platform');
-        $table->string('content_type');
-        $table->string('title');
-        $table->text('description')->nullable();
+                $table->date('publish_date');
+                $table->string('platform');
+                $table->string('content_type');
+                $table->string('title');
+                $table->text('description')->nullable();
 
-        $table->unsignedBigInteger('campaign_id')->nullable();
-        $table->unsignedBigInteger('created_by');
+                $table->unsignedBigInteger('campaign_id')->nullable();
+                $table->unsignedBigInteger('created_by');
 
-        $table->string('status')->default('draft');
+                $table->string('status')->default('draft');
 
-        $table->timestamps();
-    });
-}
-
+                $table->timestamps();
+            });
+        }
+    }
 
     /**
      * Reverse the migrations.

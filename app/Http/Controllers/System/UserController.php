@@ -8,9 +8,9 @@ use App\Http\Requests\UserUpdateRequest;
 use App\Models\Media;
 use App\Models\User;
 use App\Services\UserService;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -197,7 +197,7 @@ class UserController extends Controller
         $file = $request->file('avatar');
         $path = $file->store('avatars', 'public');
 
-        if (Schema::hasColumn('users', 'avatar_id') && class_exists(Media::class)) {
+        if (SchemaCache::hasColumn('users', 'avatar_id') && class_exists(Media::class)) {
             try {
                 if ($user->avatar && is_object($user->avatar) && ! empty($user->avatar->file_path)) {
                     Storage::disk('public')->delete($user->avatar->file_path);
@@ -220,7 +220,7 @@ class UserController extends Controller
             return back()->with('success', 'Cập nhật avatar thành công.');
         }
 
-        if (Schema::hasColumn('users', 'avatar')) {
+        if (SchemaCache::hasColumn('users', 'avatar')) {
             if (! empty($user->avatar) && is_string($user->avatar)) {
                 Storage::disk('public')->delete($user->avatar);
             }

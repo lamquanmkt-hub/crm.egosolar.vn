@@ -9,21 +9,25 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-  public function up(): void
-{
-    Schema::table('content_calendars', function (Blueprint $table) {
-        if (!Schema::hasColumn('content_calendars', 'link')) {
-            $table->string('link', 255)->nullable()->after('description');
+    public function up(): void
+    {
+        if (Schema::hasTable('content_calendars')) {
+            Schema::table('content_calendars', function (Blueprint $table) {
+                if (! Schema::hasColumn('content_calendars', 'link')) {
+                    $table->string('link', 255)->nullable()->after('description');
+                }
+            });
         }
-    });
-}
+    }
 
-public function down(): void
-{
-    Schema::table('content_calendars', function (Blueprint $table) {
-        if (Schema::hasColumn('content_calendars', 'link')) {
-            $table->dropColumn('link');
+    public function down(): void
+    {
+        if (Schema::hasTable('content_calendars')) {
+            Schema::table('content_calendars', function (Blueprint $table) {
+                if (Schema::hasColumn('content_calendars', 'link')) {
+                    $table->dropColumn('link');
+                }
+            });
         }
-    });
-}
+    }
 };

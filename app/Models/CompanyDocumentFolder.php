@@ -3,10 +3,20 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CompanyDocumentFolder extends Model
 {
-    protected $fillable = ['department', 'parent_id', 'name', 'created_by'];
+    use SoftDeletes;
+
+    protected $fillable = [
+        'department',
+        'parent_id',
+        'name',
+        'description',
+        'created_by',
+        'updated_by',
+    ];
 
     public function parent()
     {
@@ -21,5 +31,20 @@ class CompanyDocumentFolder extends Model
     public function files()
     {
         return $this->hasMany(CompanyDocumentFile::class, 'folder_id')->latest();
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function activities()
+    {
+        return $this->hasMany(CompanyDocumentActivity::class, 'folder_id')->latest();
     }
 }

@@ -4,10 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('product_goods_receipts')) {
+        if (! Schema::hasTable('product_goods_receipts')) {
             Schema::create('product_goods_receipts', function (Blueprint $table) {
                 $table->id();
                 $table->string('code', 60)->unique();
@@ -45,7 +46,7 @@ return new class extends Migration {
             });
         }
 
-        if (!Schema::hasTable('product_goods_receipt_items')) {
+        if (! Schema::hasTable('product_goods_receipt_items')) {
             Schema::create('product_goods_receipt_items', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('receipt_id');

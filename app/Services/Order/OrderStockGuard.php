@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Order;
 
+use App\Support\SchemaCache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Kiểm tra tồn kho trước khi xuất hàng cho đơn.
@@ -31,7 +31,7 @@ class OrderStockGuard
      */
     public function assertOrderStockAvailable(int $orderId, bool $lockRows = false): void
     {
-        if (! Schema::hasTable('crm_orders') || ! Schema::hasTable('crm_order_items')) {
+        if (! SchemaCache::hasTable('crm_orders') || ! SchemaCache::hasTable('crm_order_items')) {
             return;
         }
 
@@ -40,7 +40,7 @@ class OrderStockGuard
             return;
         }
 
-        $itemColumns = Schema::getColumnListing('crm_order_items');
+        $itemColumns = SchemaCache::columns('crm_order_items');
         $hasItemWarehouse = in_array('warehouse_id', $itemColumns, true);
 
         $itemsQuery = DB::table('crm_order_items')
@@ -120,7 +120,7 @@ class OrderStockGuard
      */
     public function currentWarehouseStock(int $productId, int $warehouseId, bool $lockRows = false): int
     {
-        if (Schema::hasTable('crm_product_stock')) {
+        if (SchemaCache::hasTable('crm_product_stock')) {
             $query = DB::table('crm_product_stock')
                 ->where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId);
@@ -132,7 +132,7 @@ class OrderStockGuard
             return max(0, (int) $query->sum('qty'));
         }
 
-        if (Schema::hasTable('crm_product_stock_lots')) {
+        if (SchemaCache::hasTable('crm_product_stock_lots')) {
             $query = DB::table('crm_product_stock_lots')
                 ->where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId);
@@ -144,7 +144,7 @@ class OrderStockGuard
             return max(0, (int) $query->sum('qty_remaining'));
         }
 
-        if (Schema::hasTable('crm_product_catalog') && Schema::hasColumn('crm_product_catalog', 'quantity')) {
+        if (SchemaCache::hasTable('crm_product_catalog') && SchemaCache::hasColumn('crm_product_catalog', 'quantity')) {
             return max(0, (int) DB::table('crm_product_catalog')->where('id', $productId)->value('quantity'));
         }
 
@@ -158,7 +158,7 @@ class OrderStockGuard
      */
     public function stockByProductForWarehouse(int $warehouseId): array
     {
-        if (Schema::hasTable('crm_product_stock')) {
+        if (SchemaCache::hasTable('crm_product_stock')) {
             return DB::table('crm_product_stock')
                 ->where('warehouse_id', $warehouseId)
                 ->selectRaw('product_id, COALESCE(SUM(qty), 0) as stock_qty')
@@ -168,7 +168,7 @@ class OrderStockGuard
                 ->all();
         }
 
-        if (Schema::hasTable('crm_product_stock_lots')) {
+        if (SchemaCache::hasTable('crm_product_stock_lots')) {
             return DB::table('crm_product_stock_lots')
                 ->where('warehouse_id', $warehouseId)
                 ->selectRaw('product_id, COALESCE(SUM(qty_remaining), 0) as stock_qty')
@@ -186,7 +186,7 @@ class OrderStockGuard
      */
     private function productLabel(int $productId): string
     {
-        if (! Schema::hasTable('crm_product_catalog')) {
+        if (! SchemaCache::hasTable('crm_product_catalog')) {
             return 'Sản phẩm #'.$productId;
         }
 
@@ -210,7 +210,7 @@ class OrderStockGuard
      */
     private function warehouseLabel(int $warehouseId): string
     {
-        if (! Schema::hasTable('crm_warehouses')) {
+        if (! SchemaCache::hasTable('crm_warehouses')) {
             return 'Kho #'.$warehouseId;
         }
 

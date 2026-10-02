@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Hr;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceHoliday;
 use App\Models\AttendanceSetting;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller cài đặt chấm công: giờ làm việc, ngày làm việc trong tuần và ngày nghỉ lễ.
@@ -181,7 +181,7 @@ class AttendanceSettingController extends Controller
      */
     private function safeSet(AttendanceSetting $setting, string $column, mixed $value): void
     {
-        if (Schema::hasColumn($setting->getTable(), $column)) {
+        if (SchemaCache::hasColumn($setting->getTable(), $column)) {
             $setting->{$column} = $value;
         }
     }

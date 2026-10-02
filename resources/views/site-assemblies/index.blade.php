@@ -230,13 +230,8 @@
         align-items:center;
     }
 
-    .alert{
-        border-radius:12px;
-        font-weight:800;
-        padding:9px 12px;
-        margin-bottom:10px;
-        font-size:13px;
-    }
+    /* Luật .alert ĐÃ XOÁ: mọi hộp đã sang component x-ui.alert, giá trị chép vào
+       lớp Tailwind của từng nơi gọi. Giá trị cũ: .alert{ border-radius:12px; font-weight:800; padding:9px 12px; margin-bottom:10px; font-size:13px; } */
 
     #saMaterials{
         margin-top:2px;
@@ -295,9 +290,9 @@
         <div class="sa-sub">Xuất vật tư lắp ráp, sau đó nhập thành phẩm vào kho theo công ty và công trình.</div>
     </div>
 
-    @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
-    @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
-    @if($errors->any())<div class="alert alert-danger">{{ $errors->first() }}</div>@endif
+    @if(session('success'))<x-ui.alert variant="success" class="tw:rounded-[12px] tw:font-extrabold tw:py-[9px] tw:px-[12px] tw:mb-[10px] tw:text-[13px]">{{ session('success') }}</x-ui.alert>@endif
+    @if(session('error'))<x-ui.alert variant="danger" class="tw:rounded-[12px] tw:font-extrabold tw:py-[9px] tw:px-[12px] tw:mb-[10px] tw:text-[13px]">{{ session('error') }}</x-ui.alert>@endif
+    @if($errors->any())<x-ui.alert variant="danger" class="tw:rounded-[12px] tw:font-extrabold tw:py-[9px] tw:px-[12px] tw:mb-[10px] tw:text-[13px]">{{ $errors->first() }}</x-ui.alert>@endif
 
     <div class="sa-grid">
         <div class="sa-stat"><b>{{ number_format($stats['total'] ?? 0) }}</b><span>Tổng phiếu</span></div>

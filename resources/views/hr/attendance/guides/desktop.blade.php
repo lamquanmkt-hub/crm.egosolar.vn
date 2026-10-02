@@ -147,9 +147,9 @@
                 <p>Áp dụng cho Chrome, Edge, Cốc Cốc trên laptop hoặc máy bàn.</p>
             </div>
 
-            <a href="{{ route('hr.attendance.my') }}" class="btn btn-light btn-pill">
+            <x-ui.button href="{{ route('hr.attendance.my') }}" variant="light" size="none" class="btn-pill tw:leading-[1.5]">
                 <i class="bi bi-arrow-left"></i> Quay lại chấm công
-            </a>
+            </x-ui.button>
         </div>
 
         <div class="guide-card">
@@ -161,7 +161,7 @@
                         Đăng nhập CRM, vào mục <b>Nhân sự → Chấm công của tôi</b>.
                     </div>
                     <div class="guide-img">
-                        <i class="bi bi-display fs-1 d-block mb-2"></i>
+                        <i class="bi bi-display fs-1 tw:block tw:mb-2"></i>
                         Ảnh minh họa: trang chấm công trên máy tính.
                     </div>
                 </div>
@@ -176,7 +176,7 @@
                         Máy tính thường lấy vị trí theo Wi-Fi hoặc mạng đang sử dụng.
                     </div>
                     <div class="guide-img">
-                        <i class="bi bi-geo-alt fs-1 d-block mb-2"></i>
+                        <i class="bi bi-geo-alt fs-1 tw:block tw:mb-2"></i>
                         Ảnh minh họa: popup xin quyền vị trí trên Chrome/Edge.
                     </div>
                 </div>
@@ -193,7 +193,7 @@
                         đổi thành <b>Allow / Cho phép</b>.
                     </div>
                     <div class="guide-img">
-                        <i class="bi bi-shield-check fs-1 d-block mb-2"></i>
+                        <i class="bi bi-shield-check fs-1 tw:block tw:mb-2"></i>
                         Ảnh minh họa: cài đặt quyền vị trí trên máy tính.
                     </div>
                 </div>
@@ -208,7 +208,7 @@
                         sau đó bấm chấm công lại.
                     </div>
                     <div class="guide-img">
-                        <i class="bi bi-arrow-clockwise fs-1 d-block mb-2"></i>
+                        <i class="bi bi-arrow-clockwise fs-1 tw:block tw:mb-2"></i>
                         Ảnh minh họa: tải lại trang sau khi bật quyền vị trí.
                     </div>
                 </div>

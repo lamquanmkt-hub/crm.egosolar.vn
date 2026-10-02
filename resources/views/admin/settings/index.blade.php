@@ -7,29 +7,6 @@
 @endpush
 
 @section('content')
-@php
-    $selectedRoleId = optional($selectedRole)->id;
-    $sectionRoutes = [
-        'overview' => 'admin.settings.index',
-        'appearance' => 'admin.settings.appearance',
-        'workspace' => 'admin.settings.workspace',
-        'roles' => 'admin.settings.roles',
-        'pages' => 'admin.settings.pages',
-        'menus' => 'admin.settings.menus',
-        'actions' => 'admin.settings.actions',
-        'audit' => 'admin.settings.audit',
-    ];
-    $sectionMeta = [
-        'overview' => ['Tổng quan', 'bi-grid-1x2'],
-        'appearance' => ['Giao diện & thương hiệu', 'bi-palette'],
-        'workspace' => ['Ứng dụng theo vai trò', 'bi-grid-3x3-gap'],
-        'roles' => ['Vai trò & nhân sự', 'bi-people'],
-        'pages' => ['Phân quyền trang', 'bi-window-stack'],
-        'menus' => ['Phân quyền menu', 'bi-layout-sidebar-inset'],
-        'actions' => ['Quyền thao tác', 'bi-shield-check'],
-        'audit' => ['Nhật ký thay đổi', 'bi-clock-history'],
-    ];
-@endphp
 
 <div class="ego-settings-shell">
     <header class="ego-settings-hero">
@@ -64,7 +41,9 @@
             <div class="ego-settings-nav-title">CẤU HÌNH HỆ THỐNG</div>
             <nav class="ego-settings-nav">
                 @foreach($sectionMeta as $key => [$label, $icon])
-                    <a href="{{ route($sectionRoutes[$key], $selectedRoleId ? ['role' => $selectedRoleId] : []) }}"
+                    <a href="{{ $selectedRoleId && isset($sectionRoutesWithRole[$key])
+                        ? route($sectionRoutesWithRole[$key], ['role' => $selectedRoleId])
+                        : route($sectionRoutes[$key], $selectedRoleId ? ['role' => $selectedRoleId] : []) }}"
                        class="{{ $section === $key ? 'active' : '' }}">
                         <i class="bi {{ $icon }}"></i>
                         <span>{{ $label }}</span>
@@ -103,17 +82,17 @@
                         <div><h3>Vai trò & nhân sự</h3><p>Tạo role, sao chép role và gán đúng vai trò cho từng tài khoản.</p></div>
                         <i class="bi bi-arrow-up-right"></i>
                     </a>
-                    <a href="{{ route('admin.settings.pages', $selectedRoleId ? ['role' => $selectedRoleId] : []) }}" class="ego-settings-overview-card">
+                    <a href="{{ $selectedRoleId ? route('admin.settings.roles.pages.show', ['role' => $selectedRoleId]) : route('admin.settings.pages') }}" class="ego-settings-overview-card">
                         <div class="ego-settings-overview-icon"><i class="bi bi-window-stack"></i></div>
                         <div><h3>Phân quyền trang</h3><p>Không có quyền thì truy cập URL trực tiếp sẽ bị chặn 403.</p></div>
                         <i class="bi bi-arrow-up-right"></i>
                     </a>
-                    <a href="{{ route('admin.settings.menus', $selectedRoleId ? ['role' => $selectedRoleId] : []) }}" class="ego-settings-overview-card">
+                    <a href="{{ $selectedRoleId ? route('admin.settings.roles.menus.show', ['role' => $selectedRoleId]) : route('admin.settings.menus') }}" class="ego-settings-overview-card">
                         <div class="ego-settings-overview-icon"><i class="bi bi-layout-sidebar-inset"></i></div>
                         <div><h3>Phân quyền menu</h3><p>Chọn chính xác mục nào xuất hiện trên sidebar của từng role.</p></div>
                         <i class="bi bi-arrow-up-right"></i>
                     </a>
-                    <a href="{{ route('admin.settings.actions', $selectedRoleId ? ['role' => $selectedRoleId] : []) }}" class="ego-settings-overview-card">
+                    <a href="{{ $selectedRoleId ? route('admin.settings.roles.actions.show', ['role' => $selectedRoleId]) : route('admin.settings.actions') }}" class="ego-settings-overview-card">
                         <div class="ego-settings-overview-icon"><i class="bi bi-shield-check"></i></div>
                         <div><h3>Quyền thao tác</h3><p>Phân quyền tạo, sửa, xóa, duyệt và xuất dữ liệu theo nghiệp vụ.</p></div>
                         <i class="bi bi-arrow-up-right"></i>
@@ -211,21 +190,6 @@
                 </div>
 
             @elseif(in_array($section, ['pages', 'menus', 'actions'], true))
-                @php
-                    $permissionSection = $section;
-                    $isPageSection = $section === 'pages';
-                    $isMenuSection = $section === 'menus';
-                    $sectionTitle = $isPageSection ? 'Phân quyền trang' : ($isMenuSection ? 'Phân quyền menu' : 'Quyền thao tác nghiệp vụ');
-                    $sectionDescription = $isPageSection
-                        ? 'Bỏ quyền tại đây sẽ chặn truy cập URL trực tiếp bằng middleware backend.'
-                        : ($isMenuSection
-                            ? 'Chỉ quyết định mục nào xuất hiện trên sidebar; không thay thế quyền trang.'
-                            : 'Kiểm soát tạo, sửa, xóa, duyệt, xuất dữ liệu và các thao tác chuyên môn.');
-                    $saveRoute = $isPageSection
-                        ? 'admin.settings.roles.pages'
-                        : ($isMenuSection ? 'admin.settings.roles.menus' : 'admin.settings.roles.actions');
-                    $selectedNames = $isPageSection ? $selectedPageNames : ($isMenuSection ? $selectedMenuNames : $selectedBusinessNames);
-                @endphp
 
                 <section class="ego-settings-section-head">
                     <div>
@@ -240,7 +204,7 @@
                         <div class="ego-settings-card-title">Chọn vai trò</div>
                         <div class="ego-settings-role-list">
                             @foreach($roles as $role)
-                                <a href="{{ route($sectionRoutes[$section], ['role' => $role->id]) }}" class="{{ optional($selectedRole)->id === $role->id ? 'active' : '' }}">
+                                <a href="{{ route($sectionRoutesWithRole[$section] ?? $sectionRoutes[$section], ['role' => $role->id]) }}" class="{{ optional($selectedRole)->id === $role->id ? 'active' : '' }}">
                                     <div><strong>{{ $role->ui_name }}</strong><small>{{ $role->name }}</small></div>
                                     <span>{{ $role->users_count }}</span>
                                 </a>
@@ -249,7 +213,7 @@
                     </aside>
 
                     <section class="ego-settings-card">
-                        <div class="ego-settings-card-head ego-settings-card-head--sticky">
+                        <div class="ego-settings-card-head">
                             <div>
                                 <span>ĐANG CẤU HÌNH</span>
                                 <h3>{{ optional($selectedRole)->ui_name }}</h3>
@@ -264,6 +228,21 @@
                         @if($selectedRole)
                             <form method="POST" action="{{ route($saveRoute, $selectedRole) }}" data-permission-form>
                                 @csrf @method('PUT')
+
+                                {{--
+                                    Vai trò admin luôn có đủ quyền nên mọi ô tick bị khoá.
+                                    Trước đây màn hình không nói gì, nên người dùng bấm mãi
+                                    không thấy đổi và tưởng chức năng hỏng. Nói thẳng ra.
+                                --}}
+                                @if($selectedRole->name === 'admin')
+                                    <div class="ego-settings-explain ego-settings-explain--locked">
+                                        <i class="bi bi-lock-fill"></i>
+                                        <div>
+                                            <strong>Vai trò Quản trị viên được khoá</strong>
+                                            <span>Admin luôn có toàn bộ quyền nên các ô ở đây chỉ để xem, bấm không đổi được và nút Lưu không thay đổi gì. Muốn chỉnh quyền thì chọn một vai trò khác ở cột bên trái.</span>
+                                        </div>
+                                    </div>
+                                @endif
 
                                 @if($isPageSection)
                                     <div class="ego-settings-explain ego-settings-explain--page"><i class="bi bi-shield-lock"></i><div><strong>Lớp bảo mật backend</strong><span>Khi lưu, role này tự bật kiểm soát trang. Người dùng nhập URL không được cấp sẽ nhận lỗi 403.</span></div></div>
@@ -297,6 +276,61 @@
                                     </div>
                                 @else
                                     <div class="ego-settings-explain"><i class="bi bi-lightning-charge"></i><div><strong>Quyền thao tác</strong><span>Quyền này không tự hiển thị menu và không tự mở trang. Nó chỉ cho phép hành động bên trong module.</span></div></div>
+
+                                    {{-- Ma trận CRUD: mỗi trang một hàng, 4 cột Xem/Thêm/Sửa/Xoá --}}
+                                    <div class="ego-crud-matrix-wrap">
+                                        <table class="ego-crud-matrix">
+                                            <thead>
+                                                <tr>
+                                                    <th class="ego-crud-matrix__module">Trang / Module</th>
+                                                    @foreach($actionColumns as $column)
+                                                        <th class="ego-crud-matrix__action{{ $column['destructive'] ? ' is-destructive' : '' }}">
+                                                            <i class="bi {{ $column['icon'] }}"></i>
+                                                            <span>{{ $column['label'] }}</span>
+                                                            <button type="button" class="ego-crud-matrix__toggle" data-crud-column="{{ $column['action'] }}" title="Chọn/bỏ cả cột">tất cả</button>
+                                                        </th>
+                                                    @endforeach
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($matrixRows as $module)
+                                                    <tr data-permission-item data-search="{{ $module->searchText }}">
+                                                        <th scope="row" class="ego-crud-matrix__module">
+                                                            <i class="bi {{ $module->icon }}"></i>
+                                                            <span><strong>{{ $module->label }}</strong><code>{{ $module->key }}.*</code></span>
+                                                            <button type="button" class="ego-crud-matrix__toggle" data-crud-row="{{ $module->key }}" title="Chọn/bỏ cả hàng">tất cả</button>
+                                                        </th>
+                                                        @foreach($module->cells as $cell)
+                                                            <td class="ego-crud-matrix__action{{ $cell->destructive ? ' is-destructive' : '' }}">
+                                                                @if($cell->available)
+                                                                    <label title="{{ $cell->description }}">
+                                                                        <input type="checkbox"
+                                                                               name="permissions[]"
+                                                                               value="{{ $cell->permissionName }}"
+                                                                               data-crud-cell
+                                                                               data-crud-cell-row="{{ $module->key }}"
+                                                                               data-crud-cell-column="{{ $cell->action }}"
+                                                                               @checked($cell->checked)
+                                                                               @disabled($cell->locked)>
+                                                                        @if($cell->locked)
+                                                                            <input type="hidden" name="permissions[]" value="{{ $cell->permissionName }}">
+                                                                        @endif
+                                                                        <span class="ego-crud-matrix__box"></span>
+                                                                    </label>
+                                                                @else
+                                                                    <span class="ego-crud-matrix__na" title="Trang này không có thao tác {{ strtolower($cell->actionLabel) }}">—</span>
+                                                                @endif
+                                                            </td>
+                                                        @endforeach
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    @if(count($businessGroups))
+                                        <div class="ego-settings-explain"><i class="bi bi-diagram-3"></i><div><strong>Quyền nghiệp vụ chuyên biệt</strong><span>Những thao tác mà Xem/Thêm/Sửa/Xoá không diễn tả được: duyệt đơn, chốt công nợ, phân công kỹ thuật, xuất kho...</span></div></div>
+                                    @endif
                                     <div class="ego-settings-action-groups">
                                         @foreach($businessGroups as $group)
                                             <details class="ego-settings-action-group" open data-permission-item data-search="{{ strtolower($group['label']) }}">
@@ -364,7 +398,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <form class="modal-content ego-settings-modal" method="POST" action="{{ route('admin.settings.roles.store') }}">
             @csrf
-            <div class="modal-header"><div><span>NEW ROLE</span><h5>Tạo vai trò mới</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><div><span>NEW ROLE</span><h5>Tạo vai trò mới</h5></div><x-ui.close-button in="modal" type="button" data-bs-dismiss="modal" /></div>
             <div class="modal-body">
                 <label><span>Tên hiển thị</span><input name="display_name" required placeholder="Ví dụ: Chăm sóc khách hàng"></label>
                 <label><span>Mã role</span><input name="name" placeholder="Tự tạo nếu để trống"></label>

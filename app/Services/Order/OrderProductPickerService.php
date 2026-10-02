@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Order;
 
 use App\Contracts\Services\PricingServiceInterface;
+use App\Support\SchemaCache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Truy vấn dữ liệu cho form đơn hàng (product picker): catalog sản phẩm,
@@ -38,19 +38,14 @@ class OrderProductPickerService
             return collect();
         }
 
-        $warehouseQuery = DB::table('crm_warehouses as w')
+        $warehouses = DB::table('crm_warehouses as w')
             ->join('company_warehouse as cw', 'cw.warehouse_id', '=', 'w.id')
-            ->where('cw.company_id', $companyId);
+            ->where('cw.company_id', $companyId)
+            ->orderBy('w.name')
+            ->select('w.id', 'w.name')
+            ->get();
 
-        if (Schema::hasColumn('crm_warehouses', 'is_sales_selectable')) {
-            $warehouseQuery->where(function ($builder) {
-                $builder->where('w.is_sales_selectable', 1)->orWhereNull('w.is_sales_selectable');
-            });
-        } else {
-            $warehouseQuery->where('w.name', 'not like', '[KÝ GỬI]%');
-        }
-
-        return $warehouseQuery->orderBy('w.name')->select('w.id', 'w.name')->get();
+        return $warehouses;
     }
 
     /**
@@ -66,11 +61,11 @@ class OrderProductPickerService
     public function productCatalog(string $term, int $productId, int $limit): Collection
     {
 
-        if (! Schema::hasTable('crm_product_catalog')) {
+        if (! SchemaCache::hasTable('crm_product_catalog')) {
             return collect();
         }
 
-        $columns = Schema::getColumnListing('crm_product_catalog');
+        $columns = SchemaCache::columns('crm_product_catalog');
         $has = static fn (string $column): bool => in_array($column, $columns, true);
 
         $selects = ['p.id'];
@@ -93,10 +88,10 @@ class OrderProductPickerService
                 : DB::raw('NULL as '.$column);
         }
 
-        $brandJoin = Schema::hasTable('crm_brands')
+        $brandJoin = SchemaCache::hasTable('crm_brands')
             && $has('brand_id')
-            && Schema::hasColumn('crm_brands', 'id')
-            && Schema::hasColumn('crm_brands', 'name');
+            && SchemaCache::hasColumn('crm_brands', 'id')
+            && SchemaCache::hasColumn('crm_brands', 'name');
 
         $selects[] = $brandJoin
             ? 'b.name as brand_name'
@@ -153,8 +148,8 @@ class OrderProductPickerService
         $tierPrices = [];
         $tierVats = [];
 
-        if ($productIds !== [] && Schema::hasTable('crm_product_prices')) {
-            $priceColumns = Schema::getColumnListing('crm_product_prices');
+        if ($productIds !== [] && SchemaCache::hasTable('crm_product_prices')) {
+            $priceColumns = SchemaCache::columns('crm_product_prices');
 
             if (
                 in_array('product_id', $priceColumns, true)
@@ -190,25 +185,12 @@ class OrderProductPickerService
         }
 
         $stockTotals = [];
-        if ($productIds !== [] && Schema::hasTable('crm_product_stock')) {
-            $stockQuery = DB::table('crm_product_stock as stock')
-                ->whereIn('stock.product_id', $productIds);
-
-            if (Schema::hasTable('crm_warehouses')) {
-                $stockQuery->join('crm_warehouses as warehouse', 'warehouse.id', '=', 'stock.warehouse_id');
-                if (Schema::hasColumn('crm_warehouses', 'is_sales_selectable')) {
-                    $stockQuery->where(function ($builder) {
-                        $builder->where('warehouse.is_sales_selectable', 1)->orWhereNull('warehouse.is_sales_selectable');
-                    });
-                } else {
-                    $stockQuery->where('warehouse.name', 'not like', '[KÝ GỬI]%');
-                }
-            }
-
-            $stockTotals = $stockQuery
-                ->selectRaw('stock.product_id, COALESCE(SUM(stock.qty), 0) as available_qty')
-                ->groupBy('stock.product_id')
-                ->pluck('available_qty', 'stock.product_id')
+        if ($productIds !== [] && SchemaCache::hasTable('crm_product_stock')) {
+            $stockTotals = DB::table('crm_product_stock')
+                ->whereIn('product_id', $productIds)
+                ->selectRaw('product_id, COALESCE(SUM(qty), 0) as available_qty')
+                ->groupBy('product_id')
+                ->pluck('available_qty', 'product_id')
                 ->map(fn ($qty) => max(0, (int) $qty))
                 ->all();
         }
@@ -218,9 +200,9 @@ class OrderProductPickerService
 
         if (
             $productIds !== []
-            && Schema::hasTable('crm_serial_unit_states')
-            && Schema::hasTable('crm_serial_units')
-            && Schema::hasColumn('crm_serial_unit_states', 'state')
+            && SchemaCache::hasTable('crm_serial_unit_states')
+            && SchemaCache::hasTable('crm_serial_units')
+            && SchemaCache::hasColumn('crm_serial_unit_states', 'state')
         ) {
             $serialRows = DB::table('crm_serial_unit_states as state')
                 ->join('crm_serial_units as unit', 'unit.id', '=', 'state.serial_unit_id')
@@ -307,13 +289,13 @@ class OrderProductPickerService
     {
 
         if (
-            ! Schema::hasTable('crm_product_catalog')
-            || ! Schema::hasTable('crm_warehouses')
+            ! SchemaCache::hasTable('crm_product_catalog')
+            || ! SchemaCache::hasTable('crm_warehouses')
         ) {
             return ['warehouses' => []];
         }
 
-        $productColumns = Schema::getColumnListing('crm_product_catalog');
+        $productColumns = SchemaCache::columns('crm_product_catalog');
         $product = DB::table('crm_product_catalog')
             ->where('id', $productId)
             ->select([
@@ -327,7 +309,7 @@ class OrderProductPickerService
         if (! $product) {
             return null;
         }
-        $warehouseColumns = Schema::getColumnListing('crm_warehouses');
+        $warehouseColumns = SchemaCache::columns('crm_warehouses');
         $hasWarehouseColumn = static fn (string $column): bool => in_array($column, $warehouseColumns, true);
 
         $warehouseQuery = DB::table('crm_warehouses as warehouse')
@@ -342,13 +324,6 @@ class OrderProductPickerService
                     : DB::raw('NULL as company_id'),
             ]);
 
-        if ($hasWarehouseColumn('is_sales_selectable')) {
-            $warehouseQuery->where(function ($builder) {
-                $builder->where('warehouse.is_sales_selectable', 1)->orWhereNull('warehouse.is_sales_selectable');
-            });
-        } else {
-            $warehouseQuery->where('warehouse.name', 'not like', '[KÝ GỬI]%');
-        }
         if ($hasWarehouseColumn('is_active')) {
             $warehouseQuery->where(function ($builder) {
                 $builder->where('warehouse.is_active', 1)->orWhereNull('warehouse.is_active');
@@ -363,7 +338,7 @@ class OrderProductPickerService
                     $builder->where('warehouse.company_id', $companyId);
                 }
 
-                if (Schema::hasTable('company_warehouse')) {
+                if (SchemaCache::hasTable('company_warehouse')) {
                     $method = $hasDirectCompany ? 'orWhereExists' : 'whereExists';
                     $builder->{$method}(function ($subQuery) use ($companyId) {
                         $subQuery->selectRaw('1')
@@ -379,7 +354,7 @@ class OrderProductPickerService
         $warehouseIds = $warehouses->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         $pivotCompanies = [];
-        if ($warehouseIds !== [] && Schema::hasTable('company_warehouse')) {
+        if ($warehouseIds !== [] && SchemaCache::hasTable('company_warehouse')) {
             $pivotCompanies = DB::table('company_warehouse')
                 ->whereIn('warehouse_id', $warehouseIds)
                 ->orderBy('company_id')
@@ -392,12 +367,12 @@ class OrderProductPickerService
             return (int) ($warehouse->company_id ?? $pivotCompanies[(int) $warehouse->id] ?? 0);
         })->filter()->unique()->values()->all();
 
-        $companyNames = Schema::hasTable('companies') && $resolvedCompanyIds !== []
+        $companyNames = SchemaCache::hasTable('companies') && $resolvedCompanyIds !== []
             ? DB::table('companies')->whereIn('id', $resolvedCompanyIds)->pluck('name', 'id')->all()
             : [];
 
         $stockByWarehouse = [];
-        if ($warehouseIds !== [] && Schema::hasTable('crm_product_stock')) {
+        if ($warehouseIds !== [] && SchemaCache::hasTable('crm_product_stock')) {
             $stockByWarehouse = DB::table('crm_product_stock')
                 ->where('product_id', $productId)
                 ->whereIn('warehouse_id', $warehouseIds)
@@ -406,7 +381,7 @@ class OrderProductPickerService
                 ->pluck('total', 'warehouse_id')
                 ->map(fn ($qty) => max(0, (int) $qty))
                 ->all();
-        } elseif ($warehouseIds !== [] && Schema::hasTable('crm_product_stock_lots')) {
+        } elseif ($warehouseIds !== [] && SchemaCache::hasTable('crm_product_stock_lots')) {
             $stockByWarehouse = DB::table('crm_product_stock_lots')
                 ->where('product_id', $productId)
                 ->whereIn('warehouse_id', $warehouseIds)
@@ -422,9 +397,9 @@ class OrderProductPickerService
 
         if (
             $warehouseIds !== []
-            && Schema::hasTable('crm_serial_unit_states')
-            && Schema::hasTable('crm_serial_units')
-            && Schema::hasColumn('crm_serial_unit_states', 'state')
+            && SchemaCache::hasTable('crm_serial_unit_states')
+            && SchemaCache::hasTable('crm_serial_units')
+            && SchemaCache::hasColumn('crm_serial_unit_states', 'state')
         ) {
             $serialRows = DB::table('crm_serial_unit_states as state')
                 ->join('crm_serial_units as unit', 'unit.id', '=', 'state.serial_unit_id')
@@ -498,7 +473,7 @@ class OrderProductPickerService
     public function productPrice(int $productId, ?int $priceTierId, ?int $customerTypeId): array
     {
 
-        if (! Schema::hasTable('crm_product_catalog')) {
+        if (! SchemaCache::hasTable('crm_product_catalog')) {
             return [
                 'price' => 0,
                 'vat_percent' => 0,
@@ -506,7 +481,7 @@ class OrderProductPickerService
             ];
         }
 
-        $columns = Schema::getColumnListing('crm_product_catalog');
+        $columns = SchemaCache::columns('crm_product_catalog');
         $has = fn (string $col): bool => in_array($col, $columns, true);
 
         $selects = ['id'];
@@ -540,8 +515,8 @@ class OrderProductPickerService
         $beforeVat = 0.0;
         $afterVat = 0.0;
 
-        if ($priceTierId && Schema::hasTable('crm_product_prices')) {
-            $priceCols = Schema::getColumnListing('crm_product_prices');
+        if ($priceTierId && SchemaCache::hasTable('crm_product_prices')) {
+            $priceCols = SchemaCache::columns('crm_product_prices');
 
             if (
                 in_array('product_id', $priceCols, true)
@@ -600,11 +575,11 @@ class OrderProductPickerService
     public function productsForWarehouseSelect(int $warehouseId, string $term, int $limit): array
     {
 
-        if (! Schema::hasTable('crm_product_catalog')) {
+        if (! SchemaCache::hasTable('crm_product_catalog')) {
             return [];
         }
 
-        $productColumns = Schema::getColumnListing('crm_product_catalog');
+        $productColumns = SchemaCache::columns('crm_product_catalog');
         $hasProductColumn = function (string $column) use ($productColumns): bool {
             return in_array($column, $productColumns, true);
         };
@@ -616,10 +591,10 @@ class OrderProductPickerService
                 : DB::raw('NULL as '.$column);
         }
 
-        $hasBrandJoin = Schema::hasTable('crm_brands')
+        $hasBrandJoin = SchemaCache::hasTable('crm_brands')
             && $hasProductColumn('brand_id')
-            && Schema::hasColumn('crm_brands', 'id')
-            && Schema::hasColumn('crm_brands', 'name');
+            && SchemaCache::hasColumn('crm_brands', 'id')
+            && SchemaCache::hasColumn('crm_brands', 'name');
 
         if ($hasBrandJoin) {
             $selects[] = 'b.name as brand_name';
@@ -672,8 +647,8 @@ class OrderProductPickerService
 
         $tierPricesMap = [];
         $tierVatMap = [];
-        if (! empty($productIds) && Schema::hasTable('crm_product_prices')) {
-            $priceTableColumns = Schema::getColumnListing('crm_product_prices');
+        if (! empty($productIds) && SchemaCache::hasTable('crm_product_prices')) {
+            $priceTableColumns = SchemaCache::columns('crm_product_prices');
 
             if (in_array('product_id', $priceTableColumns, true)
                 && in_array('price_tier_id', $priceTableColumns, true)

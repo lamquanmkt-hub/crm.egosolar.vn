@@ -11,12 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-	    // Thêm cột giá đại lý, giá bán lẻ, quantity vào sản phẩm
-	    Schema::table('crm_product_catalog', function (Blueprint $table) {
-		    $table->decimal('price_agent', 15, 2)->default(0)->after('price');
-		    $table->decimal('price_retail', 15, 2)->default(0)->after('price_agent');
-		    $table->integer('quantity')->default(0)->after('price_retail');
-	    });
+        // Thêm cột giá đại lý, giá bán lẻ, quantity vào sản phẩm
+        if (Schema::hasTable('crm_product_catalog')) {
+            Schema::table('crm_product_catalog', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_product_catalog', 'price_agent')) {
+                    $table->decimal('price_agent', 15, 2)->default(0)->after('price');
+                }
+                if (! Schema::hasColumn('crm_product_catalog', 'price_retail')) {
+                    $table->decimal('price_retail', 15, 2)->default(0)->after('price_agent');
+                }
+                if (! Schema::hasColumn('crm_product_catalog', 'quantity')) {
+                    $table->integer('quantity')->default(0)->after('price_retail');
+                }
+            });
+        }
     }
 
     /**
@@ -24,8 +32,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-	    Schema::table('crm_product_catalog', function (Blueprint $table) {
-		    $table->dropColumn(['price_agent', 'price_retail', 'quantity']);
-	    });
+        if (Schema::hasTable('crm_product_catalog')) {
+            Schema::table('crm_product_catalog', function (Blueprint $table) {
+                $table->dropColumn(['price_agent', 'price_retail', 'quantity']);
+            });
+        }
     }
 };

@@ -91,10 +91,13 @@
   $isPrivileged = auth()->user()->hasAnyRole(['admin','marketing_manager']);
 @endphp
 
-<div class="container-fluid kpi-shell">
+{{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+     thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+     quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+<div class="container-fluid kpi-shell tw:py-4">
   <div class="kpi-hero position-relative">
     <div class="kpi-hero-inner">
-      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <div class="tw:flex flex-wrap tw:items-center tw:gap-2 tw:mb-2">
         <span class="pill">Marketing</span>
         <span class="pill">KPI & Lương</span>
         <span class="pill">Kỳ: {{ $period }}</span>
@@ -103,7 +106,7 @@
         @endif
       </div>
 
-      <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
+      <div class="tw:flex flex-column flex-lg-row tw:items-start align-items-lg-center tw:justify-between tw:gap-4">
         <div>
           <div style="font-size: 30px; font-weight: 900; letter-spacing:-.03em;">KPI & Lương</div>
           <div class="muted" style="max-width: 880px;">
@@ -113,8 +116,8 @@
 
         <form method="GET" action="{{ route('marketing.kpi-payroll.index') }}" class="monthbox">
           <span class="muted" style="font-size: 13px;">Chọn kỳ</span>
-          <input type="month" name="period" value="{{ $period }}" class="form-control form-42" style="min-width: 190px;">
-          <button class="btn btn-primary btn-round" style="height:42px;">Xem</button>
+          <x-ui.input type="month" name="period" value="{{ $period }}" class="form-42" style="min-width: 190px;" />
+          <x-ui.button variant="primary" type="submit" class="btn-round" style="height:42px;">Xem</x-ui.button>
         </form>
       </div>
 
@@ -124,21 +127,21 @@
         </div>
 
         @if($isPrivileged)
-          <a class="btn btn-outline-primary btn-round" style="height:42px; display:inline-flex; align-items:center; gap:8px;"
+          <x-ui.button variant="outline-primary" class="btn-round" style="height:42px; display:inline-flex; align-items:center; gap:8px;"
              href="{{ route('marketing.kpi-payroll.my', ['period' => $period, 'user_id' => 'all']) }}">
             📊 Tổng hợp tất cả
-          </a>
+          </x-ui.button>
         @endif
       </div>
     </div>
   </div>
 
-  <div class="kpi-grid mt-3">
+  <div class="kpi-grid tw:mt-4">
     <div class="cardx">
       <a href="{{ route('marketing.kpi-payroll.my', ['period' => $period]) }}">
-        <div class="d-flex align-items-start justify-content-between gap-3">
+        <div class="tw:flex tw:items-start tw:justify-between tw:gap-4">
           <div>
-            <div class="icon mb-2">👤</div>
+            <div class="icon tw:mb-2">👤</div>
             <div style="font-weight: 900; font-size: 18px;">Lương & KPI của tôi</div>
             <div class="muted">Xem lương cơ bản, quỹ KPI và target theo tháng.</div>
           </div>
@@ -154,9 +157,9 @@
     @if($isPrivileged)
     <div class="cardx">
       <a href="{{ route('marketing.kpi-payroll.settings', ['period' => $period]) }}">
-        <div class="d-flex align-items-start justify-content-between gap-3">
+        <div class="tw:flex tw:items-start tw:justify-between tw:gap-4">
           <div>
-            <div class="icon mb-2">🛠️</div>
+            <div class="icon tw:mb-2">🛠️</div>
             <div style="font-weight: 900; font-size: 18px;">Thiết lập KPI & Lương</div>
             <div class="muted">Nhập lương cơ bản, quỹ KPI và target cho từng nhân viên.</div>
           </div>

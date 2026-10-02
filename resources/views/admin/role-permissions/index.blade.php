@@ -843,7 +843,7 @@
     }
 </style>
 
-<div class="container-fluid py-3 rp-shell">
+<div class="container-fluid tw:py-4 rp-shell">
     @if(session('success'))
         <div class="rp-alert rp-alert-success"><i class="bi bi-check-circle me-1"></i>{{ session('success') }}</div>
     @endif
@@ -855,7 +855,7 @@
     @endif
 
     <section class="rp-hero">
-        <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap position-relative" style="z-index:1">
+        <div class="tw:flex tw:items-start tw:justify-between tw:gap-4 flex-wrap position-relative" style="z-index:1">
             <div>
                 <div class="rp-eyebrow">Cài đặt hệ thống</div>
                 <h1 class="rp-title">Vai trò &amp; Phân quyền</h1>
@@ -896,7 +896,7 @@
                                 <span class="rp-pill">{{ $role->users_count }} nhân sự</span>
                             </div>
                             <div class="rp-role-code">{{ $role->name }} · {{ $role->permissions->count() }} quyền</div>
-                            <div class="mt-2 d-flex gap-1 flex-wrap">
+                            <div class="tw:mt-2 tw:flex tw:gap-1 flex-wrap">
                                 @if($role->is_system ?? false)<span class="rp-pill rp-pill-system">Hệ thống</span>@endif
                                 <span class="rp-pill {{ ($role->page_access_enabled ?? false) ? 'rp-pill-on' : 'rp-pill-off' }}">{{ ($role->page_access_enabled ?? false) ? 'Đang kiểm soát trang' : 'Chế độ tương thích' }}</span>
                             </div>
@@ -907,13 +907,13 @@
 
             <main>
                 @if($selectedRole)
-                    <section class="rp-card mb-3">
+                    <section class="rp-card tw:mb-4">
                         <div class="rp-card-head">
                             <div>
                                 <div class="rp-card-title">Thông tin vai trò</div>
-                                <div class="text-muted" style="font-size:11px">Role ID #{{ $selectedRole->id }}</div>
+                                <div class="tw:text-[rgba(33,37,41,0.75)]" style="font-size:11px">Role ID #{{ $selectedRole->id }}</div>
                             </div>
-                            <div class="d-flex gap-2 flex-wrap">
+                            <div class="tw:flex tw:gap-2 flex-wrap">
                                 <form method="POST" action="{{ route('admin.role-permissions.roles.clone', $selectedRole) }}">
                                     @csrf
                                     <button class="rp-btn rp-btn-soft" type="submit"><i class="bi bi-copy"></i> Sao chép</button>
@@ -939,14 +939,14 @@
                                         <input class="rp-input" name="name" value="{{ old('name', $selectedRole->name) }}" {{ ($selectedRole->is_system ?? false) ? 'readonly' : '' }} required>
                                     </div>
                                 </div>
-                                <div class="rp-field mt-3">
+                                <div class="rp-field tw:mt-4">
                                     <label>Mô tả</label>
                                     <textarea class="rp-textarea" name="description" placeholder="Mô tả trách nhiệm và phạm vi sử dụng role...">{{ old('description', $selectedRole->description) }}</textarea>
                                 </div>
                                 @if($selectedRole->is_system ?? false)
-                                    <div class="rp-note mt-3"><i class="bi bi-lock me-1"></i>Mã role hệ thống được khóa vì route hiện tại đang tham chiếu trực tiếp tên <strong>{{ $selectedRole->name }}</strong>.</div>
+                                    <div class="rp-note tw:mt-4"><i class="bi bi-lock me-1"></i>Mã role hệ thống được khóa vì route hiện tại đang tham chiếu trực tiếp tên <strong>{{ $selectedRole->name }}</strong>.</div>
                                 @endif
-                                <div class="text-end mt-3"><button class="rp-btn rp-btn-dark" type="submit"><i class="bi bi-save"></i> Lưu thông tin</button></div>
+                                <div class="tw:text-right tw:mt-4"><button class="rp-btn rp-btn-dark" type="submit"><i class="bi bi-save"></i> Lưu thông tin</button></div>
                             </form>
                         </div>
                     </section>
@@ -955,7 +955,7 @@
                         <div class="rp-card-head">
                             <div>
                                 <div class="rp-card-title">Ma trận quyền: {{ $selectedRole->ui_name }}</div>
-                                <div class="text-muted" style="font-size:11px">Chọn quyền truy cập trang trước, sau đó chọn các quyền thao tác chi tiết.</div>
+                                <div class="tw:text-[rgba(33,37,41,0.75)]" style="font-size:11px">Chọn quyền truy cập trang trước, sau đó chọn các quyền thao tác chi tiết.</div>
                             </div>
                             <span class="rp-pill"><span id="selectedPermissionCount">{{ count($selectedPermissionNames) }}</span> quyền đã chọn</span>
                         </div>
@@ -1021,7 +1021,7 @@
             <div class="rp-card-head">
                 <div>
                     <div class="rp-card-title">Gán vai trò cho nhân viên</div>
-                    <div class="text-muted" style="font-size:11px">Mỗi tài khoản có thể có nhiều role. Quyền riêng được cộng thêm ngoài quyền từ role.</div>
+                    <div class="tw:text-[rgba(33,37,41,0.75)]" style="font-size:11px">Mỗi tài khoản có thể có nhiều role. Quyền riêng được cộng thêm ngoài quyền từ role.</div>
                 </div>
                 <div class="rp-search" style="max-width:330px"><i class="bi bi-search"></i><input class="rp-input" id="userSearch" placeholder="Tìm tên hoặc email..."></div>
             </div>
@@ -1042,27 +1042,27 @@
                         <div class="rp-user-content">
                             <form method="POST" action="{{ route('admin.role-permissions.users.roles', $user) }}">
                                 @csrf @method('PUT')
-                                <div class="rp-card-title mb-2">Vai trò được gán</div>
+                                <div class="rp-card-title tw:mb-2">Vai trò được gán</div>
                                 <div class="rp-check-grid">
                                     @foreach($roles as $role)
                                         <label class="rp-check"><input type="checkbox" name="roles[]" value="{{ $role->id }}" @checked($user->roles->contains('id', $role->id))><span>{{ $role->ui_name }}</span></label>
                                     @endforeach
                                 </div>
-                                <div class="text-end mt-3"><button class="rp-btn rp-btn-primary" type="submit"><i class="bi bi-save"></i> Lưu role</button></div>
+                                <div class="tw:text-right tw:mt-4"><button class="rp-btn rp-btn-primary" type="submit"><i class="bi bi-save"></i> Lưu role</button></div>
                             </form>
 
                             <hr class="my-4">
 
                             <form method="POST" action="{{ route('admin.role-permissions.users.permissions', $user) }}">
                                 @csrf @method('PUT')
-                                <div class="rp-card-title mb-1">Quyền riêng của nhân viên</div>
-                                <div class="text-muted mb-2" style="font-size:11px">Giữ Ctrl/Command để chọn nhiều quyền. Chỉ dùng khi cần ngoại lệ so với role chung.</div>
+                                <div class="rp-card-title tw:mb-1">Quyền riêng của nhân viên</div>
+                                <div class="tw:text-[rgba(33,37,41,0.75)] tw:mb-2" style="font-size:11px">Giữ Ctrl/Command để chọn nhiều quyền. Chỉ dùng khi cần ngoại lệ so với role chung.</div>
                                 <select class="rp-select" name="permissions[]" multiple size="9">
                                     @foreach($permissions as $permission)
                                         <option value="{{ $permission->name }}" @selected($user->permissions->contains('name', $permission->name))>{{ $permission->name }}</option>
                                     @endforeach
                                 </select>
-                                <div class="text-end mt-3"><button class="rp-btn rp-btn-soft" type="submit"><i class="bi bi-person-check"></i> Lưu quyền riêng</button></div>
+                                <div class="tw:text-right tw:mt-4"><button class="rp-btn rp-btn-soft" type="submit"><i class="bi bi-person-check"></i> Lưu quyền riêng</button></div>
                             </form>
                         </div>
                     </details>
@@ -1071,7 +1071,7 @@
         </section>
     @else
         <section class="rp-card">
-            <div class="rp-card-head"><div><div class="rp-card-title">Nhật ký thay đổi phân quyền</div><div class="text-muted" style="font-size:11px">Lưu người thao tác, đối tượng và dữ liệu trước/sau.</div></div></div>
+            <div class="rp-card-head"><div><div class="rp-card-title">Nhật ký thay đổi phân quyền</div><div class="tw:text-[rgba(33,37,41,0.75)]" style="font-size:11px">Lưu người thao tác, đối tượng và dữ liệu trước/sau.</div></div></div>
             <div style="overflow:auto">
                 <table class="rp-audit-table">
                     <thead><tr><th>Thời gian</th><th>Người thao tác</th><th>Hành động</th><th>Đối tượng</th><th>IP</th></tr></thead>
@@ -1081,7 +1081,7 @@
                             <td>{{ optional($audit->created_at)->format('d/m/Y H:i:s') }}</td>
                             <td>{{ optional($audit->actor)->name ?: 'Hệ thống' }}</td>
                             <td><span class="rp-pill">{{ $audit->action }}</span></td>
-                            <td><strong>{{ $audit->subject_name ?: $audit->subject_type }}</strong><div class="text-muted">#{{ $audit->subject_id }}</div></td>
+                            <td><strong>{{ $audit->subject_name ?: $audit->subject_type }}</strong><div class="tw:text-[rgba(33,37,41,0.75)]">#{{ $audit->subject_id }}</div></td>
                             <td>{{ $audit->ip_address }}</td>
                         </tr>
                     @empty
@@ -1098,12 +1098,12 @@
     <div class="modal-dialog modal-dialog-centered">
         <form class="modal-content" method="POST" action="{{ route('admin.role-permissions.roles.store') }}" style="border:0;border-radius:18px;overflow:hidden">
             @csrf
-            <div class="modal-header" style="background:#f3fbfe;border-bottom-color:#dcecf3"><div><h5 class="modal-title fw-bold">Tạo vai trò mới</h5><div class="text-muted" style="font-size:12px">Role mới mặc định bật kiểm soát trang và có quyền Dashboard.</div></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body p-4">
+            <div class="modal-header" style="background:#f3fbfe;border-bottom-color:#dcecf3"><div><h5 class="modal-title tw:font-bold">Tạo vai trò mới</h5><div class="tw:text-[rgba(33,37,41,0.75)]" style="font-size:12px">Role mới mặc định bật kiểm soát trang và có quyền Dashboard.</div></div><x-ui.close-button in="modal" type="button" data-bs-dismiss="modal" /></div>
+            <div class="modal-body tw:p-6">
                 <div class="rp-field"><label>Tên vai trò</label><input class="rp-input" name="display_name" placeholder="Ví dụ: Trưởng phòng kinh doanh" required></div>
-                <div class="rp-field mt-3"><label>Mã role (không bắt buộc)</label><input class="rp-input" name="name" placeholder="sales_director"></div>
-                <div class="rp-field mt-3"><label>Mô tả</label><textarea class="rp-textarea" name="description" placeholder="Phạm vi trách nhiệm..."></textarea></div>
-                <div class="rp-field mt-3"><label>Sao chép quyền từ role</label><select class="rp-select" name="clone_from"><option value="">Không sao chép</option>@foreach($roles as $role)<option value="{{ $role->id }}">{{ $role->ui_name }} ({{ $role->name }})</option>@endforeach</select></div>
+                <div class="rp-field tw:mt-4"><label>Mã role (không bắt buộc)</label><input class="rp-input" name="name" placeholder="sales_director"></div>
+                <div class="rp-field tw:mt-4"><label>Mô tả</label><textarea class="rp-textarea" name="description" placeholder="Phạm vi trách nhiệm..."></textarea></div>
+                <div class="rp-field tw:mt-4"><label>Sao chép quyền từ role</label><select class="rp-select" name="clone_from"><option value="">Không sao chép</option>@foreach($roles as $role)<option value="{{ $role->id }}">{{ $role->ui_name }} ({{ $role->name }})</option>@endforeach</select></div>
             </div>
             <div class="modal-footer" style="border-top-color:#e5edf2"><button type="button" class="rp-btn rp-btn-soft" data-bs-dismiss="modal">Hủy</button><button class="rp-btn rp-btn-primary" type="submit"><i class="bi bi-plus-circle"></i> Tạo vai trò</button></div>
         </form>

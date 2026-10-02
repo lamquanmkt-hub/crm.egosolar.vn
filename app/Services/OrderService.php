@@ -152,9 +152,7 @@ class OrderService implements OrderServiceInterface
                 'payments',
                 'creator',
                 'currentStatusType',
-            ])
-            // Khóa cứng danh sách Đơn hàng về Công ty Quốc Tế EGO.
-            ->where('crm_orders.company_id', 2);
+            ]);
 
         if (
             $user
@@ -207,17 +205,6 @@ class OrderService implements OrderServiceInterface
             $query->whereIn('current_department', $statusMap[$status] ?? [$status]);
         }
 
-        if (! empty($filters['warehouse_id'])) {
-            $warehouseId = (int) $filters['warehouse_id'];
-
-            $query->where(function ($warehouseQuery) use ($warehouseId) {
-                $warehouseQuery
-                    ->where('crm_orders.warehouse_id', $warehouseId)
-                    ->orWhereHas('items', function ($itemQuery) use ($warehouseId) {
-                        $itemQuery->where('warehouse_id', $warehouseId);
-                    });
-            });
-        }
         if (! empty($filters['company_id'])) {
             $companyId = (int) $filters['company_id'];
 
@@ -477,7 +464,7 @@ class OrderService implements OrderServiceInterface
             $order = $this->orderRepo->find($id);
             OrderValidator::canSubmit($order);
 
-            $this->approvalHandler->transitionToDepartment($order, OrderDepartment::SALES_MANAGER, OrderDepartment::SALES->statusCode());
+            $this->approvalHandler->transitionToDepartment($order, OrderDepartment::SALES_MANAGER);
             $this->approvalHandler->createApprovalRecord($order, OrderDepartment::SALES_MANAGER->value);
             $this->recordStatusHistory($order, OrderDepartment::SALES->value, OrderDepartment::SALES_MANAGER->value, 'Sales gửi đơn chờ Sales Manager duyệt');
             $this->notificationService->notifyDepartment('sales_manager', $order, 'Đơn hàng mới cần Sales Manager duyệt');
@@ -520,7 +507,7 @@ class OrderService implements OrderServiceInterface
             $nextDept = $currentDept->nextDepartment();
 
             $this->approvalHandler->updateCurrentApproval($order, $currentDept, $user, $data);
-            $this->approvalHandler->transitionToDepartment($order, $nextDept, $currentDept->statusCode());
+            $this->approvalHandler->transitionToDepartment($order, $nextDept);
 
             if ($currentDept === OrderDepartment::MANAGEMENT) {
                 $this->approvalHandler->finalizeApproval($order, $user);
@@ -827,41 +814,18 @@ class OrderService implements OrderServiceInterface
     {
         $prefix = 'ORD'.now()->format('Ymd');
 
-        /*
-         * IMPORTANT:
-         * order_code has a GLOBAL unique index, while the Order model has
-         * company/global scopes and SoftDeletes. Using Order::where(...) can
-         * hide an existing code from another company or a soft-deleted order,
-         * causing ORDyyyymmdd0001 to be generated again.
-         *
-         * Query the physical table directly so every existing code is visible.
-         * This method is called inside createOrder()'s DB transaction, therefore
-         * lockForUpdate() also serializes normal concurrent code generation.
-         */
-        $lastCode = DB::table('crm_orders')
-            ->where('order_code', 'like', $prefix.'%')
+        $lastCode = Order::where('order_code', 'like', $prefix.'%')
             ->lockForUpdate()
             ->orderByDesc('order_code')
             ->value('order_code');
 
         $next = 1;
 
-        if (is_string($lastCode)
-            && preg_match('/^'.preg_quote($prefix, '/').'([0-9]+)$/', $lastCode, $matches)
-        ) {
-            $next = ((int) $matches[1]) + 1;
+        if ($lastCode) {
+            $next = (int) substr($lastCode, -4) + 1;
         }
 
-        // Defensive uniqueness check for legacy gaps / unusual historical data.
-        while (true) {
-            $candidate = sprintf('%s%04d', $prefix, $next);
-
-            if (! DB::table('crm_orders')->where('order_code', $candidate)->exists()) {
-                return $candidate;
-            }
-
-            $next++;
-        }
+        return sprintf('%s%04d', $prefix, $next);
     }
 
     /**

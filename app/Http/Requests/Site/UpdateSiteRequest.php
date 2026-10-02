@@ -19,7 +19,7 @@ class UpdateSiteRequest extends FormRequest
     {
         return (bool) optional($this->user())->hasAnyRole([
             'sales',
-            'ky_thuat',
+            'technical',
             'admin',
             'accounting',
             'warehouse',
@@ -36,7 +36,8 @@ class UpdateSiteRequest extends FormRequest
         $siteId = $this->route('id');
 
         return [
-            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+            'company_id' => ['sometimes', 'required', 'integer', 'exists:companies,id'],
+            'project_type' => ['nullable', 'string', 'in:factory,residential'],
             'name' => [
                 'required',
                 'string',
@@ -46,7 +47,7 @@ class UpdateSiteRequest extends FormRequest
 
             'status' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string', 'max:255'],
-            'contact_name' => ['nullable', 'string', 'max:255'],
+            'contact_name' => ['nullable', 'string', 'max:120'],
             'contact_phone' => ['nullable', 'string', 'max:50', 'regex:/^[0-9\-\+\s\(\)]+$/'],
             'note' => ['nullable', 'string', 'max:2000'],
 
@@ -63,9 +64,9 @@ class UpdateSiteRequest extends FormRequest
             'warranty_reminder_2_at' => ['nullable', 'date'],
             'warranty_reminder_3_at' => ['nullable', 'date'],
 
-            'technician_name' => ['nullable', 'string', 'max:255'],
+            'technician_name' => ['nullable', 'string', 'max:120'],
             'monitoring_link' => ['nullable', 'string', 'max:255'],
-            'monitoring_account' => ['nullable', 'string', 'max:255'],
+            'monitoring_account' => ['nullable', 'string', 'max:120'],
             'stage' => ['nullable', 'string', 'max:50'],
 
             'contract_amount' => ['nullable', 'numeric', 'min:0'],

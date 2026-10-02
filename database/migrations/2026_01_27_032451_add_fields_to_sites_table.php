@@ -4,37 +4,61 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/*
+ * TRÙNG HOÀN TOÀN với khối ALTER trong 2026_01_21_070759_create_sites_table:
+ * cùng 11 cột. Bản kia có bọc hasColumn, bản này thì không, nên migrate trên DB
+ * rỗng chết với "Duplicate column name 'status'".
+ *
+ * Giữ file lại (đã chạy trên production, xoá là lệch lịch sử migration) nhưng
+ * bọc điều kiện để nó thành no-op khi cột đã có.
+ */
 return new class extends Migration
 {
+    /** @var array<string, callable(Blueprint): void> */
+    private function columns(): array
+    {
+        return [
+            'status' => fn (Blueprint $t) => $t->string('status', 50)->nullable()->after('name'),
+            'stage' => fn (Blueprint $t) => $t->string('stage', 50)->nullable()->after('note'),
+            'system_kwp' => fn (Blueprint $t) => $t->decimal('system_kwp', 10, 2)->nullable()->after('note'),
+            'system_kw_ac' => fn (Blueprint $t) => $t->decimal('system_kw_ac', 10, 2)->nullable()->after('system_kwp'),
+            'system_type' => fn (Blueprint $t) => $t->string('system_type', 50)->nullable()->after('system_kw_ac'),
+            'phase' => fn (Blueprint $t) => $t->string('phase', 50)->nullable()->after('system_type'),
+            'installed_at' => fn (Blueprint $t) => $t->date('installed_at')->nullable()->after('phase'),
+            'warranty_to' => fn (Blueprint $t) => $t->date('warranty_to')->nullable()->after('installed_at'),
+            'technician_name' => fn (Blueprint $t) => $t->string('technician_name')->nullable()->after('warranty_to'),
+            'monitoring_link' => fn (Blueprint $t) => $t->string('monitoring_link')->nullable()->after('technician_name'),
+            'monitoring_account' => fn (Blueprint $t) => $t->string('monitoring_account')->nullable()->after('monitoring_link'),
+        ];
+    }
+
     public function up(): void
     {
-        Schema::table('sites', function (Blueprint $table) {
-            $table->string('status', 50)->nullable()->after('name');
-            $table->string('stage', 50)->nullable()->after('note');
+        if (! Schema::hasTable('sites')) {
+            return;
+        }
 
-            $table->decimal('system_kwp', 10, 2)->nullable()->after('note');
-            $table->decimal('system_kw_ac', 10, 2)->nullable()->after('system_kwp');
-            $table->string('system_type', 50)->nullable()->after('system_kw_ac');
-            $table->string('phase', 50)->nullable()->after('system_type');
+        $missing = array_filter(
+            $this->columns(),
+            static fn (callable $add, string $column): bool => ! Schema::hasColumn('sites', $column),
+            ARRAY_FILTER_USE_BOTH,
+        );
 
-            $table->date('installed_at')->nullable()->after('phase');
-            $table->date('warranty_to')->nullable()->after('installed_at');
+        if ($missing === []) {
+            return;
+        }
 
-            $table->string('technician_name')->nullable()->after('warranty_to');
-            $table->string('monitoring_link')->nullable()->after('technician_name');
-            $table->string('monitoring_account')->nullable()->after('monitoring_link');
-        });
+        if (Schema::hasTable('sites')) {
+            Schema::table('sites', function (Blueprint $table) use ($missing) {
+                foreach ($missing as $add) {
+                    $add($table);
+                }
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('sites', function (Blueprint $table) {
-            $table->dropColumn([
-                'status','stage',
-                'system_kwp','system_kw_ac','system_type','phase',
-                'installed_at','warranty_to',
-                'technician_name','monitoring_link','monitoring_account'
-            ]);
-        });
+        // Không tự xoá: các cột này do migration create_sites_table sở hữu.
     }
 };

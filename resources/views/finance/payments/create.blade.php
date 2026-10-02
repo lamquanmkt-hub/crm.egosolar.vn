@@ -1,128 +1,128 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4">
+<div class="container tw:py-6">
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm rounded-pill px-4">
+        <x-ui.alert variant="success" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[50rem] tw:px-6">
             {{ session('success') }}
-        </div>
+        </x-ui.alert>
     @endif
 
     @if(session('error'))
-        <div class="alert alert-danger border-0 shadow-sm rounded-pill px-4">
+        <x-ui.alert variant="danger" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[50rem] tw:px-6">
             {{ session('error') }}
-        </div>
+        </x-ui.alert>
     @endif
 
     @if($errors->any())
-        <div class="alert alert-danger border-0 shadow-sm rounded-4">
-            <div class="fw-semibold mb-2">Vui lòng kiểm tra lại dữ liệu:</div>
-            <ul class="mb-0 ps-3">
+        <x-ui.alert variant="danger" class="tw:border-0 tw:shadow-[0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[1rem]">
+            <div class="tw:font-semibold tw:mb-2">Vui lòng kiểm tra lại dữ liệu:</div>
+            <ul class="tw:mb-0 ps-3">
                 @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
-        </div>
+        </x-ui.alert>
     @endif
 
-    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
-        <div class="card-body p-0">
-            <div class="p-4 text-white" style="background: linear-gradient(135deg, #dc2626, #b91c1c);">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <x-ui.card class="border-0 shadow-lg rounded-4 overflow-hidden">
+        <x-ui.card-body class="tw:p-0">
+            <div class="tw:p-6 tw:text-[#ffffff]" style="background: linear-gradient(135deg, #dc2626, #b91c1c);">
+                <div class="tw:flex tw:justify-between tw:items-center flex-wrap tw:gap-4">
                     <div>
-                        <h3 class="mb-1 fw-bold">Tạo phiếu chi</h3>
+                        <h3 class="tw:mb-1 tw:font-bold">Tạo phiếu chi</h3>
                         <div class="opacity-75">Ghi nhận khoản chi và tự động trừ số dư quỹ / tài khoản</div>
                     </div>
-                    <a href="{{ route('finance.payments.index') }}" class="btn btn-light rounded-pill px-4 fw-semibold">
+                    <x-ui.button href="{{ route('finance.payments.index') }}" variant="light" class="rounded-pill tw:px-6 tw:font-semibold">
                         Quay lại danh sách
-                    </a>
+                    </x-ui.button>
                 </div>
             </div>
 
-            <div class="p-4">
+            <div class="tw:p-6">
                 <form action="{{ route('finance.payments.store') }}" method="POST">
                     @csrf
 
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Quỹ / Tài khoản</label>
-                            <select name="account_id" class="form-select rounded-pill" required>
+                    <div class="tw:row tw:g-3">
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Quỹ / Tài khoản</x-ui.label>
+                            <x-ui.select name="account_id" class="rounded-pill" required>
                                 <option value="">-- Chọn tài khoản --</option>
                                 @foreach($accounts as $account)
                                     <option value="{{ $account->id }}" @selected(old('account_id') == $account->id)>
                                         {{ $account->name }} - {{ number_format($account->current_balance, 0, ',', '.') }}đ
                                     </option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Ngày chi</label>
-                            <input type="date" name="payment_date" class="form-control rounded-pill"
-                                   value="{{ old('payment_date', now()->format('Y-m-d')) }}" required>
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Ngày chi</x-ui.label>
+                            <x-ui.input type="date" name="payment_date" class="rounded-pill"
+                                   value="{{ old('payment_date', now()->format('Y-m-d')) }}" required />
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Người nhận</label>
-                            <input type="text" name="payee_name" class="form-control rounded-pill"
-                                   value="{{ old('payee_name') }}" placeholder="Nhập tên người nhận">
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Người nhận</x-ui.label>
+                            <x-ui.input type="text" name="payee_name" class="rounded-pill"
+                                   value="{{ old('payee_name') }}" placeholder="Nhập tên người nhận" />
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Số điện thoại</label>
-                            <input type="text" name="payee_phone" class="form-control rounded-pill"
-                                   value="{{ old('payee_phone') }}" placeholder="Nhập số điện thoại">
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Số điện thoại</x-ui.label>
+                            <x-ui.input type="text" name="payee_phone" class="rounded-pill"
+                                   value="{{ old('payee_phone') }}" placeholder="Nhập số điện thoại" />
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Loại chi</label>
-                            <select name="category" class="form-select rounded-pill" required>
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Loại chi</x-ui.label>
+                            <x-ui.select name="category" class="rounded-pill" required>
                                 <option value="">-- Chọn loại chi --</option>
                                 @foreach($categories as $value => $label)
                                     <option value="{{ $value }}" @selected(old('category') == $value)>
                                         {{ $label }}
                                     </option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Phương thức</label>
-                            <select name="payment_method" class="form-select rounded-pill" required>
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Phương thức</x-ui.label>
+                            <x-ui.select name="payment_method" class="rounded-pill" required>
                                 <option value="">-- Chọn phương thức --</option>
                                 @foreach($paymentMethods as $value => $label)
                                     <option value="{{ $value }}" @selected(old('payment_method') == $value)>
                                         {{ $label }}
                                     </option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Số tiền</label>
-                            <input type="number" step="0.01" min="0.01" name="amount"
-                                   class="form-control rounded-pill"
+                        <div class="tw:md:col12-6">
+                            <x-ui.label>Số tiền</x-ui.label>
+                            <x-ui.input type="number" step="0.01" min="0.01" name="amount"
+                                   class="rounded-pill"
                                    value="{{ old('amount') }}"
-                                   placeholder="Nhập số tiền" required>
+                                   placeholder="Nhập số tiền" required />
                         </div>
 
-                        <div class="col-12">
-                            <label class="form-label">Ghi chú</label>
-                            <textarea name="note" rows="4" class="form-control rounded-4" placeholder="Nội dung chi...">{{ old('note') }}</textarea>
+                        <div class="tw:col12-12">
+                            <x-ui.label>Ghi chú</x-ui.label>
+                            <x-ui.input as="textarea" name="note" rows="4" class="rounded-4" placeholder="Nội dung chi...">{{ old('note') }}</x-ui.input>
                         </div>
 
-                        <div class="col-12 d-flex gap-2 flex-wrap">
-                            <button type="submit" class="btn btn-danger rounded-pill px-4 fw-semibold">
+                        <div class="tw:col12-12 tw:flex tw:gap-2 flex-wrap">
+                            <x-ui.button variant="danger" type="submit" class="rounded-pill tw:px-6 tw:font-semibold">
                                 Lưu phiếu chi
-                            </button>
-                            <a href="{{ route('finance.payments.index') }}" class="btn btn-light rounded-pill px-4">
+                            </x-ui.button>
+                            <x-ui.button href="{{ route('finance.payments.index') }}" variant="light" class="rounded-pill tw:px-6">
                                 Hủy
-                            </a>
+                            </x-ui.button>
                         </div>
                     </div>
                 </form>
             </div>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 </div>
 @endsection

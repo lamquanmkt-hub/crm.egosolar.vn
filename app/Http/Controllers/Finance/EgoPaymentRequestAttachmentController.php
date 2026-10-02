@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
-use App\Support\EgoCompanyLock;
+use App\Services\Finance\FinanceFullAccess;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -19,8 +19,8 @@ class EgoPaymentRequestAttachmentController extends Controller
      */
     private function abortIfMissing(): void
     {
-        abort_unless(Schema::hasTable('payment_requests'), 404, 'Khong thay bang payment_requests.');
-        abort_unless(Schema::hasTable('payment_attachments'), 404, 'Khong thay bang payment_attachments.');
+        abort_unless(SchemaCache::hasTable('payment_requests'), 404, 'Khong thay bang payment_requests.');
+        abort_unless(SchemaCache::hasTable('payment_attachments'), 404, 'Khong thay bang payment_attachments.');
     }
 
     /**
@@ -30,7 +30,7 @@ class EgoPaymentRequestAttachmentController extends Controller
     {
         $this->abortIfMissing();
 
-        $pr = DB::table('payment_requests')->where('company_id', EgoCompanyLock::id())->where('id', (int) $id)->first();
+        $pr = DB::table('payment_requests')->where('id', (int) $id)->first();
 
         abort_unless($pr, 404, 'Khong tim thay phieu de nghi thanh toan.');
 
@@ -83,7 +83,7 @@ class EgoPaymentRequestAttachmentController extends Controller
     }
 
     /**
-     * Xác định người dùng có được sửa chứng từ của phiếu: admin/kế toán/quản lý hoặc người tạo khi phiếu chưa duyệt.
+     * Xác định người dùng có được sửa chứng từ của phiếu: admin/kế toán/quản lý; người tạo khi phiếu chưa duyệt; HCNS được sửa chứng từ phiếu đã gửi duyệt do mình tạo.
      */
     private function canEdit($pr): bool
     {
@@ -93,8 +93,7 @@ class EgoPaymentRequestAttachmentController extends Controller
             return false;
         }
 
-        // Admin/Giám đốc hoặc người được cấp quyền đặc biệt: toàn quyền chứng từ.
-        if (method_exists($user, 'canOverrideLockedFinanceRecords') && $user->canOverrideLockedFinanceRecords()) {
+        if (app(FinanceFullAccess::class)->allows($user)) {
             return true;
         }
 
@@ -105,7 +104,17 @@ class EgoPaymentRequestAttachmentController extends Controller
         if (isset($pr->created_by) && (int) $pr->created_by === (int) $user->id) {
             $status = strtolower(trim((string) ($pr->status ?? '')));
 
-            return in_array($status, ['', 'draft', 'nhap', 'new', 'admin_rejected', 'accounting_rejected'], true);
+            if (in_array($status, ['', 'draft', 'nhap', 'new', 'admin_rejected', 'accounting_rejected'], true)) {
+                return true;
+            }
+
+            // HCNS được sửa/thay/xóa chứng từ của phiếu do chính mình tạo
+            // trong lúc phiếu đang ở trạng thái Đã gửi duyệt.
+            $isHr = $this->hasRole($user, ['hr', 'hcns', 'human_resources', 'human-resource'])
+                || (int) ($user->department_id ?? 0) === 14
+                || strtolower(trim((string) ($user->email ?? ''))) === 'hr@egosolar.vn';
+
+            return $status === 'submitted' && $isHr;
         }
 
         return false;
@@ -137,7 +146,7 @@ class EgoPaymentRequestAttachmentController extends Controller
 
         $request->validate([
             'attachments' => ['required'],
-            'attachments.*' => ['file', 'max:20480', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx'],
+            'attachments.*' => ['file', 'max:20480'],
         ]);
 
         $files = $request->file('attachments', []);
@@ -183,7 +192,7 @@ class EgoPaymentRequestAttachmentController extends Controller
         $att = $this->getAttachment($paymentRequest, $attachment);
 
         $request->validate([
-            'attachment' => ['required', 'file', 'max:20480', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx'],
+            'attachment' => ['required', 'file', 'max:20480'],
         ]);
 
         $file = $request->file('attachment');

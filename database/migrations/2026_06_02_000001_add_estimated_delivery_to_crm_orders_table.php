@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('crm_orders') && !Schema::hasColumn('crm_orders', 'estimated_delivery')) {
+        if (Schema::hasTable('crm_orders') && ! Schema::hasColumn('crm_orders', 'estimated_delivery')) {
             Schema::table('crm_orders', function (Blueprint $table) {
                 $column = $table->date('estimated_delivery')->nullable();
 

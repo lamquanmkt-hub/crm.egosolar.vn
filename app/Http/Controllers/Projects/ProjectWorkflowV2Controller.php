@@ -9,7 +9,7 @@ use App\Models\Projects\Site;
 use App\Models\SolarMaintenanceSchedule;
 use App\Models\User;
 use App\Services\Projects\ProjectWorkflowV2Service;
-use App\Services\Synced\Technical\SolarMaintenanceService;
+use App\Services\Technical\SolarMaintenanceService;
 use App\Support\SolarMaintenanceAccess;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;

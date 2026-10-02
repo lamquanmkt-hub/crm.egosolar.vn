@@ -11,15 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-       Schema::create('content_files', function (Blueprint $table) {
-    $table->id();
-    $table->unsignedBigInteger('content_calendar_id');
-    $table->string('file_path');
-    $table->string('file_name');
-    $table->string('file_type')->nullable();
-    $table->unsignedBigInteger('uploaded_by');
-    $table->timestamps();
-});
+        if (! Schema::hasTable('content_files')) {
+            Schema::create('content_files', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('content_calendar_id');
+                $table->string('file_path');
+                $table->string('file_name');
+                $table->string('file_type')->nullable();
+                $table->unsignedBigInteger('uploaded_by');
+                $table->timestamps();
+            });
+        }
     }
 
     /**

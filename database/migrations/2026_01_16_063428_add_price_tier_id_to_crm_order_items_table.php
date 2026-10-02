@@ -11,17 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('crm_order_items', function (Blueprint $table) {
-            $table->unsignedBigInteger('price_tier_id')
-                ->nullable()
-                ->after('product_id');
+        if (Schema::hasTable('crm_order_items')) {
+            Schema::table('crm_order_items', function (Blueprint $table) {
+                if (! Schema::hasColumn('crm_order_items', 'price_tier_id')) {
+                    $table->unsignedBigInteger('price_tier_id')
+                        ->nullable()
+                        ->after('product_id');
+                }
 
-            $table->index('price_tier_id', 'idx_oi_price_tier');
+                $table->index('price_tier_id', 'idx_oi_price_tier');
 
-            $table->foreign('price_tier_id', 'fk_oi_price_tier')
-                ->references('id')->on('crm_price_tiers')
-                ->nullOnDelete();
-        });
+                $table->foreign('price_tier_id', 'fk_oi_price_tier')
+                    ->references('id')->on('crm_price_tiers')
+                    ->nullOnDelete();
+            });
+        }
     }
 
     /**
@@ -29,10 +33,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('crm_order_items', function (Blueprint $table) {
-            $table->dropForeign('fk_oi_price_tier');
-            $table->dropIndex('idx_oi_price_tier');
-            $table->dropColumn('price_tier_id');
-        });
+        if (Schema::hasTable('crm_order_items')) {
+            Schema::table('crm_order_items', function (Blueprint $table) {
+                $table->dropForeign('fk_oi_price_tier');
+                $table->dropIndex('idx_oi_price_tier');
+                $table->dropColumn('price_tier_id');
+            });
+        }
     }
 };

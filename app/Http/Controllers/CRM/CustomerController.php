@@ -12,6 +12,8 @@ use App\Models\Core\Region;
 use App\Models\CRM\Customers\Customer;
 use App\Models\CRM\Customers\CustomerType;
 use App\Models\User;
+use App\Services\Projects\SiteQuoteLookup;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +21,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class CustomerController extends Controller
 {
@@ -64,70 +65,6 @@ class CustomerController extends Controller
         ]);
     }
 
-    /**
-     * Tổng quan hợp nhất Khách hàng + Chăm sóc/Pipeline.
-     * Không đọc/ghi thay đổi vào crm_orders hoặc crm_leads.
-     */
-    public function overview(Request $request): View
-    {
-        $this->authorize('viewAny', Customer::class);
-
-        $pipelineStats = [
-            'total' => 0,
-            'caring' => 0,
-            'quote_sent' => 0,
-            'won' => 0,
-            'need_follow' => 0,
-            'unlinked' => 0,
-            'potential_value' => 0.0,
-        ];
-
-        $pipelineByStatus = collect();
-
-        if (Schema::hasTable('sales_work_reports')) {
-            $pipeline = DB::table('sales_work_reports');
-
-            if (! $this->canViewAllPipeline($request->user())) {
-                $pipeline->where('assigned_to', (int) $request->user()->id);
-            }
-
-            $pipelineStats = [
-                'total' => (clone $pipeline)->count(),
-                'caring' => (clone $pipeline)
-                    ->whereIn('status', ['consulting', 'follow_up', 'quoted'])
-                    ->count(),
-                'quote_sent' => (clone $pipeline)
-                    ->whereIn('quote_status', ['sent', 'viewed', 'waiting'])
-                    ->count(),
-                'won' => (clone $pipeline)
-                    ->where('status', 'won')
-                    ->count(),
-                'need_follow' => (clone $pipeline)
-                    ->whereIn('status', ['consulting', 'follow_up', 'quoted'])
-                    ->whereNotNull('next_followup_at')
-                    ->where('next_followup_at', '<=', now()->addDay())
-                    ->count(),
-                'unlinked' => Schema::hasColumn('sales_work_reports', 'customer_id')
-                    ? (clone $pipeline)->whereNull('customer_id')->count()
-                    : 0,
-                'potential_value' => (float) (clone $pipeline)
-                    ->sum('revenue_expectation'),
-            ];
-
-            $pipelineByStatus = (clone $pipeline)
-                ->select('status', DB::raw('COUNT(*) as total'))
-                ->groupBy('status')
-                ->orderByDesc('total')
-                ->get();
-        }
-
-        return view('customers.overview', [
-            'stats' => $this->customerStats($request),
-            'pipelineStats' => $pipelineStats,
-            'pipelineByStatus' => $pipelineByStatus,
-        ]);
-    }
-
     public function create(): RedirectResponse
     {
         return redirect()->route('customers.index');
@@ -144,8 +81,7 @@ class CustomerController extends Controller
                 'max:2048',
             ],
         ], [
-            'ai_chatbot_link.url' =>
-                'Link Chat Bot AI không đúng định dạng URL.',
+            'ai_chatbot_link.url' => 'Link Chat Bot AI không đúng định dạng URL.',
         ]);
 
         $customerData['ai_chatbot_link'] =
@@ -174,7 +110,7 @@ class CustomerController extends Controller
 
         $interactions = collect();
 
-        if (Schema::hasTable('crm_customer_interactions')) {
+        if (SchemaCache::hasTable('crm_customer_interactions')) {
             $interactions = DB::table(
                 'crm_customer_interactions as interactions'
             )
@@ -200,30 +136,27 @@ class CustomerController extends Controller
 
         $nextFollowup = $interactions
             ->filter(
-                fn (object $item): bool =>
-                    ! empty($item->next_followup_date)
+                fn (object $item): bool => ! empty($item->next_followup_date)
             )
             ->sortBy('next_followup_date')
             ->first();
 
         $orders = collect($customerDetail->orders ?? [])
             ->sortByDesc(
-                fn ($order) =>
-                    $order->order_date
+                fn ($order) => $order->order_date
                     ?? $order->created_at
                     ?? null
             )
             ->values();
 
         $orderRevenue = (float) $orders->sum(
-            fn ($order): float =>
-                (float) ($order->total_amount ?? 0)
+            fn ($order): float => (float) ($order->total_amount ?? 0)
         );
 
         $debtTotal = 0.0;
         $debtRows = collect();
 
-        if (Schema::hasTable('crm_customer_debts')) {
+        if (SchemaCache::hasTable('crm_customer_debts')) {
             $debtRows = DB::table('crm_customer_debts')
                 ->where('customer_id', $customer->id)
                 ->orderByDesc('id')
@@ -236,7 +169,7 @@ class CustomerController extends Controller
 
         $quotations = collect();
 
-        if (Schema::hasTable('sales_quotations')) {
+        if (SchemaCache::hasTable('sales_quotations')) {
             $quotations = DB::table('sales_quotations')
                 ->where('customer_id', $customer->id)
                 ->whereNull('deleted_at')
@@ -248,14 +181,13 @@ class CustomerController extends Controller
 
         $warrantyEventCount = 0;
 
-        if (Schema::hasTable('crm_serial_warranty_events')) {
+        if (SchemaCache::hasTable('crm_serial_warranty_events')) {
             $warrantyEventCount = DB::table(
                 'crm_serial_warranty_events'
             )
                 ->where('customer_id', $customer->id)
                 ->count();
         }
-
 
         /*
          * EGO_CUSTOMER_SITES_V31_START
@@ -272,8 +204,8 @@ class CustomerController extends Controller
         $sites = collect();
         $siteContractValue = 0.0;
 
-        if (Schema::hasTable('sites')) {
-            $siteColumns = Schema::getColumnListing('sites');
+        if (SchemaCache::hasTable('sites')) {
+            $siteColumns = SchemaCache::columns('sites');
 
             $phoneDigits = preg_replace(
                 '/\D+/',
@@ -387,18 +319,14 @@ class CustomerController extends Controller
 
                         if (
                             $customerEmail !== ''
-                            && in_array(
-                                'quote_customer_email',
-                                $siteColumns,
-                                true
-                            )
+                            && SchemaCache::hasTable('site_quotes')
                         ) {
                             $method = $conditionAdded
                                 ? 'orWhereRaw'
                                 : 'whereRaw';
 
                             $match->{$method}(
-                                'LOWER(TRIM(COALESCE(quote_customer_email, ""))) = ?',
+                                'LOWER(TRIM(COALESCE('.SiteQuoteLookup::latest('customer_email').', ""))) = ?',
                                 [$customerEmail]
                             );
 
@@ -407,22 +335,14 @@ class CustomerController extends Controller
 
                         if (
                             $customerTaxCode !== ''
-                            && in_array(
-                                'quote_customer_tax_code',
-                                $siteColumns,
-                                true
-                            )
+                            && SchemaCache::hasTable('site_quotes')
                         ) {
                             $method = $conditionAdded
                                 ? 'orWhereRaw'
                                 : 'whereRaw';
 
                             $match->{$method}(
-                                "REPLACE(
-                                    COALESCE(quote_customer_tax_code, ''),
-                                    ' ',
-                                    ''
-                                ) = ?",
+                                'REPLACE(COALESCE('.SiteQuoteLookup::latest('customer_tax_code').", ''), ' ', '') = ?",
                                 [$customerTaxCode]
                             );
 
@@ -506,8 +426,7 @@ class CustomerController extends Controller
                     ->get();
 
                 $siteContractValue = (float) $sites->sum(
-                    fn (object $site): float =>
-                        (float) ($site->contract_amount ?? 0)
+                    fn (object $site): float => (float) ($site->contract_amount ?? 0)
                 );
             }
         }
@@ -530,7 +449,7 @@ class CustomerController extends Controller
         $handoverHistory = collect();
 
         if (
-            Schema::hasTable(
+            SchemaCache::hasTable(
                 'crm_customer_handover_logs'
             )
         ) {
@@ -570,7 +489,6 @@ class CustomerController extends Controller
                     'action_users.name as action_user_name',
                 ]);
         }
-
 
         return view('customers.show', [
             'customer' => $customerDetail,
@@ -614,8 +532,7 @@ class CustomerController extends Controller
                 'max:2048',
             ],
         ], [
-            'ai_chatbot_link.url' =>
-                'Link Chat Bot AI không đúng định dạng URL.',
+            'ai_chatbot_link.url' => 'Link Chat Bot AI không đúng định dạng URL.',
         ]);
 
         if ($request->exists('ai_chatbot_link')) {
@@ -689,7 +606,7 @@ class CustomerController extends Controller
         $this->authorize('update', $customer);
 
         abort_unless(
-            Schema::hasTable('crm_customer_interactions'),
+            SchemaCache::hasTable('crm_customer_interactions'),
             503,
             'Bảng lịch sử chăm sóc chưa sẵn sàng.'
         );
@@ -728,10 +645,8 @@ class CustomerController extends Controller
                 'date',
             ],
         ], [
-            'content.required' =>
-                'Vui lòng nhập nội dung chăm sóc.',
-            'interaction_type.required' =>
-                'Vui lòng chọn hình thức tương tác.',
+            'content.required' => 'Vui lòng nhập nội dung chăm sóc.',
+            'interaction_type.required' => 'Vui lòng chọn hình thức tương tác.',
         ]);
 
         $now = now();
@@ -739,22 +654,14 @@ class CustomerController extends Controller
         DB::table('crm_customer_interactions')->insert([
             'customer_id' => $customer->id,
             'lead_id' => null,
-            'interaction_type' =>
-                $validated['interaction_type'],
-            'subject' =>
-                $validated['subject'] ?? null,
-            'content' =>
-                $validated['content'],
-            'interaction_date' =>
-                $validated['interaction_date'] ?? $now,
-            'duration_minutes' =>
-                $validated['duration_minutes'] ?? null,
-            'outcome' =>
-                $validated['outcome'] ?? null,
-            'next_followup_date' =>
-                $validated['next_followup_date'] ?? null,
-            'created_by' =>
-                $request->user()?->id,
+            'interaction_type' => $validated['interaction_type'],
+            'subject' => $validated['subject'] ?? null,
+            'content' => $validated['content'],
+            'interaction_date' => $validated['interaction_date'] ?? $now,
+            'duration_minutes' => $validated['duration_minutes'] ?? null,
+            'outcome' => $validated['outcome'] ?? null,
+            'next_followup_date' => $validated['next_followup_date'] ?? null,
+            'created_by' => $request->user()?->id,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -799,12 +706,9 @@ class CustomerController extends Controller
                 'max:2000',
             ],
         ], [
-            'owner_id.required' =>
-                'Vui lòng chọn nhân viên nhận bàn giao.',
-            'owner_id.exists' =>
-                'Nhân viên nhận bàn giao không tồn tại.',
-            'handover_note.max' =>
-                'Ghi chú bàn giao tối đa 2.000 ký tự.',
+            'owner_id.required' => 'Vui lòng chọn nhân viên nhận bàn giao.',
+            'owner_id.exists' => 'Nhân viên nhận bàn giao không tồn tại.',
+            'handover_note.max' => 'Ghi chú bàn giao tối đa 2.000 ký tự.',
         ]);
 
         $newOwnerId = (int) $validated['owner_id'];
@@ -836,7 +740,7 @@ class CustomerController extends Controller
                     ->firstOrFail();
 
                 if (
-                    Schema::hasColumn(
+                    SchemaCache::hasColumn(
                         'users',
                         'is_active'
                     )
@@ -853,27 +757,22 @@ class CustomerController extends Controller
                 ]);
 
                 if (
-                    Schema::hasTable(
+                    SchemaCache::hasTable(
                         'crm_customer_handover_logs'
                     )
                 ) {
                     DB::table(
                         'crm_customer_handover_logs'
                     )->insert([
-                        'customer_id' =>
-                            $lockedCustomer->id,
+                        'customer_id' => $lockedCustomer->id,
 
-                        'from_user_id' =>
-                            $oldOwnerId,
+                        'from_user_id' => $oldOwnerId,
 
-                        'to_user_id' =>
-                            $newOwnerId,
+                        'to_user_id' => $newOwnerId,
 
-                        'handed_over_by' =>
-                            $request->user()?->id,
+                        'handed_over_by' => $request->user()?->id,
 
-                        'note' =>
-                            $validated['handover_note']
+                        'note' => $validated['handover_note']
                             ?? null,
 
                         'created_at' => now(),
@@ -1024,10 +923,8 @@ class CustomerController extends Controller
                     'name' => $customer->name,
                     'phone' => $customer->phone,
                     'email' => $customer->email,
-                    'tax_code' =>
-                        $customer->billing_tax_code,
-                    'owner' =>
-                        $customer->assignedUser?->name,
+                    'tax_code' => $customer->billing_tax_code,
+                    'owner' => $customer->assignedUser?->name,
                     'url' => route(
                         'customers.show',
                         $customer
@@ -1088,14 +985,10 @@ class CustomerController extends Controller
     ): JsonResponse {
         return response()->json([
             'id' => $customer->id,
-            'billing_company_name' =>
-                $customer->billing_company_name,
-            'billing_tax_code' =>
-                $customer->billing_tax_code,
-            'billing_address' =>
-                $customer->billing_address,
-            'billing_email' =>
-                $customer->billing_email,
+            'billing_company_name' => $customer->billing_company_name,
+            'billing_tax_code' => $customer->billing_tax_code,
+            'billing_address' => $customer->billing_address,
+            'billing_email' => $customer->billing_email,
         ]);
     }
 
@@ -1131,18 +1024,13 @@ class CustomerController extends Controller
         $customer->update($validated);
 
         return response()->json([
-            'message' =>
-                'Lưu thông tin hóa đơn thành công.',
+            'message' => 'Lưu thông tin hóa đơn thành công.',
             'data' => [
                 'id' => $customer->id,
-                'billing_company_name' =>
-                    $customer->billing_company_name,
-                'billing_tax_code' =>
-                    $customer->billing_tax_code,
-                'billing_address' =>
-                    $customer->billing_address,
-                'billing_email' =>
-                    $customer->billing_email,
+                'billing_company_name' => $customer->billing_company_name,
+                'billing_tax_code' => $customer->billing_tax_code,
+                'billing_address' => $customer->billing_address,
+                'billing_email' => $customer->billing_email,
             ],
         ]);
     }
@@ -1219,7 +1107,7 @@ class CustomerController extends Controller
         }
 
         if (
-            Schema::hasColumn(
+            SchemaCache::hasColumn(
                 'users',
                 'is_active'
             )
@@ -1228,7 +1116,7 @@ class CustomerController extends Controller
         }
 
         if (
-            Schema::hasColumn(
+            SchemaCache::hasColumn(
                 'users',
                 'status'
             )
@@ -1250,39 +1138,6 @@ class CustomerController extends Controller
                 'name',
                 'email',
             ]);
-    }
-
-    /**
-     * Quyền xem toàn bộ dữ liệu chăm sóc trong màn Khách hàng.
-     */
-    private function canViewAllPipeline(?User $user): bool
-    {
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->can('customer.view_all') || $user->can('customer.view_sales_all')) {
-            return true;
-        }
-
-        if (method_exists($user, 'hasAnyRole')) {
-            return $user->hasAnyRole([
-                'admin',
-                'management',
-                'sales_manager',
-                'accounting',
-            ]);
-        }
-
-        if (method_exists($user, 'hasRole')) {
-            foreach (['admin', 'management', 'sales_manager', 'accounting'] as $role) {
-                if ($user->hasRole($role)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     /**
@@ -1336,7 +1191,7 @@ class CustomerController extends Controller
 
         $latestInteractions = collect();
 
-        if (Schema::hasTable('crm_customer_interactions')) {
+        if (SchemaCache::hasTable('crm_customer_interactions')) {
             $latestInteractions = DB::table(
                 'crm_customer_interactions as interactions'
             )
@@ -1365,16 +1220,15 @@ class CustomerController extends Controller
                 ->get()
                 ->groupBy('customer_id')
                 ->map(
-                    fn (Collection $group) =>
-                        $group->first()
+                    fn (Collection $group) => $group->first()
                 );
         }
 
         $orderCounts = collect();
 
         if (
-            Schema::hasTable('crm_orders')
-            && Schema::hasTable('crm_leads')
+            SchemaCache::hasTable('crm_orders')
+            && SchemaCache::hasTable('crm_leads')
         ) {
             $orderCounts = DB::table('crm_orders as orders')
                 ->join(
@@ -1420,8 +1274,8 @@ class CustomerController extends Controller
         $items->each(function (Customer $customer) use (
             $latestInteractions,
             $orderCounts,
-            $phoneCounts,
-            $now
+            $phoneCounts
+
         ): void {
             $interaction = $latestInteractions->get(
                 $customer->id

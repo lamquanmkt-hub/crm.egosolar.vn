@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -198,8 +198,8 @@ class EgoOrderDocumentController extends Controller
      */
     private function getOrder(int $orderId)
     {
-        abort_unless(Schema::hasTable('crm_orders'), 404, 'Không thấy bảng crm_orders.');
-        abort_unless(Schema::hasTable('crm_order_documents'), 500, 'Chưa có bảng crm_order_documents. Vui lòng chạy migrate.');
+        abort_unless(SchemaCache::hasTable('crm_orders'), 404, 'Không thấy bảng crm_orders.');
+        abort_unless(SchemaCache::hasTable('crm_order_documents'), 500, 'Chưa có bảng crm_order_documents. Vui lòng chạy migrate.');
 
         $order = DB::table('crm_orders')->where('id', $orderId)->first();
 
@@ -236,32 +236,32 @@ class EgoOrderDocumentController extends Controller
 
         $customerId = null;
 
-        if ($order && Schema::hasColumn('crm_orders', 'customer_id') && ! empty($order->customer_id)) {
+        if ($order && SchemaCache::hasColumn('crm_orders', 'customer_id') && ! empty($order->customer_id)) {
             $customerId = (int) $order->customer_id;
         }
 
-        if (! $customerId && $order && ! empty($order->lead_id) && Schema::hasTable('crm_leads') && Schema::hasColumn('crm_leads', 'customer_id')) {
+        if (! $customerId && $order && ! empty($order->lead_id) && SchemaCache::hasTable('crm_leads') && SchemaCache::hasColumn('crm_leads', 'customer_id')) {
             $customerId = DB::table('crm_leads')->where('id', (int) $order->lead_id)->value('customer_id');
             $customerId = $customerId ? (int) $customerId : null;
         }
 
         $profileId = null;
 
-        if (Schema::hasTable('customer_profiles')) {
-            if ($customerId && Schema::hasColumn('customer_profiles', 'customer_id')) {
+        if (SchemaCache::hasTable('customer_profiles')) {
+            if ($customerId && SchemaCache::hasColumn('customer_profiles', 'customer_id')) {
                 $profileId = DB::table('customer_profiles')->where('customer_id', $customerId)->value('id');
                 $profileId = $profileId ? (int) $profileId : null;
             }
 
-            if (! $profileId && $customerId && Schema::hasTable('crm_customers')) {
+            if (! $profileId && $customerId && SchemaCache::hasTable('crm_customers')) {
                 $customer = DB::table('crm_customers')->where('id', $customerId)->first();
 
-                if ($customer && ! empty($customer->phone) && Schema::hasColumn('customer_profiles', 'phone')) {
+                if ($customer && ! empty($customer->phone) && SchemaCache::hasColumn('customer_profiles', 'phone')) {
                     $profileId = DB::table('customer_profiles')->where('phone', $customer->phone)->value('id');
                     $profileId = $profileId ? (int) $profileId : null;
                 }
 
-                if (! $profileId && $customer && ! empty($customer->name) && Schema::hasColumn('customer_profiles', 'agent_name')) {
+                if (! $profileId && $customer && ! empty($customer->name) && SchemaCache::hasColumn('customer_profiles', 'agent_name')) {
                     $profileId = DB::table('customer_profiles')->where('agent_name', $customer->name)->value('id');
                     $profileId = $profileId ? (int) $profileId : null;
                 }

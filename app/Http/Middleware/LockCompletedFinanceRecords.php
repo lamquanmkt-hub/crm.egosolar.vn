@@ -2,14 +2,17 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Finance\FinanceFullAccess;
+use App\Support\SchemaCache;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
 class LockCompletedFinanceRecords
 {
+    public function __construct(private readonly FinanceFullAccess $access) {}
+
     private array $completedStatuses = [
         'accounting_approved',
         'paid',
@@ -29,21 +32,17 @@ class LockCompletedFinanceRecords
             return $next($request);
         }
 
-        $user = $request->user();
-
-        // Admin (Giám đốc) hoặc người được gán riêng quyền
-        // `payment_requests.override_locked` mới được sửa bản ghi đã hoàn tất.
-        if ($user && method_exists($user, 'canOverrideLockedFinanceRecords') && $user->canOverrideLockedFinanceRecords()) {
+        if ($this->access->allows($request->user())) {
             return $next($request);
         }
 
         try {
             if ($this->touchesCompletedPaymentRequest($request)) {
-                return $this->deny($request, 'Phiếu đề nghị thanh toán đã hoàn thành. Chỉ Admin/Giám đốc hoặc người được cấp quyền đặc biệt mới được sửa.');
+                return $this->deny($request, 'Phiếu đề nghị thanh toán đã hoàn thành. Chỉ user '.$this->access->primaryEmail().' được sửa.');
             }
 
             if ($this->touchesCompletedSupplierDebt($request)) {
-                return $this->deny($request, 'Công nợ/đợt thanh toán đã hoàn thành. Chỉ Admin/Giám đốc hoặc người được cấp quyền đặc biệt mới được sửa.');
+                return $this->deny($request, 'Công nợ/đợt thanh toán đã hoàn thành. Chỉ user '.$this->access->primaryEmail().' được sửa.');
             }
         } catch (\Throwable $e) {
             report($e);
@@ -97,13 +96,13 @@ class LockCompletedFinanceRecords
 
     private function isPaymentRequestCompleted(int $id): bool
     {
-        if ($id <= 0 || ! Schema::hasTable('payment_requests')) {
+        if ($id <= 0 || ! SchemaCache::hasTable('payment_requests')) {
             return false;
         }
 
         $query = DB::table('payment_requests')->where('id', $id);
 
-        if (Schema::hasColumn('payment_requests', 'deleted_at')) {
+        if (SchemaCache::hasColumn('payment_requests', 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
 
@@ -120,7 +119,7 @@ class LockCompletedFinanceRecords
 
     private function isSupplierPaymentRoundCompleted(int $roundId): bool
     {
-        if ($roundId <= 0 || ! Schema::hasTable('finance_supplier_debt_payments')) {
+        if ($roundId <= 0 || ! SchemaCache::hasTable('finance_supplier_debt_payments')) {
             return false;
         }
 
@@ -149,7 +148,7 @@ class LockCompletedFinanceRecords
 
     private function isSupplierDebtCompleted(int $debtId): bool
     {
-        if ($debtId <= 0 || ! Schema::hasTable('finance_supplier_debts')) {
+        if ($debtId <= 0 || ! SchemaCache::hasTable('finance_supplier_debts')) {
             return false;
         }
 
@@ -203,17 +202,17 @@ class LockCompletedFinanceRecords
 
     private function sumPaidSupplierDebtRounds(int $debtId): float
     {
-        if (! Schema::hasTable('finance_supplier_debt_payments')) {
+        if (! SchemaCache::hasTable('finance_supplier_debt_payments')) {
             return 0.0;
         }
 
         $query = DB::table('finance_supplier_debt_payments as p')
             ->where('p.supplier_debt_id', $debtId);
 
-        if (Schema::hasTable('payment_requests') && Schema::hasColumn('finance_supplier_debt_payments', 'payment_request_id')) {
+        if (SchemaCache::hasTable('payment_requests') && SchemaCache::hasColumn('finance_supplier_debt_payments', 'payment_request_id')) {
             $query->leftJoin('payment_requests as pr', 'pr.id', '=', 'p.payment_request_id');
 
-            if (Schema::hasColumn('payment_requests', 'deleted_at')) {
+            if (SchemaCache::hasColumn('payment_requests', 'deleted_at')) {
                 $query->where(function ($q) {
                     $q->whereNull('pr.deleted_at')->orWhereNull('pr.id');
                 });

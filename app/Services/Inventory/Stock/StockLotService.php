@@ -7,8 +7,8 @@ namespace App\Services\Inventory\Stock;
 use App\Contracts\Services\StockLotServiceInterface;
 use App\Models\Inventory\Catalog\Product;
 use App\Models\Inventory\Stock\ProductStock;
+use App\Support\SchemaCache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Service quản lý lô tồn kho (StockLot) theo FIFO: nhập lô, xuất lô, đồng bộ tồn.
@@ -26,7 +26,7 @@ class StockLotService implements StockLotServiceInterface
         float $costBeforeVat = 0,
         float $costVatPercent = 0
     ): void {
-        if (! Schema::hasTable('crm_product_stock_lots')) {
+        if (! SchemaCache::hasTable('crm_product_stock_lots')) {
             $this->syncLegacyStock((int) $product->id, $companyId, $warehouseId, $targetQty);
 
             return;
@@ -92,7 +92,7 @@ class StockLotService implements StockLotServiceInterface
             throw new \InvalidArgumentException('Số lượng nhập lô phải lớn hơn 0.');
         }
 
-        if (! Schema::hasTable('crm_product_stock_lots')) {
+        if (! SchemaCache::hasTable('crm_product_stock_lots')) {
             $this->changeProductStock((int) $product->id, $companyId, $warehouseId, $qtyIn, 'Nhập kho', (int) $product->id);
 
             return 0;
@@ -101,7 +101,7 @@ class StockLotService implements StockLotServiceInterface
         $costAfterVat = round($costBeforeVat * (1 + max(0, $costVatPercent) / 100), 2);
         $actualCostAfterVat = round($costAfterVat + (($qtyIn > 0) ? ($extraCost / $qtyIn) : 0), 2);
 
-        $columns = Schema::getColumnListing('crm_product_stock_lots');
+        $columns = SchemaCache::columns('crm_product_stock_lots');
         $has = fn (string $column): bool => in_array($column, $columns, true);
         $put = function (array &$payload, string $column, $value) use ($has): void {
             if ($has($column)) {
@@ -167,7 +167,7 @@ class StockLotService implements StockLotServiceInterface
             return [];
         }
 
-        if (! Schema::hasTable('crm_product_stock_lots')) {
+        if (! SchemaCache::hasTable('crm_product_stock_lots')) {
             $this->changeProductStock($productId, (int) ($companyId ?? 0), $warehouseId, -$qty, $meta['reason'] ?? 'Xuất kho', (int) ($meta['reference_id'] ?? 0));
 
             return [];
@@ -324,7 +324,7 @@ class StockLotService implements StockLotServiceInterface
         /*
          * Chống trừ tồn 2 lần nếu trước đó đã ghi allocation nhưng quy trình bị lỗi giữa chừng.
          */
-        if (Schema::hasTable('crm_order_item_stock_allocations') && $orderId > 0 && $orderItemId > 0) {
+        if (SchemaCache::hasTable('crm_order_item_stock_allocations') && $orderId > 0 && $orderItemId > 0) {
             $allocatedQty = (int) DB::table('crm_order_item_stock_allocations')
                 ->where('order_id', $orderId)
                 ->where('order_item_id', $orderItemId)
@@ -377,7 +377,7 @@ class StockLotService implements StockLotServiceInterface
      */
     private function insertOrderAllocationIfPossible(array $allocation, array $meta): void
     {
-        if (! Schema::hasTable('crm_order_item_stock_allocations')) {
+        if (! SchemaCache::hasTable('crm_order_item_stock_allocations')) {
             return;
         }
 
@@ -419,11 +419,11 @@ class StockLotService implements StockLotServiceInterface
         ?string $referenceType = null,
         ?string $note = null
     ): void {
-        if (! Schema::hasTable('crm_stock_movements')) {
+        if (! SchemaCache::hasTable('crm_stock_movements')) {
             return;
         }
 
-        $columns = Schema::getColumnListing('crm_stock_movements');
+        $columns = SchemaCache::columns('crm_stock_movements');
         $has = fn (string $column): bool => in_array($column, $columns, true);
         $payload = [];
 

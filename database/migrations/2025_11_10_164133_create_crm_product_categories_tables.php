@@ -11,22 +11,26 @@ return new class extends Migration
      */
     public function up(): void
     {
-	    // Tạo bảng danh mục sản phẩm
-	    Schema::create('crm_product_categories', function (Blueprint $table) {
-		    $table->id();
-		    $table->string('name', 255);
-		    $table->text('description')->nullable();
-		    $table->foreignId('parent_id')->nullable()->constrained('crm_product_categories')->nullOnDelete();
-		    $table->timestamps();
-	    });
+        // Tạo bảng danh mục sản phẩm
+        if (! Schema::hasTable('crm_product_categories')) {
+            Schema::create('crm_product_categories', function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 255);
+                $table->text('description')->nullable();
+                $table->foreignId('parent_id')->nullable()->constrained('crm_product_categories')->nullOnDelete();
+                $table->timestamps();
+            });
+        }
 
-	    // Thêm foreign key cho category_id trong crm_product_catalog
-	    Schema::table('crm_product_catalog', function (Blueprint $table) {
-		    $table->foreign('category_id')
-		          ->references('id')
-		          ->on('crm_product_categories')
-		          ->nullOnDelete();
-	    });
+        // Thêm foreign key cho category_id trong crm_product_catalog
+        if (Schema::hasTable('crm_product_catalog')) {
+            Schema::table('crm_product_catalog', function (Blueprint $table) {
+                $table->foreign('category_id')
+                    ->references('id')
+                    ->on('crm_product_categories')
+                    ->nullOnDelete();
+            });
+        }
     }
 
     /**
@@ -34,10 +38,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-	    Schema::table('crm_product_catalog', function (Blueprint $table) {
-		    $table->dropForeign(['category_id']);
-	    });
+        if (Schema::hasTable('crm_product_catalog')) {
+            Schema::table('crm_product_catalog', function (Blueprint $table) {
+                $table->dropForeign(['category_id']);
+            });
+        }
 
-	    Schema::dropIfExists('crm_product_categories');
+        Schema::dropIfExists('crm_product_categories');
     }
 };

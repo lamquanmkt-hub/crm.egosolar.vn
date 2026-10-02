@@ -9,7 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('solar_maintenance_schedules')) {
+        if (! Schema::hasTable('solar_maintenance_schedules')) {
             return;
         }
 
@@ -26,7 +26,7 @@ return new class extends Migration
         Schema::dropIfExists('solar_maintenance_status_histories');
         Schema::dropIfExists('solar_maintenance_assignees');
 
-        if (!Schema::hasTable('solar_maintenance_schedules')) {
+        if (! Schema::hasTable('solar_maintenance_schedules')) {
             return;
         }
 
@@ -44,67 +44,103 @@ return new class extends Migration
 
         foreach ($columns as $column) {
             if (Schema::hasColumn('solar_maintenance_schedules', $column)) {
-                Schema::table('solar_maintenance_schedules', function (Blueprint $table) use ($column) {
-                    $table->dropColumn($column);
-                });
+                if (Schema::hasTable('solar_maintenance_schedules')) {
+                    Schema::table('solar_maintenance_schedules', function (Blueprint $table) use ($column) {
+                        $table->dropColumn($column);
+                    });
+                }
             }
         }
     }
 
     private function addScheduleColumns(): void
     {
-        if (!Schema::hasColumn('solar_maintenance_schedules', 'company_id')) {
-            Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                $table->unsignedBigInteger('company_id')->nullable()->index()->after('site_id');
-            });
+        if (! Schema::hasColumn('solar_maintenance_schedules', 'company_id')) {
+            if (Schema::hasTable('solar_maintenance_schedules')) {
+                Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
+                    if (! Schema::hasColumn('solar_maintenance_schedules', 'company_id')) {
+                        $table->unsignedBigInteger('company_id')->nullable()->index()->after('site_id');
+                    }
+                });
+            }
         }
 
-        if (!Schema::hasColumn('solar_maintenance_schedules', 'schedule_code')) {
-            Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                $table->string('schedule_code', 40)->nullable()->unique()->after('id');
-            });
+        if (! Schema::hasColumn('solar_maintenance_schedules', 'schedule_code')) {
+            if (Schema::hasTable('solar_maintenance_schedules')) {
+                Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
+                    if (! Schema::hasColumn('solar_maintenance_schedules', 'schedule_code')) {
+                        $table->string('schedule_code', 40)->nullable()->unique()->after('id');
+                    }
+                });
+            }
         }
 
-        if (!Schema::hasColumn('solar_maintenance_schedules', 'started_at')) {
-            Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                $table->timestamp('started_at')->nullable()->after('scheduled_date');
-            });
+        if (! Schema::hasColumn('solar_maintenance_schedules', 'started_at')) {
+            if (Schema::hasTable('solar_maintenance_schedules')) {
+                Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
+                    if (! Schema::hasColumn('solar_maintenance_schedules', 'started_at')) {
+                        $table->timestamp('started_at')->nullable()->after('scheduled_date');
+                    }
+                });
+            }
         }
 
-        if (!Schema::hasColumn('solar_maintenance_schedules', 'completed_at')) {
-            Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                $table->timestamp('completed_at')->nullable()->after('completed_date');
-            });
+        if (! Schema::hasColumn('solar_maintenance_schedules', 'completed_at')) {
+            if (Schema::hasTable('solar_maintenance_schedules')) {
+                Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
+                    if (! Schema::hasColumn('solar_maintenance_schedules', 'completed_at')) {
+                        $table->timestamp('completed_at')->nullable()->after('completed_date');
+                    }
+                });
+            }
         }
 
-        if (!Schema::hasColumn('solar_maintenance_schedules', 'cancelled_at')) {
-            Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                $table->timestamp('cancelled_at')->nullable()->after('completed_at');
-            });
+        if (! Schema::hasColumn('solar_maintenance_schedules', 'cancelled_at')) {
+            if (Schema::hasTable('solar_maintenance_schedules')) {
+                Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
+                    if (! Schema::hasColumn('solar_maintenance_schedules', 'cancelled_at')) {
+                        $table->timestamp('cancelled_at')->nullable()->after('completed_at');
+                    }
+                });
+            }
         }
 
-        if (!Schema::hasColumn('solar_maintenance_schedules', 'cancellation_reason')) {
-            Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                $table->text('cancellation_reason')->nullable()->after('cancelled_at');
-            });
+        if (! Schema::hasColumn('solar_maintenance_schedules', 'cancellation_reason')) {
+            if (Schema::hasTable('solar_maintenance_schedules')) {
+                Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
+                    if (! Schema::hasColumn('solar_maintenance_schedules', 'cancellation_reason')) {
+                        $table->text('cancellation_reason')->nullable()->after('cancelled_at');
+                    }
+                });
+            }
         }
 
-        if (!Schema::hasColumn('solar_maintenance_schedules', 'reopened_at')) {
-            Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                $table->timestamp('reopened_at')->nullable()->after('cancellation_reason');
-            });
+        if (! Schema::hasColumn('solar_maintenance_schedules', 'reopened_at')) {
+            if (Schema::hasTable('solar_maintenance_schedules')) {
+                Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
+                    if (! Schema::hasColumn('solar_maintenance_schedules', 'reopened_at')) {
+                        $table->timestamp('reopened_at')->nullable()->after('cancellation_reason');
+                    }
+                });
+            }
         }
 
-        if (!Schema::hasColumn('solar_maintenance_schedules', 'reopened_by')) {
-            Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                $table->unsignedBigInteger('reopened_by')->nullable()->index()->after('reopened_at');
-            });
+        if (! Schema::hasColumn('solar_maintenance_schedules', 'reopened_by')) {
+            if (Schema::hasTable('solar_maintenance_schedules')) {
+                Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
+                    if (! Schema::hasColumn('solar_maintenance_schedules', 'reopened_by')) {
+                        $table->unsignedBigInteger('reopened_by')->nullable()->index()->after('reopened_at');
+                    }
+                });
+            }
         }
 
-        if (!Schema::hasColumn('solar_maintenance_schedules', 'deleted_at')) {
-            Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
-                $table->softDeletes();
-            });
+        if (! Schema::hasColumn('solar_maintenance_schedules', 'deleted_at')) {
+            if (Schema::hasTable('solar_maintenance_schedules')) {
+                Schema::table('solar_maintenance_schedules', function (Blueprint $table) {
+                    $table->softDeletes();
+                });
+            }
         }
     }
 
@@ -180,7 +216,7 @@ return new class extends Migration
                         $update['schedule_code'] = sprintf('SM-%s-%06d', $year, $row->id);
                     }
 
-                    if (empty($row->company_id) && !empty($row->site_id) && Schema::hasTable('sites')) {
+                    if (empty($row->company_id) && ! empty($row->site_id) && Schema::hasTable('sites')) {
                         $companyId = DB::table('sites')->where('id', $row->site_id)->value('company_id');
                         if ($companyId) {
                             $update['company_id'] = (int) $companyId;
@@ -207,7 +243,7 @@ return new class extends Migration
                         $ids = $decoded;
                     }
 
-                    if (!$ids && !empty($row->assigned_to)) {
+                    if (! $ids && ! empty($row->assigned_to)) {
                         $ids = [(int) $row->assigned_to];
                     }
 
@@ -229,7 +265,7 @@ return new class extends Migration
                         ->where('maintenance_schedule_id', $row->id)
                         ->exists();
 
-                    if (!$hasHistory) {
+                    if (! $hasHistory) {
                         DB::table('solar_maintenance_status_histories')->insert([
                             'maintenance_schedule_id' => $row->id,
                             'from_status' => null,

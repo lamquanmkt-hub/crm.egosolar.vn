@@ -51,18 +51,15 @@
                 button.setAttribute('aria-expanded', 'false');
             });
 
-            const anyDrawerOpen = panels.some((panel) => (
-                panel.classList.contains('is-open')
-                && panel.dataset.crmPanel !== 'more'
-            ));
-            backdrop?.classList.toggle('is-open', anyDrawerOpen && isMobilePanelMode());
-            backdrop?.setAttribute('aria-hidden', anyDrawerOpen && isMobilePanelMode() ? 'false' : 'true');
+            const anyOpen = panels.some((panel) => panel.classList.contains('is-open'));
+            backdrop?.classList.toggle('is-open', anyOpen && isMobilePanelMode());
+            backdrop?.setAttribute('aria-hidden', anyOpen && isMobilePanelMode() ? 'false' : 'true');
         };
 
         const openPanel = (name) => {
             const panel = root.querySelector(`[data-crm-panel="${CSS.escape(name)}"]`);
-            const toggles = Array.from(root.querySelectorAll(`[data-crm-panel-toggle="${CSS.escape(name)}"]`));
-            if (!panel || !toggles.length) return;
+            const toggle = root.querySelector(`[data-crm-panel-toggle="${CSS.escape(name)}"]`);
+            if (!panel || !toggle) return;
 
             const alreadyOpen = panel.classList.contains('is-open');
             closePanels();
@@ -70,11 +67,9 @@
 
             panel.classList.add('is-open');
             panel.setAttribute('aria-hidden', 'false');
-            toggles.forEach((toggle) => toggle.setAttribute('aria-expanded', 'true'));
-
-            const useBackdrop = isMobilePanelMode() && name !== 'more';
-            backdrop?.classList.toggle('is-open', useBackdrop);
-            backdrop?.setAttribute('aria-hidden', useBackdrop ? 'false' : 'true');
+            toggle.setAttribute('aria-expanded', 'true');
+            backdrop?.classList.toggle('is-open', isMobilePanelMode());
+            backdrop?.setAttribute('aria-hidden', isMobilePanelMode() ? 'false' : 'true');
 
             const search = panel.querySelector('input[type="search"]');
             if (search) window.setTimeout(() => search.focus(), 80);
@@ -103,11 +98,8 @@
         });
 
         window.addEventListener('resize', () => {
-            const anyDrawerOpen = panels.some((panel) => (
-                panel.classList.contains('is-open')
-                && panel.dataset.crmPanel !== 'more'
-            ));
-            backdrop?.classList.toggle('is-open', anyDrawerOpen && isMobilePanelMode());
+            const anyOpen = panels.some((panel) => panel.classList.contains('is-open'));
+            backdrop?.classList.toggle('is-open', anyOpen && isMobilePanelMode());
         }, { passive: true });
 
         root.querySelectorAll('[data-crm-open-panel]').forEach((button) => {

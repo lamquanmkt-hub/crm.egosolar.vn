@@ -1,7 +1,4 @@
-{{-- Thanh thao tác nhanh cho Admin/Giám đốc (hoặc người được cấp quyền
-     `payment_requests.override_locked`). Trước đây khối này kiểm tra
-     hardcode email — nay dùng đúng hệ phân quyền Spatie của hệ thống. --}}
-@if(auth()->check() && auth()->user()->canOverrideLockedFinanceRecords())
+@if(strtolower((string) optional(auth()->user())->email) === 'buibichthao@egosolar.vn')
 <style>
     .ego-pay-admin-actions {
         display: inline-flex;
@@ -57,39 +54,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
 
-    // Xóa phiếu là thao tác có ghi nhật ký: bắt buộc nhập lý do (>= 5 ký tự).
-    function egoPayConfirmWithReason(form, id) {
-        if (!confirm('Xóa phiếu ĐNTT #' + id + '? Liên kết công nợ sẽ quay lại trạng thái chưa lập ĐNTT.')) {
-            return false;
-        }
-
-        var reason = window.prompt('Nhập lý do xóa phiếu ĐNTT #' + id + ' (bắt buộc, tối thiểu 5 ký tự):', '');
-
-        if (reason === null) {
-            return false;
-        }
-
-        reason = String(reason).trim();
-
-        if (reason.length < 5) {
-            alert('Lý do xóa phải có ít nhất 5 ký tự.');
-            return false;
-        }
-
-        var field = form.querySelector('input[name="audit_reason"]');
-
-        if (!field) {
-            field = document.createElement('input');
-            field.type = 'hidden';
-            field.name = 'audit_reason';
-            form.appendChild(field);
-        }
-
-        field.value = reason;
-
-        return true;
-    }
-
     function idFromPaymentUrl(href) {
         try {
             const url = new URL(href, window.location.origin);
@@ -116,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function () {
         form.style.display = 'inline';
         form.style.margin = '0';
         form.onsubmit = function () {
-            return egoPayConfirmWithReason(form, id);
+            return confirm('Xóa phiếu ĐNTT #' + id + '? Liên kết công nợ sẽ quay lại trạng thái chưa lập ĐNTT.');
         };
 
         form.innerHTML =
@@ -158,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
         form.action = '/payment-requests/' + id + '/force-delete-by-thao';
         form.style.margin = '0';
         form.onsubmit = function () {
-            return egoPayConfirmWithReason(form, id);
+            return confirm('Xóa phiếu ĐNTT #' + id + '? Liên kết công nợ sẽ quay lại trạng thái chưa lập ĐNTT.');
         };
         form.innerHTML =
             '<input type="hidden" name="_token" value="' + csrf + '">' +

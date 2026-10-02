@@ -6,10 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Marketing\MarketingBudget;
 use App\Models\Marketing\MarketingCampaign;
 use App\Models\Marketing\MarketingMetric;
+use App\Support\SchemaCache;
+use App\View\Presenters\Marketing\MarketingBudgetPagePresenter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller ngân sách marketing: tổng hợp theo khoảng ngày và CRUD.
@@ -19,7 +20,7 @@ class MarketingBudgetController extends Controller
     /**
      * Tổng hợp ngân sách + chỉ số theo khoảng ngày/kênh/chiến dịch (phân bổ theo số ngày overlap).
      */
-    public function index(Request $request)
+    public function index(Request $request, MarketingBudgetPagePresenter $presenter)
     {
         // Filters (NEW: from/to + giữ month cũ để tương thích tạm)
         $month = $request->get('month');        // YYYY-MM (legacy)
@@ -95,8 +96,8 @@ class MarketingBudgetController extends Controller
         $metricRows = (clone $metricQ)->limit(20)->get();
 
         // ===== SUM METRICS (phân bổ theo overlap trong range) =====
-        $hasOrders = Schema::hasColumn('marketing_metrics', 'orders');
-        $hasRevenue = Schema::hasColumn('marketing_metrics', 'revenue');
+        $hasOrders = SchemaCache::hasColumn('marketing_metrics', 'orders');
+        $hasRevenue = SchemaCache::hasColumn('marketing_metrics', 'revenue');
 
         $sumSpend = 0;
         $sumLeads = 0;
@@ -228,7 +229,7 @@ class MarketingBudgetController extends Controller
             ->sortByDesc(fn ($x) => ($x->budget + $x->spend))
             ->values();
 
-        return view('marketing.budget', [
+        return view('marketing.budget', array_merge([
             // NEW for UI
             'from' => $fromView,
             'to' => $toView,
@@ -239,12 +240,9 @@ class MarketingBudgetController extends Controller
             'platform' => $platform,
             'campaign_id' => $campaign_id,
 
-            'rows' => $rows,
             'totalBudget' => $totalBudget,
             'totalSpent' => $totalSpent,
-            'summary' => $summary,
 
-            'metricRows' => $metricRows,
             'sumSpend' => $sumSpend,
             'sumLeads' => $sumLeads,
             'sumReach' => $sumReach,
@@ -255,8 +253,25 @@ class MarketingBudgetController extends Controller
             'roas' => $roas,
 
             'campaigns' => $campaigns,
-            'campaignCombined' => $campaignCombined,
-        ]);
+
+            // Quyền sửa/xoá: trước đây view tự hỏi `auth()->user()?->hasAnyRole(...)` để
+            // chọn colspan dòng rỗng. Cùng một điều kiện với `@hasanyrole` ở các cột thao tác.
+            'canManage' => $request->user()?->hasAnyRole('marketing_manager|admin') ?? false,
+        ], $presenter->viewData(
+            rows: $rows,
+            summary: $summary,
+            metricRows: $metricRows,
+            campaignCombined: $campaignCombined,
+            // THÔ, không phải $fromView/$toView: hai biến đó luôn có giá trị mặc định
+            // (đầu/cuối tháng hiện tại) nên dùng chúng thì `hasFilter` không bao giờ sai.
+            rawFilters: [
+                'from' => $fromRaw,
+                'to' => $toRaw,
+                'platform' => $platform,
+                'campaign_id' => $campaign_id,
+                'month' => $month,
+            ],
+        )));
     }
 
     /**

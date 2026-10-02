@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('solar_maintenance_schedules')) {
+        if (! Schema::hasTable('solar_maintenance_schedules')) {
             Schema::create('solar_maintenance_schedules', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('site_id')->nullable()->index();

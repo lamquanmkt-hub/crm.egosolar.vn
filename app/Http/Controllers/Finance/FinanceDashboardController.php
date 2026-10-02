@@ -9,10 +9,13 @@ use App\Models\CRM\Orders\Order;
 use App\Models\Department;
 use App\Models\Payroll;
 use App\Models\User;
+use App\Support\ProbeFailureLog;
+use App\Support\SchemaCache;
+use App\View\Presenters\Finance\FinanceDashboardPresenter;
+use App\View\Presenters\Finance\SalaryDetailPresenter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -24,10 +27,14 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
  */
 class FinanceDashboardController extends Controller
 {
+    public function __construct(
+        private readonly SalaryDetailPresenter $salaryDetailPresenter,
+    ) {}
+
     /**
      * Trang tổng quan tài chính với các chỉ số thu chi, công nợ, lợi nhuận.
      */
-    public function index(Request $request)
+    public function index(Request $request, FinanceDashboardPresenter $presenter)
     {
         $filters = [
             'keyword' => trim((string) $request->get('keyword', '')),
@@ -65,25 +72,26 @@ class FinanceDashboardController extends Controller
         $recentOrderProfits = $this->getRecentOrderProfits($filters);
         $orderStatuses = $this->getOrderStatuses();
 
-        return view('finance.index', compact(
-            'filters',
-            'orderStatuses',
-            'totalOrders',
-            'pendingPaymentRequests',
-            'pendingDisbursement',
-            'totalReceivableBase',
-            'collectedAmount',
-            'receivableAmount',
-            'overdueReceivables',
-            'totalRevenue',
-            'totalCost',
-            'grossProfit',
-            'grossMargin',
-            'cashInPeriod',
-            'cashOutPeriod',
-            'netCashFlow',
-            'collectionRate',
-            'recentOrderProfits'
+        // View chỉ in: mọi phép định dạng (tiền, phần trăm, ngày, lớp màu theo dấu) ở presenter.
+        return view('finance.index', array_merge(
+            compact('filters', 'orderStatuses'),
+            $presenter->viewData(compact(
+                'totalOrders',
+                'pendingPaymentRequests',
+                'pendingDisbursement',
+                'totalReceivableBase',
+                'collectedAmount',
+                'receivableAmount',
+                'overdueReceivables',
+                'totalRevenue',
+                'totalCost',
+                'grossProfit',
+                'grossMargin',
+                'cashInPeriod',
+                'cashOutPeriod',
+                'netCashFlow',
+                'collectionRate',
+            ), $recentOrderProfits),
         ));
     }
 
@@ -119,7 +127,7 @@ class FinanceDashboardController extends Controller
             ->with(['department', 'position'])
             ->orderBy('name');
 
-        if (Schema::hasColumn('users', 'is_active')) {
+        if (SchemaCache::hasColumn('users', 'is_active')) {
             $employeesQuery->where(function ($q) {
                 $q->where('is_active', 1)
                     ->orWhereNull('is_active');
@@ -162,7 +170,7 @@ class FinanceDashboardController extends Controller
 
         if (
             $attendanceSetting &&
-            Schema::hasColumn($attendanceSetting->getTable(), 'late_penalty_per_time')
+            SchemaCache::hasColumn($attendanceSetting->getTable(), 'late_penalty_per_time')
         ) {
             $latePenaltyPerTime = (int) ($attendanceSetting->late_penalty_per_time ?? 0);
         }
@@ -229,7 +237,7 @@ class FinanceDashboardController extends Controller
             return $employee;
         });
 
-        $departments = Schema::hasTable('departments')
+        $departments = SchemaCache::hasTable('departments')
             ? Department::orderBy('name')->get()
             : collect();
 
@@ -286,7 +294,7 @@ class FinanceDashboardController extends Controller
             ->with(['department', 'position'])
             ->orderBy('name');
 
-        if (Schema::hasColumn('users', 'is_active')) {
+        if (SchemaCache::hasColumn('users', 'is_active')) {
             $employeesQuery->where(function ($q) {
                 $q->where('is_active', 1)
                     ->orWhereNull('is_active');
@@ -328,7 +336,7 @@ class FinanceDashboardController extends Controller
 
         if (
             $attendanceSetting &&
-            Schema::hasColumn($attendanceSetting->getTable(), 'late_penalty_per_time')
+            SchemaCache::hasColumn($attendanceSetting->getTable(), 'late_penalty_per_time')
         ) {
             $latePenaltyPerTime = (int) ($attendanceSetting->late_penalty_per_time ?? 0);
         }
@@ -802,8 +810,9 @@ class FinanceDashboardController extends Controller
         }
 
         $end = (clone $start)->endOfMonth();
+        $standardDaysAuto = $this->calculateStandardWorkdays($month);
 
-        $workingDays = AttendanceRecord::query()
+        $workingDaysAuto = AttendanceRecord::query()
             ->where('user_id', $user->id)
             ->whereBetween('work_date', [$start->toDateString(), $end->toDateString()])
             ->whereNotNull('check_in_at')
@@ -821,12 +830,11 @@ class FinanceDashboardController extends Controller
             ->count();
 
         $attendanceSetting = AttendanceSetting::first();
-
         $latePenaltyPerTime = 0;
 
         if (
             $attendanceSetting &&
-            Schema::hasColumn($attendanceSetting->getTable(), 'late_penalty_per_time')
+            SchemaCache::hasColumn($attendanceSetting->getTable(), 'late_penalty_per_time')
         ) {
             $latePenaltyPerTime = (int) ($attendanceSetting->late_penalty_per_time ?? 0);
         }
@@ -836,16 +844,340 @@ class FinanceDashboardController extends Controller
             ->where('payroll_month', $month)
             ->first();
 
-        return view('finance.salary-detail', [
+        $salaryMeta = $this->decodePayrollNote($payroll?->note);
+        $technicalSalaryMap = $this->getTechnicalSalaryMap($month);
+        $technicalSalaryTotal = (float) ($technicalSalaryMap[$user->id] ?? 0);
+        $technicalKpi = $this->getTechnicalKpiSnapshot($user->id, $month);
+
+        $standardDays = $payroll ? (float) $payroll->standard_days : (float) $standardDaysAuto;
+        $workingDays = $payroll ? (float) $payroll->working_days : (float) $workingDaysAuto;
+        $basicSalary = $payroll ? (float) $payroll->basic_salary : $this->getEmployeeBaseSalary($user);
+
+        if (($this->isTechnicalEmployee($user) || $technicalSalaryTotal > 0) && $technicalSalaryTotal > 0) {
+            $basicSalary = $technicalSalaryTotal;
+        }
+
+        $componentValues = collect();
+        if ($payroll && SchemaCache::hasTable('payroll_slip_component_values')) {
+            $componentValues = DB::table('payroll_slip_component_values')
+                ->where('payroll_id', $payroll->id)
+                ->pluck('amount', 'component_id');
+        }
+
+        $components = $this->getPayrollSlipComponents();
+        $componentRows = $components->map(function ($component) use (
+            $payroll,
+            $salaryMeta,
+            $componentValues,
+            $basicSalary,
+            $standardDays,
+            $workingDays,
+            $lateCount,
+            $latePenaltyPerTime,
+            $technicalKpi
+        ) {
+            $amount = $this->resolvePayrollSlipComponentAmount(
+                $component,
+                $payroll,
+                $salaryMeta,
+                $componentValues,
+                $basicSalary,
+                $standardDays,
+                $workingDays,
+                $lateCount,
+                $latePenaltyPerTime,
+                $technicalKpi
+            );
+
+            return (object) [
+                'definition' => $component,
+                'amount' => $amount,
+            ];
+        });
+
+        $incomeTotal = (float) $componentRows
+            ->filter(fn ($row) => ($row->definition->section ?? '') === 'income' && (bool) ($row->definition->affects_total ?? false))
+            ->sum('amount');
+
+        $deductionTotal = (float) $componentRows
+            ->filter(fn ($row) => ($row->definition->section ?? '') === 'deduction' && (bool) ($row->definition->affects_total ?? false))
+            ->sum('amount');
+
+        $calculatedNet = round($incomeTotal - $deductionTotal);
+        if ($components->isEmpty()) {
+            $incomeTotal = $standardDays > 0 ? ($basicSalary / $standardDays) * $workingDays : 0;
+            $incomeTotal += (float) ($payroll->allowance ?? 0) + (float) ($payroll->commission ?? 0) + (float) ($payroll->bonus ?? 0);
+            $deductionTotal = (float) ($payroll->advance ?? 0) + (float) ($payroll->other_deduction ?? 0) + ($lateCount * $latePenaltyPerTime);
+            $calculatedNet = $payroll ? (float) $payroll->net_salary : round($incomeTotal - $deductionTotal);
+        }
+
+        $slipSettings = $this->payrollSlipSettingsMap();
+
+        return view('finance.salary-detail', array_merge([
             'employee' => $user->load(['department', 'position']),
             'month' => $month,
-            'workingDays' => $payroll ? (float) $payroll->working_days : $workingDays,
+            'workingDays' => $workingDays,
+            'standardDays' => $standardDays,
             'totalMinutes' => $totalMinutes,
             'payroll' => $payroll,
+            'salaryMeta' => $salaryMeta,
             'lateCount' => $lateCount,
             'latePenaltyPerTime' => $latePenaltyPerTime,
             'latePenaltyTotal' => $lateCount * $latePenaltyPerTime,
+            'technicalKpi' => $technicalKpi,
+            'componentRows' => $componentRows,
+            'incomeTotal' => $incomeTotal,
+            'deductionTotal' => $deductionTotal,
+            'calculatedNet' => $calculatedNet,
+            'slipSettings' => $slipSettings,
+            'editMode' => $request->boolean('edit'),
+            'canEditSlip' => $this->canEditPayrollSlip(),
+            'isAdmin' => $this->isAdminUser(),
+        ], $this->salaryDetailPresenter->viewData($componentRows, $salaryMeta, $technicalKpi)));
+    }
+
+    /**
+     * Cấu hình mẫu phiếu lương. Chỉ quản trị viên được phép truy cập/thay đổi.
+     */
+    public function salarySlipSettings()
+    {
+        abort_unless($this->isAdminUser(), 403);
+
+        return view('finance.salary-slip-settings', [
+            'settings' => $this->payrollSlipSettingsMap(),
+            'components' => $this->getPayrollSlipComponents(false),
+            'sourceOptions' => $this->payrollSlipSourceOptions(),
         ]);
+    }
+
+    public function saveSalarySlipSettings(Request $request)
+    {
+        abort_unless($this->isAdminUser(), 403);
+
+        if (! SchemaCache::hasTable('payroll_slip_settings')) {
+            return back()->with('error', 'Chưa có bảng cấu hình phiếu lương. Hãy chạy migration của gói cập nhật.');
+        }
+
+        $data = $request->validate([
+            'title' => 'required|string|max:190',
+            'subtitle' => 'nullable|string|max:500',
+            'footer_note' => 'nullable|string|max:1000',
+        ]);
+
+        $data['show_attendance'] = $request->boolean('show_attendance') ? '1' : '0';
+        $data['show_kpi_summary'] = $request->boolean('show_kpi_summary') ? '1' : '0';
+        $data['show_note'] = $request->boolean('show_note') ? '1' : '0';
+
+        foreach ($data as $key => $value) {
+            DB::table('payroll_slip_settings')->updateOrInsert(
+                ['setting_key' => $key],
+                ['setting_value' => $value, 'updated_at' => now(), 'created_at' => now()]
+            );
+        }
+
+        return back()->with('success', 'Đã lưu cấu hình chung của phiếu lương.');
+    }
+
+    public function createSalarySlipComponent(Request $request)
+    {
+        abort_unless($this->isAdminUser(), 403);
+        $data = $this->validateSalarySlipComponent($request);
+
+        $baseCode = trim((string) ($request->input('code') ?: \Illuminate\Support\Str::slug($data['label'], '_')));
+        $baseCode = $baseCode !== '' ? $baseCode : 'component';
+        $code = $baseCode;
+        $i = 2;
+        while (DB::table('payroll_slip_components')->where('code', $code)->exists()) {
+            $code = $baseCode.'_'.$i++;
+        }
+
+        DB::table('payroll_slip_components')->insert(array_merge($data, [
+            'code' => $code,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]));
+
+        return back()->with('success', 'Đã thêm thành phần phiếu lương: '.$data['label']);
+    }
+
+    public function updateSalarySlipComponent(Request $request, $component)
+    {
+        abort_unless($this->isAdminUser(), 403);
+        $data = $this->validateSalarySlipComponent($request);
+
+        DB::table('payroll_slip_components')
+            ->where('id', $component)
+            ->whereNull('deleted_at')
+            ->update(array_merge($data, ['updated_at' => now()]));
+
+        return back()->with('success', 'Đã cập nhật thành phần phiếu lương.');
+    }
+
+    public function deleteSalarySlipComponent($component)
+    {
+        abort_unless($this->isAdminUser(), 403);
+
+        DB::table('payroll_slip_components')
+            ->where('id', $component)
+            ->whereNull('deleted_at')
+            ->update([
+                'is_active' => 0,
+                'deleted_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        return back()->with('success', 'Đã xóa thành phần khỏi mẫu phiếu lương. Dữ liệu lịch sử vẫn được giữ.');
+    }
+
+    /**
+     * Cập nhật một phiếu lương từ trang chi tiết. Các dòng cấu hình động được lưu riêng,
+     * các nguồn lõi tiếp tục đồng bộ với bảng payrolls để không phá bảng lương hiện tại.
+     */
+    public function saveSalaryDetail(Request $request, User $user)
+    {
+        $month = $request->input('month', now()->format('Y-m'));
+        try {
+            Carbon::createFromFormat('Y-m', $month);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Kỳ lương không hợp lệ.');
+        }
+
+        $componentsInput = $request->input('components', []);
+        $components = $this->getPayrollSlipComponents();
+        $existing = Payroll::query()->where('user_id', $user->id)->where('payroll_month', $month)->first();
+        $salaryMeta = $this->decodePayrollNote($existing?->note);
+
+        $standardDays = $existing ? (float) $existing->standard_days : (float) $this->calculateStandardWorkdays($month);
+        $workingDays = $existing ? (float) $existing->working_days : 0;
+        $basicSalary = $existing ? (float) $existing->basic_salary : $this->getEmployeeBaseSalary($user);
+        $core = [
+            'standard_days' => $standardDays,
+            'working_days' => $workingDays,
+            'basic_salary' => $basicSalary,
+            'allowance' => (float) ($existing->allowance ?? 0),
+            'commission' => (float) ($existing->commission ?? 0),
+            'bonus' => (float) ($existing->bonus ?? 0),
+            'advance' => (float) ($existing->advance ?? 0),
+            'other_deduction' => (float) ($existing->other_deduction ?? 0),
+        ];
+
+        $incomeBreakdown = is_array($salaryMeta['income_breakdown'] ?? null) ? $salaryMeta['income_breakdown'] : [];
+        $deductionBreakdown = is_array($salaryMeta['deduction_breakdown'] ?? null) ? $salaryMeta['deduction_breakdown'] : [];
+
+        DB::beginTransaction();
+        try {
+            foreach ($components as $component) {
+                if (! (bool) ($component->editable_amount ?? false) || ! array_key_exists($component->id, $componentsInput)) {
+                    continue;
+                }
+
+                $amount = max((float) $componentsInput[$component->id], 0);
+                $source = (string) ($component->source ?? 'manual');
+
+                if (array_key_exists($source, $core)) {
+                    $core[$source] = $amount;
+
+                    continue;
+                }
+
+                if (str_starts_with($source, 'income_')) {
+                    $incomeBreakdown[substr($source, 7)] = $amount;
+
+                    continue;
+                }
+
+                if (str_starts_with($source, 'deduction_')) {
+                    $deductionBreakdown[substr($source, 10)] = $amount;
+
+                    continue;
+                }
+            }
+
+            $core['allowance'] = array_sum(array_map('floatval', $incomeBreakdown));
+            $lateAuto = (float) ($deductionBreakdown['late_penalty'] ?? 0);
+            $core['other_deduction'] = max(array_sum(array_map('floatval', $deductionBreakdown)), 0);
+
+            $salaryMeta['income_breakdown'] = $incomeBreakdown;
+            $salaryMeta['deduction_breakdown'] = $deductionBreakdown;
+            $salaryMeta['note_text'] = trim((string) $request->input('note_text', $salaryMeta['note_text'] ?? ''));
+
+            $payroll = Payroll::updateOrCreate(
+                ['user_id' => $user->id, 'payroll_month' => $month],
+                array_merge($core, [
+                    'net_salary' => (float) ($existing->net_salary ?? 0),
+                    'note' => json_encode($salaryMeta, JSON_UNESCAPED_UNICODE),
+                    'created_by' => $existing?->created_by ?: auth()->id(),
+                ])
+            );
+
+            if (SchemaCache::hasTable('payroll_slip_component_values')) {
+                foreach ($components as $component) {
+                    if (! (bool) ($component->editable_amount ?? false) || ! array_key_exists($component->id, $componentsInput)) {
+                        continue;
+                    }
+
+                    $source = (string) ($component->source ?? 'manual');
+                    if (! in_array($source, ['manual', 'fixed'], true)) {
+                        continue;
+                    }
+
+                    DB::table('payroll_slip_component_values')->updateOrInsert(
+                        ['payroll_id' => $payroll->id, 'component_id' => $component->id],
+                        ['amount' => max((float) $componentsInput[$component->id], 0), 'updated_at' => now(), 'created_at' => now()]
+                    );
+                }
+            }
+
+            $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+            $end = (clone $start)->endOfMonth();
+            $lateCount = AttendanceRecord::query()
+                ->where('user_id', $user->id)
+                ->whereBetween('work_date', [$start->toDateString(), $end->toDateString()])
+                ->where('late_minutes', '>', 0)
+                ->count();
+            $attendanceSetting = AttendanceSetting::first();
+            $latePenaltyPerTime = ($attendanceSetting && SchemaCache::hasColumn($attendanceSetting->getTable(), 'late_penalty_per_time'))
+                ? (int) ($attendanceSetting->late_penalty_per_time ?? 0)
+                : 0;
+            $technicalKpi = $this->getTechnicalKpiSnapshot($user->id, $month);
+            $values = SchemaCache::hasTable('payroll_slip_component_values')
+                ? DB::table('payroll_slip_component_values')->where('payroll_id', $payroll->id)->pluck('amount', 'component_id')
+                : collect();
+
+            $currentMeta = $this->decodePayrollNote($payroll->note);
+            $rows = $components->map(function ($component) use ($payroll, $currentMeta, $values, $lateCount, $latePenaltyPerTime, $technicalKpi) {
+                return (object) [
+                    'definition' => $component,
+                    'amount' => $this->resolvePayrollSlipComponentAmount(
+                        $component,
+                        $payroll,
+                        $currentMeta,
+                        $values,
+                        (float) $payroll->basic_salary,
+                        (float) $payroll->standard_days,
+                        (float) $payroll->working_days,
+                        $lateCount,
+                        $latePenaltyPerTime,
+                        $technicalKpi
+                    ),
+                ];
+            });
+
+            $incomeTotal = (float) $rows->filter(fn ($row) => $row->definition->section === 'income' && (bool) $row->definition->affects_total)->sum('amount');
+            $deductionTotal = (float) $rows->filter(fn ($row) => $row->definition->section === 'deduction' && (bool) $row->definition->affects_total)->sum('amount');
+            $payroll->net_salary = round($incomeTotal - $deductionTotal);
+            $payroll->save();
+
+            DB::commit();
+
+            return redirect()->route('finance.salary.detail', ['user' => $user->id, 'month' => $month])
+                ->with('success', 'Đã cập nhật phiếu lương.');
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return back()->with('error', 'Không thể cập nhật phiếu lương: '.$e->getMessage());
+        }
     }
 
     /**
@@ -955,7 +1287,7 @@ class FinanceDashboardController extends Controller
 
         $holidayDates = collect();
 
-        if (Schema::hasTable('attendance_holidays')) {
+        if (SchemaCache::hasTable('attendance_holidays')) {
             $holidayDates = DB::table('attendance_holidays')
                 ->whereBetween('holiday_date', [$start->toDateString(), $end->toDateString()])
                 ->pluck('holiday_date')
@@ -965,7 +1297,7 @@ class FinanceDashboardController extends Controller
 
         $saturdayCustomDates = [];
 
-        if ($setting && Schema::hasColumn($setting->getTable(), 'saturday_custom_dates')) {
+        if ($setting && SchemaCache::hasColumn($setting->getTable(), 'saturday_custom_dates')) {
             $rawCustomDates = $setting->saturday_custom_dates ?? [];
 
             if (is_string($rawCustomDates)) {
@@ -1037,7 +1369,7 @@ class FinanceDashboardController extends Controller
         ];
 
         foreach ($columns as $column) {
-            if (Schema::hasColumn('users', $column) && isset($employee->{$column})) {
+            if (SchemaCache::hasColumn('users', $column) && isset($employee->{$column})) {
                 return (float) $employee->{$column};
             }
         }
@@ -1058,7 +1390,7 @@ class FinanceDashboardController extends Controller
         if (
             str_contains($text, 'kỹ thuật') ||
             str_contains($text, 'ky thuat') ||
-            str_contains($text, 'ky_thuat') ||
+            str_contains($text, 'technical') ||
             str_contains($text, 'technical')
         ) {
             return true;
@@ -1066,7 +1398,7 @@ class FinanceDashboardController extends Controller
 
         if (method_exists($employee, 'hasRole')) {
             try {
-                return $employee->hasRole('ky_thuat')
+                return $employee->hasRole('technical')
                     || $employee->hasRole('kythuat')
                     || $employee->hasRole('Kỹ thuật')
                     || $employee->hasRole('technical');
@@ -1076,6 +1408,219 @@ class FinanceDashboardController extends Controller
         }
 
         return false;
+    }
+
+    private function canEditPayrollSlip(): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        if ($this->isAdminUser()) {
+            return true;
+        }
+
+        if (method_exists($user, 'hasAnyRole')) {
+            return $user->hasAnyRole(['accounting', 'management']);
+        }
+
+        return in_array((string) ($user->role ?? ''), ['accounting', 'management'], true);
+    }
+
+    private function isAdminUser(): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        if ((int) ($user->is_admin ?? 0) === 1 || (($user->role ?? null) === 'admin')) {
+            return true;
+        }
+
+        return method_exists($user, 'hasRole') && $user->hasRole('admin');
+    }
+
+    private function decodePayrollNote($note): array
+    {
+        if (! is_string($note) || trim($note) === '') {
+            return [
+                'note_text' => '',
+                'income_breakdown' => [],
+                'deduction_breakdown' => [],
+            ];
+        }
+
+        $decoded = json_decode($note, true);
+        if (! is_array($decoded)) {
+            return [
+                'note_text' => $note,
+                'income_breakdown' => [],
+                'deduction_breakdown' => [],
+            ];
+        }
+
+        $decoded['note_text'] = (string) ($decoded['note_text'] ?? '');
+        $decoded['income_breakdown'] = is_array($decoded['income_breakdown'] ?? null) ? $decoded['income_breakdown'] : [];
+        $decoded['deduction_breakdown'] = is_array($decoded['deduction_breakdown'] ?? null) ? $decoded['deduction_breakdown'] : [];
+
+        return $decoded;
+    }
+
+    private function payrollSlipSettingsMap(): array
+    {
+        $defaults = [
+            'title' => 'PHIẾU LƯƠNG NHÂN VIÊN',
+            'subtitle' => 'Chi tiết thu nhập, khấu trừ và thực nhận theo kỳ lương',
+            'footer_note' => 'Phiếu lương được tổng hợp từ dữ liệu chấm công, KPI và các khoản điều chỉnh đã được xác nhận.',
+            'show_attendance' => '1',
+            'show_kpi_summary' => '1',
+            'show_note' => '1',
+        ];
+
+        if (! SchemaCache::hasTable('payroll_slip_settings')) {
+            return $defaults;
+        }
+
+        $stored = DB::table('payroll_slip_settings')->pluck('setting_value', 'setting_key')->all();
+
+        return array_merge($defaults, $stored);
+    }
+
+    private function getPayrollSlipComponents(bool $activeOnly = true)
+    {
+        if (! SchemaCache::hasTable('payroll_slip_components')) {
+            return collect();
+        }
+
+        $query = DB::table('payroll_slip_components')->whereNull('deleted_at');
+        if ($activeOnly) {
+            $query->where('is_active', 1)->where('show_on_payslip', 1);
+        }
+
+        return $query->orderBy('sort_order')->orderBy('id')->get();
+    }
+
+    private function payrollSlipSourceOptions(): array
+    {
+        return [
+            'manual' => 'Nhập tay theo từng phiếu',
+            'fixed' => 'Giá trị mặc định',
+            'basic_salary' => 'Lương tháng',
+            'standard_days' => 'Ngày công chuẩn',
+            'working_days' => 'Ngày công thực tế',
+            'salary_by_days' => 'Lương theo ngày công',
+            'income_business_trip' => 'Công tác phí',
+            'income_meal' => 'Phụ cấp cơm',
+            'income_phone' => 'Phụ cấp điện thoại',
+            'income_housing' => 'Phụ cấp nhà ở',
+            'income_fuel' => 'Phụ cấp xăng xe',
+            'income_child' => 'Phụ cấp con nhỏ',
+            'income_province' => 'Phụ cấp tỉnh',
+            'commission' => 'Hoa hồng / OT',
+            'bonus' => 'Thưởng',
+            'technical_kpi' => 'Lương KPI kỹ thuật đã duyệt',
+            'deduction_bhxh' => 'BHXH',
+            'deduction_bhyt' => 'BHYT',
+            'deduction_bhtn' => 'BHTN',
+            'deduction_pit' => 'Thuế TNCN',
+            'advance' => 'Tạm ứng',
+            'late_penalty' => 'Phạt đi trễ tự động',
+            'deduction_other' => 'Khấu trừ khác',
+        ];
+    }
+
+    private function validateSalarySlipComponent(Request $request): array
+    {
+        $validated = $request->validate([
+            'label' => 'required|string|max:190',
+            'section' => 'required|in:info,income,deduction',
+            'source' => 'required|string|max:80',
+            'display_format' => 'required|in:money,number,percent',
+            'default_amount' => 'nullable|numeric|min:0',
+            'sort_order' => 'nullable|integer|min:0|max:99999',
+            'note' => 'nullable|string|max:1000',
+        ]);
+
+        $validated['default_amount'] = (float) ($validated['default_amount'] ?? 0);
+        $validated['sort_order'] = (int) ($validated['sort_order'] ?? 0);
+        $validated['affects_total'] = $request->boolean('affects_total');
+        $validated['editable_amount'] = $request->boolean('editable_amount');
+        $validated['show_on_payslip'] = $request->boolean('show_on_payslip');
+        $validated['is_active'] = $request->boolean('is_active');
+
+        return $validated;
+    }
+
+    private function getTechnicalKpiSnapshot(int $userId, string $month)
+    {
+        if (! SchemaCache::hasTable('technical_kpi_payrolls')) {
+            return null;
+        }
+
+        $monthColumn = $this->firstExistingColumn('technical_kpi_payrolls', ['payroll_month', 'salary_month', 'month', 'period']);
+        $userColumn = $this->firstExistingColumn('technical_kpi_payrolls', ['user_id', 'employee_id', 'staff_id']);
+        if (! $monthColumn || ! $userColumn) {
+            return null;
+        }
+
+        $query = DB::table('technical_kpi_payrolls')
+            ->where($userColumn, $userId)
+            ->whereIn($monthColumn, $this->getMonthVariants($month));
+
+        if (SchemaCache::hasColumn('technical_kpi_payrolls', 'status')) {
+            $query->whereIn('status', ['approved', 'locked', 'confirmed']);
+        }
+
+        return $query->orderByDesc('id')->first();
+    }
+
+    private function resolvePayrollSlipComponentAmount(
+        $component,
+        $payroll,
+        array $salaryMeta,
+        $componentValues,
+        float $basicSalary,
+        float $standardDays,
+        float $workingDays,
+        int $lateCount,
+        int $latePenaltyPerTime,
+        $technicalKpi
+    ): float {
+        $source = (string) ($component->source ?? 'manual');
+        $income = is_array($salaryMeta['income_breakdown'] ?? null) ? $salaryMeta['income_breakdown'] : [];
+        $deduction = is_array($salaryMeta['deduction_breakdown'] ?? null) ? $salaryMeta['deduction_breakdown'] : [];
+
+        if (isset($componentValues[$component->id]) && in_array($source, ['manual', 'fixed'], true)) {
+            return (float) $componentValues[$component->id];
+        }
+
+        return match ($source) {
+            'basic_salary' => $basicSalary,
+            'standard_days' => $standardDays,
+            'working_days' => $workingDays,
+            'salary_by_days' => $standardDays > 0 ? ($basicSalary / $standardDays) * $workingDays : 0,
+            'commission' => (float) ($payroll->commission ?? 0),
+            'bonus' => (float) ($payroll->bonus ?? 0),
+            'advance' => (float) ($payroll->advance ?? 0),
+            'income_business_trip' => (float) ($income['business_trip'] ?? 0),
+            'income_meal' => (float) ($income['meal'] ?? 0),
+            'income_phone' => (float) ($income['phone'] ?? 0),
+            'income_housing' => (float) ($income['housing'] ?? 0),
+            'income_fuel' => (float) ($income['fuel'] ?? 0),
+            'income_child' => (float) ($income['child'] ?? 0),
+            'income_province' => (float) ($income['province'] ?? 0),
+            'deduction_bhxh' => (float) ($deduction['bhxh'] ?? 0),
+            'deduction_bhyt' => (float) ($deduction['bhyt'] ?? 0),
+            'deduction_bhtn' => (float) ($deduction['bhtn'] ?? 0),
+            'deduction_pit' => (float) ($deduction['pit'] ?? 0),
+            'deduction_other' => (float) ($deduction['other'] ?? 0),
+            'late_penalty' => (float) ($lateCount * $latePenaltyPerTime),
+            'technical_kpi' => (float) ($technicalKpi->real_kpi_salary ?? 0),
+            'fixed' => (float) ($component->default_amount ?? 0),
+            default => (float) ($component->default_amount ?? 0),
+        };
     }
 
     /**
@@ -1094,7 +1639,7 @@ class FinanceDashboardController extends Controller
         $monthVariants = $this->getMonthVariants($month);
 
         foreach ($tables as $table) {
-            if (! Schema::hasTable($table)) {
+            if (! SchemaCache::hasTable($table)) {
                 continue;
             }
 
@@ -1128,12 +1673,20 @@ class FinanceDashboardController extends Controller
             }
 
             try {
-                return DB::table($table)
+                $query = DB::table($table)
                     ->select($userColumn, DB::raw('SUM(COALESCE(`'.$amountColumn.'`, 0)) as amount'))
-                    ->whereIn($monthColumn, $monthVariants)
+                    ->whereIn($monthColumn, $monthVariants);
+
+                if ($table === 'technical_kpi_payrolls' && SchemaCache::hasColumn($table, 'status')) {
+                    $query->whereIn('status', ['approved', 'locked', 'confirmed']);
+                }
+
+                return $query
                     ->groupBy($userColumn)
                     ->pluck('amount', $userColumn);
             } catch (\Throwable $e) {
+                ProbeFailureLog::warn('FinanceDashboardController::getTechnicalSalaryMap', $e);
+
                 continue;
             }
         }
@@ -1169,7 +1722,7 @@ class FinanceDashboardController extends Controller
     private function firstExistingColumn(string $table, array $columns): ?string
     {
         foreach ($columns as $column) {
-            if (Schema::hasColumn($table, $column)) {
+            if (SchemaCache::hasColumn($table, $column)) {
                 return $column;
             }
         }
@@ -1188,21 +1741,21 @@ class FinanceDashboardController extends Controller
             $keyword = $filters['keyword'];
 
             $query->where(function ($q) use ($keyword) {
-                if (Schema::hasColumn('crm_orders', 'order_code')) {
+                if (SchemaCache::hasColumn('crm_orders', 'order_code')) {
                     $q->orWhere('order_code', 'like', '%'.$keyword.'%');
                 }
 
-                if (Schema::hasColumn('crm_orders', 'customer_name')) {
+                if (SchemaCache::hasColumn('crm_orders', 'customer_name')) {
                     $q->orWhere('customer_name', 'like', '%'.$keyword.'%');
                 }
 
-                if (Schema::hasColumn('crm_orders', 'customer_phone')) {
+                if (SchemaCache::hasColumn('crm_orders', 'customer_phone')) {
                     $q->orWhere('customer_phone', 'like', '%'.$keyword.'%');
                 }
             });
         }
 
-        if (! empty($filters['order_status']) && Schema::hasColumn('crm_orders', 'status')) {
+        if (! empty($filters['order_status']) && SchemaCache::hasColumn('crm_orders', 'status')) {
             $query->where('status', $filters['order_status']);
         }
 
@@ -1226,11 +1779,11 @@ class FinanceDashboardController extends Controller
      */
     private function getOrderDateColumn(): ?string
     {
-        if (Schema::hasColumn('crm_orders', 'order_date')) {
+        if (SchemaCache::hasColumn('crm_orders', 'order_date')) {
             return 'order_date';
         }
 
-        if (Schema::hasColumn('crm_orders', 'created_at')) {
+        if (SchemaCache::hasColumn('crm_orders', 'created_at')) {
             return 'created_at';
         }
 
@@ -1242,7 +1795,7 @@ class FinanceDashboardController extends Controller
      */
     private function getOrderStatuses(): array
     {
-        if (! Schema::hasTable('crm_orders') || ! Schema::hasColumn('crm_orders', 'status')) {
+        if (! SchemaCache::hasTable('crm_orders') || ! SchemaCache::hasColumn('crm_orders', 'status')) {
             return [];
         }
 
@@ -1261,7 +1814,7 @@ class FinanceDashboardController extends Controller
      */
     private function getPendingPaymentRequestsCount(array $filters): int
     {
-        if (! Schema::hasTable('payment_requests') || ! Schema::hasColumn('payment_requests', 'status')) {
+        if (! SchemaCache::hasTable('payment_requests') || ! SchemaCache::hasColumn('payment_requests', 'status')) {
             return 0;
         }
 
@@ -1289,9 +1842,9 @@ class FinanceDashboardController extends Controller
     private function getPendingPaymentRequestsAmount(array $filters): float
     {
         if (
-            ! Schema::hasTable('payment_requests') ||
-            ! Schema::hasColumn('payment_requests', 'status') ||
-            ! Schema::hasColumn('payment_requests', 'amount')
+            ! SchemaCache::hasTable('payment_requests') ||
+            ! SchemaCache::hasColumn('payment_requests', 'status') ||
+            ! SchemaCache::hasColumn('payment_requests', 'amount')
         ) {
             return 0;
         }
@@ -1319,11 +1872,11 @@ class FinanceDashboardController extends Controller
      */
     private function getPaymentRequestDateColumn(): ?string
     {
-        if (Schema::hasColumn('payment_requests', 'updated_at')) {
+        if (SchemaCache::hasColumn('payment_requests', 'updated_at')) {
             return 'updated_at';
         }
 
-        if (Schema::hasColumn('payment_requests', 'created_at')) {
+        if (SchemaCache::hasColumn('payment_requests', 'created_at')) {
             return 'created_at';
         }
 
@@ -1335,7 +1888,7 @@ class FinanceDashboardController extends Controller
      */
     private function getDebtBaseQuery(array $filters)
     {
-        if (! Schema::hasTable('crm_customer_debts')) {
+        if (! SchemaCache::hasTable('crm_customer_debts')) {
             return null;
         }
 
@@ -1345,17 +1898,17 @@ class FinanceDashboardController extends Controller
             $keyword = $filters['keyword'];
 
             $query->where(function ($q) use ($keyword) {
-                if (Schema::hasColumn('crm_customer_debts', 'customer_name')) {
+                if (SchemaCache::hasColumn('crm_customer_debts', 'customer_name')) {
                     $q->orWhere('customer_name', 'like', '%'.$keyword.'%');
                 }
 
-                if (Schema::hasColumn('crm_customer_debts', 'order_code')) {
+                if (SchemaCache::hasColumn('crm_customer_debts', 'order_code')) {
                     $q->orWhere('order_code', 'like', '%'.$keyword.'%');
                 }
             });
         }
 
-        if (! empty($filters['order_status']) && Schema::hasColumn('crm_customer_debts', 'status')) {
+        if (! empty($filters['order_status']) && SchemaCache::hasColumn('crm_customer_debts', 'status')) {
             $query->where('status', $filters['order_status']);
         }
 
@@ -1379,11 +1932,11 @@ class FinanceDashboardController extends Controller
      */
     private function getDebtDateColumn(): ?string
     {
-        if (Schema::hasColumn('crm_customer_debts', 'debt_date')) {
+        if (SchemaCache::hasColumn('crm_customer_debts', 'debt_date')) {
             return 'debt_date';
         }
 
-        if (Schema::hasColumn('crm_customer_debts', 'created_at')) {
+        if (SchemaCache::hasColumn('crm_customer_debts', 'created_at')) {
             return 'created_at';
         }
 
@@ -1397,7 +1950,7 @@ class FinanceDashboardController extends Controller
     {
         $query = $this->getDebtBaseQuery($filters);
 
-        if (! $query || ! Schema::hasColumn('crm_customer_debts', 'total_amount')) {
+        if (! $query || ! SchemaCache::hasColumn('crm_customer_debts', 'total_amount')) {
             return 0;
         }
 
@@ -1411,7 +1964,7 @@ class FinanceDashboardController extends Controller
     {
         $query = $this->getDebtBaseQuery($filters);
 
-        if (! $query || ! Schema::hasColumn('crm_customer_debts', 'paid_amount')) {
+        if (! $query || ! SchemaCache::hasColumn('crm_customer_debts', 'paid_amount')) {
             return 0;
         }
 
@@ -1425,7 +1978,7 @@ class FinanceDashboardController extends Controller
     {
         $query = $this->getDebtBaseQuery($filters);
 
-        if (! $query || ! Schema::hasColumn('crm_customer_debts', 'debt_amount')) {
+        if (! $query || ! SchemaCache::hasColumn('crm_customer_debts', 'debt_amount')) {
             return 0;
         }
 
@@ -1441,8 +1994,8 @@ class FinanceDashboardController extends Controller
 
         if (
             ! $query ||
-            ! Schema::hasColumn('crm_customer_debts', 'debt_amount') ||
-            ! Schema::hasColumn('crm_customer_debts', 'status')
+            ! SchemaCache::hasColumn('crm_customer_debts', 'debt_amount') ||
+            ! SchemaCache::hasColumn('crm_customer_debts', 'status')
         ) {
             return 0;
         }
@@ -1459,13 +2012,13 @@ class FinanceDashboardController extends Controller
     {
         $query = $this->getFilteredOrdersQuery($filters);
 
-        if (Schema::hasColumn('crm_orders', 'total_amount')) {
+        if (SchemaCache::hasColumn('crm_orders', 'total_amount')) {
             return (float) $query->sum('total_amount');
         }
 
         if (
-            Schema::hasTable('crm_order_items') &&
-            Schema::hasColumn('crm_order_items', 'line_total')
+            SchemaCache::hasTable('crm_order_items') &&
+            SchemaCache::hasColumn('crm_order_items', 'line_total')
         ) {
             $orderIds = $query->pluck('id');
 
@@ -1483,13 +2036,13 @@ class FinanceDashboardController extends Controller
     private function getTotalCost(array $filters): float
     {
         if (
-            ! Schema::hasTable('crm_order_items') ||
-            ! Schema::hasTable('crm_product_catalog') ||
-            ! Schema::hasColumn('crm_order_items', 'order_id') ||
-            ! Schema::hasColumn('crm_order_items', 'product_id') ||
-            ! Schema::hasColumn('crm_order_items', 'quantity') ||
-            ! Schema::hasColumn('crm_product_catalog', 'id') ||
-            ! Schema::hasColumn('crm_product_catalog', 'price_agent')
+            ! SchemaCache::hasTable('crm_order_items') ||
+            ! SchemaCache::hasTable('crm_product_catalog') ||
+            ! SchemaCache::hasColumn('crm_order_items', 'order_id') ||
+            ! SchemaCache::hasColumn('crm_order_items', 'product_id') ||
+            ! SchemaCache::hasColumn('crm_order_items', 'quantity') ||
+            ! SchemaCache::hasColumn('crm_product_catalog', 'id') ||
+            ! SchemaCache::hasColumn('crm_product_catalog', 'price_agent')
         ) {
             return 0;
         }
@@ -1513,15 +2066,15 @@ class FinanceDashboardController extends Controller
     private function getCashInPeriod(array $filters): float
     {
         if (
-            ! Schema::hasTable('crm_payments') ||
-            ! Schema::hasColumn('crm_payments', 'amount')
+            ! SchemaCache::hasTable('crm_payments') ||
+            ! SchemaCache::hasColumn('crm_payments', 'amount')
         ) {
             return 0;
         }
 
-        $dateColumn = Schema::hasColumn('crm_payments', 'payment_date')
+        $dateColumn = SchemaCache::hasColumn('crm_payments', 'payment_date')
             ? 'payment_date'
-            : (Schema::hasColumn('crm_payments', 'created_at') ? 'created_at' : null);
+            : (SchemaCache::hasColumn('crm_payments', 'created_at') ? 'created_at' : null);
 
         if (! $dateColumn) {
             return 0;
@@ -1551,8 +2104,8 @@ class FinanceDashboardController extends Controller
     private function getCashOutPeriod(array $filters): float
     {
         if (
-            ! Schema::hasTable('payment_requests') ||
-            ! Schema::hasColumn('payment_requests', 'amount')
+            ! SchemaCache::hasTable('payment_requests') ||
+            ! SchemaCache::hasColumn('payment_requests', 'amount')
         ) {
             return 0;
         }
@@ -1565,7 +2118,7 @@ class FinanceDashboardController extends Controller
 
         $query = DB::table('payment_requests');
 
-        if (Schema::hasColumn('payment_requests', 'status')) {
+        if (SchemaCache::hasColumn('payment_requests', 'status')) {
             $query->whereIn('status', [
                 'accounting_approved',
                 'approved',
@@ -1596,9 +2149,9 @@ class FinanceDashboardController extends Controller
     private function getRecentOrderProfits(array $filters)
     {
         if (
-            ! Schema::hasTable('crm_orders') ||
-            ! Schema::hasTable('crm_order_items') ||
-            ! Schema::hasTable('crm_product_catalog')
+            ! SchemaCache::hasTable('crm_orders') ||
+            ! SchemaCache::hasTable('crm_order_items') ||
+            ! SchemaCache::hasTable('crm_product_catalog')
         ) {
             return collect();
         }
@@ -1614,7 +2167,7 @@ class FinanceDashboardController extends Controller
         ];
 
         foreach ($requiredColumns as [$table, $column]) {
-            if (! Schema::hasColumn($table, $column)) {
+            if (! SchemaCache::hasColumn($table, $column)) {
                 return collect();
             }
         }
@@ -1625,7 +2178,7 @@ class FinanceDashboardController extends Controller
             return collect();
         }
 
-        $orderDateColumn = Schema::hasColumn('crm_orders', 'order_date') ? 'order_date' : 'created_at';
+        $orderDateColumn = SchemaCache::hasColumn('crm_orders', 'order_date') ? 'order_date' : 'created_at';
 
         return DB::table('crm_order_items as oi')
             ->join('crm_orders as o', 'o.id', '=', 'oi.order_id')

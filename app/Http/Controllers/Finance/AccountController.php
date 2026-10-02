@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\View\Presenters\Finance\AccountListPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -45,7 +46,10 @@ class AccountController extends Controller
             'cash_balance' => Account::where('type', 'cash')->sum('current_balance'),
         ];
 
-        return view('finance.accounts.index', compact('accounts', 'stats'));
+        return view('finance.accounts.index', array_merge(
+            compact('accounts', 'stats'),
+            app(AccountListPresenter::class)->viewData($accounts, $stats)
+        ));
     }
 
     /**

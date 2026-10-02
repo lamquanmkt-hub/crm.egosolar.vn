@@ -41,6 +41,11 @@ class AttendanceRecord extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function correctionRequests(): HasMany
+    {
+        return $this->hasMany(AttendanceCorrectionRequest::class);
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
@@ -66,10 +71,4 @@ class AttendanceRecord extends Model
             default => 'secondary',
         };
     }
-
-    public function correctionRequests(): HasMany
-    {
-        return $this->hasMany(AttendanceCorrectionRequest::class);
-    }
-
 }

@@ -6,18 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Technical\StoreSolarMaintenanceRequest;
 use App\Http\Requests\Technical\UpdateSolarMaintenanceRequest;
 use App\Http\Requests\Technical\UpdateSolarMaintenanceStatusRequest;
-use App\Models\SolarMaintenanceProfile;
 use App\Models\SolarMaintenanceSchedule;
-use App\Services\Technical\MaintenanceProjectHandoffService;
+use App\Models\SolarWarrantyClaim;
+use App\Models\SolarWarrantyStockMovement;
 use App\Services\Technical\SolarMaintenanceQueryService;
 use App\Services\Technical\SolarMaintenanceService;
-use App\Support\EgoCompanyScope;
+use App\Services\Technical\SolarWarrantyQueryService;
 use App\Support\SolarMaintenanceAccess;
+use App\View\Presenters\Technical\MaintenanceDashboardPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\ViewErrorBag;
 use Illuminate\View\View;
 
 /**
@@ -31,346 +32,103 @@ class SolarMaintenanceController extends Controller
     public function __construct(
         private readonly SolarMaintenanceQueryService $queryService,
         private readonly SolarMaintenanceService $service,
+        private readonly SolarWarrantyQueryService $warrantyQuery,
+        private readonly MaintenanceDashboardPresenter $dashboardPresenter,
     ) {}
 
     /**
      * Hiển thị trang danh sách lịch bảo trì kèm bộ lọc, thống kê và quyền thao tác.
      */
-
-    /**
-     * Xóa hồ sơ khỏi Bảo hành & O&M.
-     * Không xóa project/công trình CRM gốc.
-     */
-    public function destroyMaintenanceProfile(
-        Request $request,
-        SolarMaintenanceProfile $profile
-    ) {
-        $user = $request->user();
-
-        abort_unless(
-            $user
-            && (
-                $user->hasAnyRole([
-                    'admin',
-                    'management',
-                    'manager',
-                    'technical_manager',
-                    'technical_leader',
-                    'truong_phong_ky_thuat',
-                ])
-                || \App\Support\SolarMaintenanceAccess::isManager($user)
-            ),
-            403,
-            'Bạn không có quyền xóa hồ sơ bảo hành.'
-        );
-
-        DB::transaction(function () use ($profile) {
-
-            /*
-             * Soft delete toàn bộ các đợt thuộc profile.
-             */
-            $scheduleQuery = DB::table(
-                'solar_maintenance_schedules'
-            )->where(
-                'maintenance_profile_id',
-                $profile->id
-            );
-
-            if (
-                Schema::hasColumn(
-                    'solar_maintenance_schedules',
-                    'deleted_at'
-                )
-            ) {
-                $scheduleQuery->update([
-                    'deleted_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            } else {
-                $scheduleQuery->update([
-                    'status' => 'cancelled',
-                    'updated_at' => now(),
-                ]);
-            }
-
-            /*
-             * Ẩn profile khỏi O&M.
-             */
-            $payload = [
-                'status' => 'deleted',
-                'updated_at' => now(),
-            ];
-
-            if (
-                Schema::hasColumn(
-                    'solar_maintenance_profiles',
-                    'deleted_at'
-                )
-            ) {
-                $payload['deleted_at'] = now();
-            }
-
-            DB::table(
-                'solar_maintenance_profiles'
-            )
-                ->where('id', $profile->id)
-                ->update($payload);
-
-            /*
-             * Xóa event lịch kỹ thuật được sync từ O&M nếu có.
-             */
-            if (
-                Schema::hasTable(
-                    'technical_schedule_events'
-                )
-            ) {
-                $scheduleIds = DB::table(
-                    'solar_maintenance_schedules'
-                )
-                    ->where(
-                        'maintenance_profile_id',
-                        $profile->id
-                    )
-                    ->pluck('id');
-
-                $eventIds = DB::table(
-                    'technical_schedule_events'
-                )
-                    ->where(
-                        'source_type',
-                        'maintenance'
-                    )
-                    ->whereIn(
-                        'source_id',
-                        $scheduleIds
-                    )
-                    ->pluck('id');
-
-                if (
-                    $eventIds->isNotEmpty()
-                    && Schema::hasTable(
-                        'technical_schedule_event_users'
-                    )
-                ) {
-                    DB::table(
-                        'technical_schedule_event_users'
-                    )
-                        ->whereIn(
-                            'event_id',
-                            $eventIds
-                        )
-                        ->delete();
-                }
-
-                DB::table(
-                    'technical_schedule_events'
-                )
-                    ->whereIn(
-                        'id',
-                        $eventIds
-                    )
-                    ->delete();
-            }
-        });
-
-        return back()->with(
-            'success',
-            'Đã xóa hồ sơ khỏi Bảo hành & O&M. Công trình CRM gốc vẫn được giữ nguyên.'
-        );
-    }
     public function index(Request $request): View
     {
         $this->authorize('viewAny', SolarMaintenanceSchedule::class);
-        app(MaintenanceProjectHandoffService::class)->syncExistingCompletedThrottled();
-
-        $allowedViews = ['all', 'needs_action', 'upcoming', 'overdue', 'completed'];
-        $currentView = (string) $request->input('view', 'all');
-        if (! in_array($currentView, $allowedViews, true)) {
-            $currentView = 'all';
-        }
-        $request->merge(['view' => $currentView]);
 
         $user = $request->user();
         $schedules = $this->queryService->schedules($request, $user);
         $summary = $this->queryService->summary($user);
+        $overviewSchedules = $this->queryService->overviewSchedules($user, 8);
+        $technicianWorkload = $this->queryService->technicianWorkload($user, 6);
+        $maintenanceRounds = $this->queryService->roundOverview($user, 4);
         $sites = $this->queryService->recentSites($user);
         $users = $this->queryService->technicalUsers();
-
-        $profileQuery = SolarMaintenanceProfile::query();
-        $companyId = EgoCompanyScope::currentId();
-        if (
-            $companyId > 0
-            && ! SolarMaintenanceAccess::isAdmin($user)
-            && ! SolarMaintenanceAccess::isTechnician($user)
-        ) {
-            $profileQuery->where(function ($q) use ($companyId) {
-                $q->where('company_id', $companyId)->orWhereNull('company_id');
-            });
-        }
-
-        $waitingProfiles = (clone $profileQuery)
-            ->where('status', 'waiting_plan')
-            ->orderByDesc('source_completed_at')
-            ->orderByDesc('id')
-            ->limit(100)
-            ->get();
-
-        $profileCount = (clone $profileQuery)->where('status', 'waiting_plan')->count();
-        $summary['waiting_plan'] = $profileCount;
-
-        /*
-         * Dropdown lập kế hoạch trước đây chỉ lấy bảng `sites`, trong khi
-         * "Danh sách công trình tổng" còn có công trình Kỹ thuật tự tạo
-         * nằm ở project_test/maintenance profile và có thể không có bản ghi site.
-         * Bổ sung các profile chưa xuất hiện trong $sites để không mất công trình.
-         */
-        $loadedSiteIds = $sites->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $profileOptionQuery = clone $profileQuery;
-        if ($companyId > 0 && ! SolarMaintenanceAccess::isAdmin($user)) {
-            // Dropdown tạo kế hoạch phải bám công ty đang làm việc, giống danh sách sites.
-            $profileOptionQuery->where(function ($q) use ($companyId) {
-                $q->where('company_id', $companyId)->orWhereNull('company_id');
-            });
-        }
-
-        $profileOptions = $profileOptionQuery
-            ->where('status', '!=', 'deleted')
-            ->orderByDesc('id')
-            ->limit(300)
-            ->get()
-            ->filter(function (SolarMaintenanceProfile $profile) use ($loadedSiteIds) {
-                $siteId = (int) ($profile->site_id ?? 0);
-                return $siteId <= 0 || ! in_array($siteId, $loadedSiteIds, true);
-            })
-            ->values();
+        $activeView = in_array($request->input('view'), ['overview', 'maintenance', 'claims', 'stock', 'files'], true)
+            ? (string) $request->input('view')
+            : 'overview';
+        $warrantySummary = $this->warrantyQuery->summary($user);
+        $claims = $this->warrantyQuery->claims($request, $user);
+        $stockMovements = $this->warrantyQuery->stockMovements($request, $user);
+        $openClaims = $this->warrantyQuery->openClaimOptions($user);
+        $warehouses = $this->warrantyQuery->warehouses($user);
+        $documentSites = $this->warrantyQuery->documentSites($user);
+        $recentClaims = $this->warrantyQuery->recentClaims($user);
+        $recentStock = $this->warrantyQuery->recentStock($user);
 
         $types = SolarMaintenanceSchedule::TYPES;
         $statuses = SolarMaintenanceSchedule::STATUSES;
         $priorities = SolarMaintenanceSchedule::PRIORITIES;
         $filters = $request->only([
             'q', 'month', 'date_from', 'date_to', 'status', 'type',
-            'priority', 'assignee_id', 'overdue', 'view', 'section',
+            'priority', 'assignee_id', 'overdue',
         ]);
-        $filters['view'] = $currentView;
-        $filters['month'] = $filters['month'] ?? '';
+
+        $filters['month'] = $filters['month'] ?? now()->format('Y-m');
 
         $permissions = [
             'create' => $user->can('create', SolarMaintenanceSchedule::class),
-            'manage' => SolarMaintenanceAccess::canPlan($user),
-            'assign' => SolarMaintenanceAccess::canAssign($user),
-            'approve' => SolarMaintenanceAccess::canApprove($user),
+            'manage' => SolarMaintenanceAccess::canManage($user),
             'admin' => SolarMaintenanceAccess::isAdmin($user),
+            'approve' => SolarMaintenanceAccess::canApprove($user),
+            'claim_create' => SolarMaintenanceAccess::canCreateWarrantyClaim($user),
+            'stock_manage' => SolarMaintenanceAccess::canHandleWarrantyStock($user),
+            'manager' => SolarMaintenanceAccess::isManager($user),
+            'warehouse' => SolarMaintenanceAccess::isWarehouse($user),
+            'technician_only' => SolarMaintenanceAccess::isTechnicianOnly($user),
         ];
 
-        return view('technical.maintenance.index', compact(
-            'schedules','summary','sites','users','types','statuses','priorities',
-            'filters','permissions','waitingProfiles','profileOptions'
-        ));
-    }
-
-    /**
-     * Hàng đợi phê duyệt dành cho Admin / Trưởng phòng kỹ thuật.
-     * Mỗi dòng là một đợt bảo hành độc lập, không gộp theo công trình.
-     */
-    public function approvalQueue(Request $request): View
-    {
-        $this->authorize('viewAny', SolarMaintenanceSchedule::class);
-        abort_unless(SolarMaintenanceAccess::canApprove($request->user()), 403);
-
-        $allowedViews = ['pending', 'revision', 'approved'];
-        $approvalView = (string) $request->input('approval_view', 'pending');
-        if (! in_array($approvalView, $allowedViews, true)) {
-            $approvalView = 'pending';
-        }
-        $request->merge(['approval_view' => $approvalView]);
-
-        $user = $request->user();
-        $approvalQueue = $this->queryService->approvalQueue($request, $user);
-        $approvalSummary = $this->queryService->approvalSummary($user);
-        $selectedId = (int) $request->input('selected', $approvalQueue->first()?->id ?? 0);
-        $selectedSchedule = $selectedId > 0
-            ? $this->queryService->approvalItem($selectedId, $user)
-            : null;
-
-        return view('technical.maintenance.approvals', [
-            'approvalQueue' => $approvalQueue,
-            'approvalSummary' => $approvalSummary,
-            'approvalView' => $approvalView,
-            'selectedSchedule' => $selectedSchedule,
-            'statuses' => SolarMaintenanceSchedule::STATUSES,
-            'types' => SolarMaintenanceSchedule::TYPES,
-            'priorities' => SolarMaintenanceSchedule::PRIORITIES,
-            'approvalStatuses' => SolarMaintenanceSchedule::APPROVAL_STATUSES,
-            'reportConclusions' => \App\Services\Technical\SolarMaintenanceWorkflowService::CONCLUSIONS,
-        ]);
+        return view('technical.maintenance.index', array_merge(compact(
+            'schedules',
+            'summary',
+            'overviewSchedules',
+            'technicianWorkload',
+            'maintenanceRounds',
+            'sites',
+            'users',
+            'types',
+            'statuses',
+            'priorities',
+            'filters',
+            'permissions',
+            'activeView',
+            'warrantySummary',
+            'claims',
+            'stockMovements',
+            'openClaims',
+            'warehouses',
+            'documentSites',
+            'recentClaims',
+            'recentStock',
+        ) + [
+            'claimTypes' => SolarWarrantyClaim::TYPES,
+            'claimStatuses' => SolarWarrantyClaim::STATUSES,
+            'claimPriorities' => SolarWarrantyClaim::PRIORITIES,
+            'stockTypes' => SolarWarrantyStockMovement::TYPES,
+            'stockStatuses' => SolarWarrantyStockMovement::STATUSES,
+        ], $this->dashboardPresenter->viewData(
+            $summary,
+            $warrantySummary,
+            $statuses,
+            $permissions,
+            $overviewSchedules,
+            $schedules,
+            $technicianWorkload,
+            $maintenanceRounds,
+            session()->get('errors') ?? new ViewErrorBag,
+        )));
     }
 
     /**
      * Tạo chuỗi các đợt bảo trì / bảo hành mới từ dữ liệu đã validate.
      */
-
-    public function destroyProfile(
-        Request $request,
-        SolarMaintenanceProfile $profile
-    ) {
-        $user = $request->user();
-
-        abort_unless(
-            $user
-            && $user->hasAnyRole([
-                'admin',
-                'management',
-                'manager',
-                'technical_manager',
-                'technical_leader',
-                'truong_phong_ky_thuat',
-            ]),
-            403,
-            'Bạn không có quyền xóa hồ sơ bảo hành.'
-        );
-
-        DB::transaction(function () use ($profile) {
-
-            /*
-             * Soft delete toàn bộ lịch thuộc hồ sơ.
-             */
-            DB::table('solar_maintenance_schedules')
-                ->where('maintenance_profile_id', $profile->id)
-                ->whereNull('deleted_at')
-                ->update([
-                    'deleted_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-            /*
-             * Profile hiện không có deleted_at trong một số bản schema.
-             * Vì vậy ưu tiên set inactive; nếu có deleted_at thì soft delete.
-             */
-            $columns = \Illuminate\Support\Facades\Schema::getColumnListing(
-                'solar_maintenance_profiles'
-            );
-
-            $payload = [
-                'status' => 'deleted',
-                'updated_at' => now(),
-            ];
-
-            if (in_array('deleted_at', $columns, true)) {
-                $payload['deleted_at'] = now();
-            }
-
-            DB::table('solar_maintenance_profiles')
-                ->where('id', $profile->id)
-                ->update($payload);
-        });
-
-        return redirect()
-            ->route('ky-thuat.maintenance.index')
-            ->with(
-                'success',
-                'Đã xóa hồ sơ bảo hành/O&M khỏi danh sách điều hành.'
-            );
-    }
     public function store(StoreSolarMaintenanceRequest $request): RedirectResponse
     {
         $this->authorize('create', SolarMaintenanceSchedule::class);
@@ -398,6 +156,14 @@ class SolarMaintenanceController extends Controller
 
         $hasValidSite = (bool) ($schedule->site_id && $schedule->site);
 
+        // Model Site cast `date` → JSON mặc định ra ISO 8601 theo UTC (lệch một ngày); trả Y-m-d như trước.
+        $siteJson = $schedule->site?->toArray();
+        foreach ($schedule->site?->getCasts() ?? [] as $attribute => $cast) {
+            if ($cast === 'date' && isset($siteJson[$attribute])) {
+                $siteJson[$attribute] = $schedule->site->{$attribute}?->format('Y-m-d');
+            }
+        }
+
         return response()->json([
             'id' => $schedule->id,
             'schedule_code' => $schedule->schedule_code,
@@ -420,12 +186,12 @@ class SolarMaintenanceController extends Controller
             'result_note' => $schedule->result_note,
             'round_no' => $schedule->round_no,
             'total_rounds' => $schedule->total_rounds,
-            'site' => $schedule->site,
+            'site' => $siteJson,
             'has_valid_site' => $hasValidSite,
             'site_detail_url' => $hasValidSite
-                ? route('ky-thuat.maintenance.site', ['site' => $schedule->site_id])
+                ? route('projects-unified.maintenance.site', ['site' => $schedule->site_id])
                 : null,
-            'schedule_detail_url' => route('ky-thuat.maintenance.show', ['schedule' => $schedule->id]),
+            'schedule_detail_url' => route('projects-unified.maintenance.show', ['schedule' => $schedule->id]),
             'round_label' => 'Đợt '.((int) ($schedule->round_no ?: 1)).'/'.((int) ($schedule->total_rounds ?: 1)),
             'history' => $schedule->statusHistories->take(20)->map(fn ($item) => [
                 'from_status' => $item->from_status,
@@ -468,8 +234,9 @@ class SolarMaintenanceController extends Controller
                 'battery_kwh' => $site->battery_kwh,
                 'system_type' => $site->system_type,
                 'phase' => $site->phase,
-                'installed_at' => $site->installed_at,
-                'warranty_to' => $site->warranty_to,
+                // Model cast `date` → trả Y-m-d như trước để ô <input type=date> nhận được.
+                'installed_at' => $site->installed_at?->format('Y-m-d'),
+                'warranty_to' => $site->warranty_to?->format('Y-m-d'),
                 'monitoring_link' => $site->monitoring_link,
                 'monitoring_account' => $site->monitoring_account,
             ])->values(),
@@ -485,9 +252,95 @@ class SolarMaintenanceController extends Controller
     ): RedirectResponse {
         $this->authorize('update', $schedule);
 
-        $this->service->update($schedule, $request->validated(), $request->user());
+        $data = $request->validated();
+        $assignmentChanged = array_key_exists('leader_user_id', $data)
+            || array_key_exists('member_user_ids', $data)
+            || array_key_exists('assigned_user_ids', $data);
+
+        if ($assignmentChanged) {
+            abort_unless(SolarMaintenanceAccess::isManager($request->user()), 403);
+        }
+
+        $updated = $this->service->update($schedule, $data, $request->user());
+
+        if ($assignmentChanged && $updated->assignees->isNotEmpty()) {
+            $updated->assignees()->update(['accepted_at' => null, 'started_at' => null]);
+            $updated->approvals()->create([
+                'approval_level' => 'assignment',
+                'submitted_by' => $request->user()->id,
+                'action' => 'assignment_submitted',
+                'status' => 'pending',
+                'comment' => 'Đã chọn nhóm kỹ thuật, chờ Admin duyệt phân công.',
+                'submitted_at' => now(),
+                'metadata' => ['assignee_ids' => $updated->assignees->pluck('user_id')->all()],
+            ]);
+
+            return back()->with('success', 'Đã chọn nhân sự. Chờ Admin duyệt phân công.');
+        }
 
         return back()->with('success', 'Đã cập nhật lịch và ghi nhận lịch sử thay đổi.');
+    }
+
+    public function approveAssignment(Request $request, SolarMaintenanceSchedule $schedule): RedirectResponse
+    {
+        $this->authorize('view', $schedule);
+        abort_unless(SolarMaintenanceAccess::isAdmin($request->user()), 403, 'Chỉ Admin được duyệt phân công.');
+
+        if (! $schedule->assignees()->exists()) {
+            return back()->with('error', 'Cần chọn kỹ thuật viên trước khi duyệt.');
+        }
+
+        DB::transaction(function () use ($request, $schedule): void {
+            if (in_array($schedule->status, ['draft', 'scheduled', 'unassigned'], true)) {
+                $this->service->changeStatus($schedule, [
+                    'status' => 'assigned',
+                    'reason' => 'Admin duyệt phân công nhóm kỹ thuật.',
+                ], $request->user());
+                $schedule->refresh();
+            }
+
+            $schedule->approvals()->create([
+                'approval_level' => 'assignment',
+                'submitted_by' => $request->user()->id,
+                'approver_id' => $request->user()->id,
+                'action' => 'assignment_approved',
+                'status' => 'approved',
+                'comment' => 'Admin đã duyệt danh sách kỹ thuật viên được phân công.',
+                'submitted_at' => now(),
+                'reviewed_at' => now(),
+                'metadata' => ['assignee_ids' => $schedule->assignees()->pluck('user_id')->all()],
+            ]);
+        });
+
+        return back()->with('success', 'Đã duyệt phân công. Kỹ thuật viên có thể nhận việc.');
+    }
+
+    public function acceptAssignment(Request $request, SolarMaintenanceSchedule $schedule): RedirectResponse
+    {
+        $this->authorize('view', $schedule);
+        $assignment = $schedule->assignees()->where('user_id', $request->user()->id)->first();
+        abort_unless($assignment, 403, 'Chỉ người được phân công mới được nhận việc.');
+
+        $approval = $schedule->approvals()->where('approval_level', 'assignment')->latest('id')->first();
+        if ($approval && $approval->status !== 'approved') {
+            return back()->with('error', 'Admin chưa duyệt phân công.');
+        }
+
+        DB::transaction(function () use ($request, $schedule, $assignment): void {
+            $assignment->forceFill([
+                'accepted_at' => $assignment->accepted_at ?: now(),
+                'started_at' => $assignment->started_at ?: now(),
+            ])->save();
+
+            if (in_array($schedule->status, ['assigned', 'customer_confirmed', 'travelling'], true)) {
+                $this->service->changeStatus($schedule, [
+                    'status' => 'in_progress',
+                    'reason' => $request->user()->name.' đã nhận việc.',
+                ], $request->user());
+            }
+        });
+
+        return back()->with('success', 'Đã nhận việc. Bạn có thể bắt đầu thực hiện.');
     }
 
     /**

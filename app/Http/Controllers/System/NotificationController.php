@@ -4,13 +4,13 @@ namespace App\Http\Controllers\System;
 
 use App\Contracts\Services\NotificationServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Controller tổng hợp thông báo hệ thống, công việc và nhân sự cho người dùng.
@@ -51,7 +51,6 @@ class NotificationController extends Controller
     public function markAsRead($id)
     {
         if (is_string($id) && str_starts_with($id, 'hr_')) {
-            $this->ensureHrAnnouncementTables();
 
             $announcementId = (int) str_replace('hr_', '', $id);
 
@@ -74,7 +73,6 @@ class NotificationController extends Controller
 
         /* EGO_TASK_NOTIFY_MARK_READ */
         if (is_string($id) && str_starts_with($id, 'task_')) {
-            $this->ensureTaskNotificationTable();
             $notificationId = (int) str_replace('task_', '', $id);
 
             DB::table('task_notifications')
@@ -155,40 +153,12 @@ class NotificationController extends Controller
         ]);
     }
 
-    /* EGO_TASK_NOTIFY_CONTROLLER_START */
-    /**
-     * Tạo bảng task_notifications nếu chưa tồn tại.
-     */
-    private function ensureTaskNotificationTable(): void
-    {
-        if (Schema::hasTable('task_notifications')) {
-            return;
-        }
-
-        DB::statement("CREATE TABLE IF NOT EXISTS `task_notifications` (
-            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `task_id` BIGINT UNSIGNED NULL,
-            `user_id` BIGINT UNSIGNED NOT NULL,
-            `created_by` BIGINT UNSIGNED NULL,
-            `type` VARCHAR(50) NOT NULL DEFAULT 'assigned',
-            `title` VARCHAR(255) NOT NULL,
-            `message` TEXT NULL,
-            `link` VARCHAR(500) NULL,
-            `is_read` TINYINT(1) NOT NULL DEFAULT 0,
-            `read_at` TIMESTAMP NULL DEFAULT NULL,
-            `created_at` TIMESTAMP NULL DEFAULT NULL,
-            `updated_at` TIMESTAMP NULL DEFAULT NULL,
-            KEY `task_notifications_user_read_idx` (`user_id`,`is_read`,`created_at`),
-            KEY `task_notifications_task_idx` (`task_id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-    }
-
     /**
      * Đếm số thông báo công việc chưa đọc của người dùng.
      */
     private function taskNotificationUnreadCount(int $userId): int
     {
-        if (! Schema::hasTable('task_notifications')) {
+        if (! SchemaCache::hasTable('task_notifications')) {
             return 0;
         }
 
@@ -203,12 +173,12 @@ class NotificationController extends Controller
      */
     private function taskNotificationItems(int $userId, int $limit)
     {
-        if (! Schema::hasTable('task_notifications')) {
+        if (! SchemaCache::hasTable('task_notifications')) {
             return collect();
         }
 
         $query = DB::table('task_notifications as n');
-        if (Schema::hasTable('tasks')) {
+        if (SchemaCache::hasTable('tasks')) {
             $query->leftJoin('tasks as t', 't.id', '=', 'n.task_id')->addSelect('t.title as task_title');
         }
 
@@ -244,7 +214,7 @@ class NotificationController extends Controller
      */
     private function markAllTaskNotificationsAsRead(int $userId): void
     {
-        if (! Schema::hasTable('task_notifications')) {
+        if (! SchemaCache::hasTable('task_notifications')) {
             return;
         }
 
@@ -504,52 +474,10 @@ class NotificationController extends Controller
     }
 
     /**
-     * Tạo các bảng thông báo nhân sự nếu chưa tồn tại.
-     */
-    private function ensureHrAnnouncementTables(): void
-    {
-        if (! Schema::hasTable('hr_announcements')) {
-            DB::statement("
-                CREATE TABLE hr_announcements (
-                    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                    title VARCHAR(255) NOT NULL,
-                    body LONGTEXT NULL,
-                    category VARCHAR(80) NOT NULL DEFAULT 'general',
-                    target_type VARCHAR(50) NOT NULL DEFAULT 'all',
-                    department_id BIGINT UNSIGNED NULL,
-                    user_id BIGINT UNSIGNED NULL,
-                    starts_at DATETIME NULL,
-                    ends_at DATETIME NULL,
-                    is_pinned TINYINT(1) NOT NULL DEFAULT 0,
-                    status VARCHAR(50) NOT NULL DEFAULT 'published',
-                    created_by BIGINT UNSIGNED NULL,
-                    created_at TIMESTAMP NULL DEFAULT NULL,
-                    updated_at TIMESTAMP NULL DEFAULT NULL
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            ");
-        }
-
-        if (! Schema::hasTable('hr_announcement_reads')) {
-            DB::statement('
-                CREATE TABLE hr_announcement_reads (
-                    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                    announcement_id BIGINT UNSIGNED NOT NULL,
-                    user_id BIGINT UNSIGNED NOT NULL,
-                    read_at TIMESTAMP NULL DEFAULT NULL,
-                    created_at TIMESTAMP NULL DEFAULT NULL,
-                    updated_at TIMESTAMP NULL DEFAULT NULL,
-                    UNIQUE KEY hra_reads_unique (announcement_id, user_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            ');
-        }
-    }
-
-    /**
      * Dựng query các thông báo nhân sự hiển thị được cho người dùng.
      */
     private function hrVisibleQuery(int $userId)
     {
-        $this->ensureHrAnnouncementTables();
 
         $user = DB::table('users')->where('id', $userId)->first();
         $departmentId = $user->department_id ?? null;
@@ -582,7 +510,7 @@ class NotificationController extends Controller
      */
     private function hrAnnouncementUnreadCount(int $userId): int
     {
-        if (! Schema::hasTable('hr_announcements')) {
+        if (! SchemaCache::hasTable('hr_announcements')) {
             return 0;
         }
 
@@ -600,7 +528,7 @@ class NotificationController extends Controller
      */
     private function hrAnnouncementItems(int $userId, int $limit)
     {
-        if (! Schema::hasTable('hr_announcements')) {
+        if (! SchemaCache::hasTable('hr_announcements')) {
             return collect();
         }
 
@@ -646,7 +574,7 @@ class NotificationController extends Controller
      */
     private function markAllHrAnnouncementsAsRead(int $userId): void
     {
-        if (! Schema::hasTable('hr_announcements')) {
+        if (! SchemaCache::hasTable('hr_announcements')) {
             return;
         }
 

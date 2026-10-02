@@ -52,7 +52,7 @@ class OrderApprovalHandler
      * Chuyển đơn hàng sang department khác.
      *
      * @param  OrderDepartment|null  $dept  Department đích (null nếu cancelled)
-     * @param  OrderStatusCode|null  $statusCode  Status code tùy chỉnh (null = lấy từ dept)
+     * @param  OrderStatusCode|null  $statusCode  Mã tuỳ chỉnh (từ chối/huỷ); null = mã của bộ phận đích
      * @param  string|null  $rawDept  Department string raw (cho trường hợp 'cancelled')
      */
     public function transitionToDepartment(
@@ -62,7 +62,7 @@ class OrderApprovalHandler
         ?string $rawDept = null,
     ): void {
         $deptValue = $rawDept ?? $dept?->value ?? 'cancelled';
-        $codeValue = $statusCode?->value ?? $dept?->statusCode()->value ?? 'CANCELLED';
+        $codeValue = $statusCode?->value ?? $dept?->arrivalStatusCode()->value ?? 'CANCELLED';
         $status = OrderStatusType::where('code', $codeValue)->first();
 
         $order->update([

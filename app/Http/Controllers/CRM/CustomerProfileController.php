@@ -5,10 +5,9 @@ namespace App\Http\Controllers\CRM;
 use App\Http\Controllers\Controller;
 use App\Models\CustomerProfile;
 use App\Models\CustomerProfileDocument;
-use Illuminate\Database\Schema\Blueprint;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -46,7 +45,6 @@ class CustomerProfileController extends Controller
      */
     public function index(Request $request)
     {
-        $this->ensureTables();
 
         $query = CustomerProfile::query()->orderByDesc('id');
 
@@ -110,7 +108,6 @@ class CustomerProfileController extends Controller
      */
     public function create(Request $request)
     {
-        $this->ensureTables();
 
         $profile = new CustomerProfile([
             'status' => 'draft',
@@ -146,7 +143,6 @@ class CustomerProfileController extends Controller
      */
     public function store(Request $request)
     {
-        $this->ensureTables();
 
         $data = $this->validatedData($request);
         $data['deposit_amount'] = $this->money($data['deposit_amount'] ?? 0);
@@ -283,7 +279,6 @@ class CustomerProfileController extends Controller
      */
     public function syncCustomers(Request $request)
     {
-        $this->ensureTables();
 
         $selectedIds = collect((array) $request->input('customer_ids', []))
             ->map(fn ($id) => (int) $id)
@@ -345,7 +340,6 @@ class CustomerProfileController extends Controller
      */
     public function shippingIndex(Request $request)
     {
-        $this->ensureTables();
 
         $q = trim((string) $request->input('q', ''));
 
@@ -376,7 +370,6 @@ class CustomerProfileController extends Controller
      */
     public function storeShipping(Request $request)
     {
-        $this->ensureTables();
 
         $data = $this->validatedShippingData($request);
 
@@ -400,7 +393,6 @@ class CustomerProfileController extends Controller
      */
     public function updateShipping(Request $request, int $shipping)
     {
-        $this->ensureTables();
 
         $data = $this->validatedShippingData($request);
 
@@ -427,7 +419,6 @@ class CustomerProfileController extends Controller
      */
     public function destroyShipping(int $shipping)
     {
-        $this->ensureTables();
 
         DB::table('customer_profile_shippings')->where('id', $shipping)->delete();
 
@@ -439,7 +430,6 @@ class CustomerProfileController extends Controller
      */
     public function export(Request $request): StreamedResponse
     {
-        $this->ensureTables();
 
         $profiles = CustomerProfile::query()->orderByDesc('id')->get();
         $this->decorateProfiles($profiles);
@@ -491,7 +481,7 @@ class CustomerProfileController extends Controller
      */
     private function shippingUnits()
     {
-        if (! Schema::hasTable('customer_profile_shippings')) {
+        if (! SchemaCache::hasTable('customer_profile_shippings')) {
             return collect();
         }
 
@@ -578,38 +568,12 @@ class CustomerProfileController extends Controller
     }
 
     /**
-     * Kiểm tra các bảng bắt buộc và tự tạo bảng customer_profile_shippings nếu chưa có.
-     */
-    private function ensureTables(): void
-    {
-        abort_unless(Schema::hasTable('customer_profiles'), 500, 'Chưa có bảng customer_profiles. Vui lòng chạy php artisan migrate.');
-        abort_unless(Schema::hasTable('customer_profile_documents'), 500, 'Chưa có bảng customer_profile_documents. Vui lòng chạy php artisan migrate.');
-
-        if (! Schema::hasTable('customer_profile_shippings')) {
-            Schema::create('customer_profile_shippings', function (Blueprint $table) {
-                $table->id();
-                $table->string('name');
-                $table->string('phone', 80)->nullable();
-                $table->string('address', 500)->nullable();
-                $table->string('route', 255)->nullable();
-                $table->text('note')->nullable();
-                $table->unsignedBigInteger('created_by')->nullable();
-                $table->unsignedBigInteger('updated_by')->nullable();
-                $table->timestamps();
-                $table->index('name');
-                $table->index('phone');
-                $table->index('route');
-            });
-        }
-    }
-
-    /**
      * Tìm tên bảng khách hàng đang tồn tại trong hệ thống (crm_customers/customers/clients).
      */
     private function customerTable(): ?string
     {
         foreach (['crm_customers', 'customers', 'clients'] as $table) {
-            if (Schema::hasTable($table)) {
+            if (SchemaCache::hasTable($table)) {
                 return $table;
             }
         }
@@ -627,7 +591,7 @@ class CustomerProfileController extends Controller
             return collect();
         }
 
-        $cols = Schema::getColumnListing($table);
+        $cols = SchemaCache::columns($table);
         $nameCol = $this->firstColumn($cols, ['name', 'company_name', 'customer_name', 'full_name', 'contact_name']);
         $phoneCol = $this->firstColumn($cols, ['phone', 'mobile', 'tel', 'telephone']);
         $emailCol = $this->firstColumn($cols, ['email']);
@@ -664,13 +628,13 @@ class CustomerProfileController extends Controller
      */
     private function priceTiers()
     {
-        if (! Schema::hasTable('crm_price_tiers')) {
+        if (! SchemaCache::hasTable('crm_price_tiers')) {
             return collect();
         }
 
         return DB::table('crm_price_tiers')
-            ->when(Schema::hasColumn('crm_price_tiers', 'is_active'), fn ($q) => $q->where('is_active', 1))
-            ->orderBy(Schema::hasColumn('crm_price_tiers', 'priority') ? 'priority' : 'id')
+            ->when(SchemaCache::hasColumn('crm_price_tiers', 'is_active'), fn ($q) => $q->where('is_active', 1))
+            ->orderBy(SchemaCache::hasColumn('crm_price_tiers', 'priority') ? 'priority' : 'id')
             ->get();
     }
 
@@ -679,7 +643,7 @@ class CustomerProfileController extends Controller
      */
     private function tierName($tierId): ?string
     {
-        if (! $tierId || ! Schema::hasTable('crm_price_tiers')) {
+        if (! $tierId || ! SchemaCache::hasTable('crm_price_tiers')) {
             return null;
         }
 

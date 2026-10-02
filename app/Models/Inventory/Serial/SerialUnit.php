@@ -1,21 +1,15 @@
 <?php
 
-declare(strict_types=1);
 namespace App\Models\Inventory\Serial;
 
-use Illuminate\Database\Eloquent\SoftDeletes;
-
-use App\Models\Core\Warehouse;
 use App\Models\Inventory\Catalog\Product;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
 class SerialUnit extends Model
 {
     use HasFactory, SoftDeletes;

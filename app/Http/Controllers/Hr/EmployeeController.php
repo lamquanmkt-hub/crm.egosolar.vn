@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\Position;
 use App\Models\User;
-use Illuminate\Database\Schema\Blueprint;
+use App\Services\Hr\EmployeeDirectoryService;
+use App\Support\ProbeFailureLog;
+use App\Support\SchemaCache;
+use App\View\Presenters\Hr\EmployeeDetailPresenter;
+use App\View\Presenters\Hr\EmployeeEditPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -21,33 +24,10 @@ use Spatie\Permission\Models\Role;
  */
 class EmployeeController extends Controller
 {
-    /**
-     * Tự thêm các cột lương (official/probation/internship) vào bảng users nếu chưa có.
-     */
-    private function ensureEmployeeSalaryColumns(): void
-    {
-        try {
-            if (! Schema::hasTable('users')) {
-                return;
-            }
-
-            Schema::table('users', function (Blueprint $table) {
-                if (! Schema::hasColumn('users', 'official_salary')) {
-                    $table->decimal('official_salary', 15, 2)->nullable()->after('is_active');
-                }
-
-                if (! Schema::hasColumn('users', 'probation_salary')) {
-                    $table->decimal('probation_salary', 15, 2)->nullable()->after('official_salary');
-                }
-
-                if (! Schema::hasColumn('users', 'internship_salary')) {
-                    $table->decimal('internship_salary', 15, 2)->nullable()->after('probation_salary');
-                }
-            });
-        } catch (\Throwable $e) {
-            // Nếu DB user chưa có quyền ALTER TABLE thì không làm sập trang HR.
-        }
-    }
+    public function __construct(
+        private readonly EmployeeDirectoryService $directory,
+        private readonly EmployeeDetailPresenter $detailPresenter,
+    ) {}
 
     /**
      * Chuẩn hoá chuỗi lương nhập vào (bỏ đ, dấu chấm, phẩy, khoảng trắng) về số float không âm.
@@ -98,7 +78,6 @@ class EmployeeController extends Controller
      */
     public function index(Request $request)
     {
-        $this->ensureEmployeeSalaryColumns();
         $query = User::query()
             ->with(['department', 'position', 'roles', 'avatar'])
             ->orderBy('name');
@@ -139,36 +118,16 @@ class EmployeeController extends Controller
         $inactiveEmployees = User::where('is_active', 0)->count();
         $departmentCount = Department::count();
 
-        $inactiveEmployeesList = $employees
-            ->filter(fn ($user) => (int) $user->is_active !== 1)
-            ->values();
-
-        $activeEmployeesOnly = $employees
-            ->filter(fn ($user) => (int) $user->is_active === 1)
-            ->values();
-
-        $boardUsers = $activeEmployeesOnly
-            ->filter(fn ($user) => $this->isBoardMember($user))
-            ->sortBy(fn ($user) => [
-                ! $this->isLikelyLeader($user),
-                strtolower($user->name ?? ''),
-            ])
-            ->values();
-
-        $departmentGroups = $this->buildDepartmentGroups($activeEmployeesOnly, $boardUsers);
-
-        return view('hr.employees.index', compact(
-            'departments',
-            'positions',
-            'roles',
-            'totalEmployees',
-            'activeEmployees',
-            'inactiveEmployees',
-            'departmentCount',
-            'boardUsers',
-            'departmentGroups',
-            'inactiveEmployeesList'
-        ));
+        return view('hr.employees.index', [
+            'departments' => $departments,
+            'positions' => $positions,
+            'roles' => $roles,
+            'totalEmployees' => $totalEmployees,
+            'activeEmployees' => $activeEmployees,
+            'inactiveEmployees' => $inactiveEmployees,
+            'departmentCount' => $departmentCount,
+            ...$this->directory->viewData($employees),
+        ]);
     }
 
     /**
@@ -176,7 +135,6 @@ class EmployeeController extends Controller
      */
     public function create()
     {
-        $this->ensureEmployeeSalaryColumns();
         $departments = Department::orderBy('name')->get();
         $positions = Position::orderBy('name')->get();
         $roles = Role::orderBy('name')->get();
@@ -189,7 +147,6 @@ class EmployeeController extends Controller
      */
     public function store(Request $request)
     {
-        $this->ensureEmployeeSalaryColumns();
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
@@ -237,10 +194,23 @@ class EmployeeController extends Controller
      */
     public function show(string $id)
     {
-        $this->ensureEmployeeSalaryColumns();
         $employee = User::with(['department', 'position', 'roles', 'avatar'])->findOrFail($id);
+        $employeeId = (int) $employee->id;
 
-        return view('hr.employees.show', compact('employee'));
+        // Hai truy vấn này trước đây nằm trong khối @php của view. Guard SchemaCache giữ nguyên:
+        // hai bảng do migration "safe" tạo nên có thể chưa tồn tại trên môi trường cũ.
+        $profile = SchemaCache::hasTable('hr_employee_profiles')
+            ? DB::table('hr_employee_profiles')->where('employee_id', $employeeId)->first()
+            : null;
+
+        $files = SchemaCache::hasTable('hr_employee_files')
+            ? DB::table('hr_employee_files')->where('employee_id', $employeeId)->orderByDesc('id')->get()
+            : collect();
+
+        return view('hr.employees.show', array_merge(
+            compact('employee'),
+            $this->detailPresenter->viewData($employee, $profile, $files),
+        ));
     }
 
     /**
@@ -250,13 +220,15 @@ class EmployeeController extends Controller
      */
     public function edit(string $id)
     {
-        $this->ensureEmployeeSalaryColumns();
         $employee = User::with(['roles', 'avatar'])->findOrFail($id);
         $departments = Department::orderBy('name')->get();
         $positions = Position::orderBy('name')->get();
         $roles = Role::orderBy('name')->get();
 
-        return view('hr.employees.edit', compact('employee', 'departments', 'positions', 'roles'));
+        return view('hr.employees.edit', array_merge(
+            compact('employee', 'departments', 'positions', 'roles'),
+            app(EmployeeEditPresenter::class)->viewData($employee, (array) request()->old())
+        ));
     }
 
     /**
@@ -266,7 +238,6 @@ class EmployeeController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $this->ensureEmployeeSalaryColumns();
         $employee = User::findOrFail($id);
 
         $request->validate([
@@ -326,29 +297,29 @@ class EmployeeController extends Controller
             ];
 
             // Xóa dữ liệu phụ không ảnh hưởng lịch sử duyệt
-            if (Schema::hasTable('model_has_roles')) {
+            if (SchemaCache::hasTable('model_has_roles')) {
                 DB::table('model_has_roles')->where('model_id', $id)->delete();
             }
 
-            if (Schema::hasTable('model_has_permissions')) {
+            if (SchemaCache::hasTable('model_has_permissions')) {
                 DB::table('model_has_permissions')->where('model_id', $id)->delete();
             }
 
-            if (Schema::hasTable('sessions')) {
+            if (SchemaCache::hasTable('sessions')) {
                 DB::table('sessions')->where('user_id', $id)->delete();
             }
 
-            if (Schema::hasTable('personal_access_tokens')) {
+            if (SchemaCache::hasTable('personal_access_tokens')) {
                 DB::table('personal_access_tokens')
                     ->where('tokenable_id', $id)
                     ->delete();
             }
 
-            if (Schema::hasTable('hr_employee_profiles')) {
+            if (SchemaCache::hasTable('hr_employee_profiles')) {
                 DB::table('hr_employee_profiles')->where('employee_id', $id)->delete();
             }
 
-            if (Schema::hasTable('hr_employee_files')) {
+            if (SchemaCache::hasTable('hr_employee_files')) {
                 $files = DB::table('hr_employee_files')->where('employee_id', $id)->get();
 
                 foreach ($files as $file) {
@@ -362,7 +333,7 @@ class EmployeeController extends Controller
 
             $hasImportantReferences = false;
 
-            if (Schema::hasTable('users')) {
+            if (SchemaCache::hasTable('users')) {
                 try {
                     $references = DB::select("
                         SELECT TABLE_NAME, COLUMN_NAME
@@ -380,7 +351,7 @@ class EmployeeController extends Controller
                             continue;
                         }
 
-                        if (! Schema::hasTable($table)) {
+                        if (! SchemaCache::hasTable($table)) {
                             continue;
                         }
 
@@ -394,6 +365,8 @@ class EmployeeController extends Controller
                         }
                     }
                 } catch (\Throwable $e) {
+                    ProbeFailureLog::warn('EmployeeController::destroy', $e);
+
                     // Nếu không đọc được information_schema thì dùng phương án an toàn: xóa mềm.
                     $hasImportantReferences = true;
                 }
@@ -407,7 +380,7 @@ class EmployeeController extends Controller
                     return redirect()->route('hr.employees.index')->with('success', 'Đã xóa nhân viên khỏi hệ thống.');
                 }
 
-                if (Schema::hasTable('users')) {
+                if (SchemaCache::hasTable('users')) {
                     DB::table('users')->where('id', $id)->delete();
 
                     return redirect()->route('hr.employees.index')->with('success', 'Đã xóa user khỏi hệ thống.');
@@ -415,8 +388,8 @@ class EmployeeController extends Controller
             }
 
             // Có lịch sử liên quan: không delete cứng, chỉ ẩn + khóa tài khoản
-            if (Schema::hasTable('users')) {
-                $columns = Schema::getColumnListing('users');
+            if (SchemaCache::hasTable('users')) {
+                $columns = SchemaCache::columns('users');
                 $data = [];
 
                 if (in_array('status', $columns, true)) {
@@ -492,193 +465,5 @@ class EmployeeController extends Controller
     public function orgChart(Request $request)
     {
         return $this->index($request);
-    }
-
-    /**
-     * Gom nhân viên đang hoạt động thành các nhóm phòng ban (gộp Marketing & Sales, Kế toán & Kho) kèm leader.
-     *
-     * @param  \Illuminate\Support\Collection  $employees  Danh sách nhân viên
-     * @param  \Illuminate\Support\Collection|null  $boardUsers  Danh sách ban giám đốc
-     */
-    private function buildDepartmentGroups($employees, $boardUsers = null)
-    {
-        $grouped = [];
-        $boardUserIds = collect($boardUsers)->pluck('id')->all();
-
-        foreach ($employees as $employee) {
-            if ((int) $employee->is_active !== 1) {
-                continue;
-            }
-
-            $departmentNames = $this->extractDepartmentNames($employee);
-
-            if (empty($departmentNames)) {
-                $departmentNames = ['Chưa gán phòng ban'];
-            }
-
-            foreach ($departmentNames as $departmentName) {
-                $normalized = mb_strtolower(trim($departmentName));
-
-                if ($this->isMarketingSales($normalized)) {
-                    $key = 'marketing-sales';
-                    $name = 'Marketing & Sales';
-                    $subtitle = '1 trưởng nhóm chung, 2 nhánh nhân sự: Marketing và Sales';
-                } elseif ($this->isAccountingWarehouse($normalized)) {
-                    $key = 'accounting-warehouse';
-                    $name = 'Kế toán & Kho';
-                    $subtitle = 'Nhóm kế toán, tài chính nội bộ và kho vận';
-                } elseif ($normalized === 'chưa gán phòng ban') {
-                    $key = 'unassigned';
-                    $name = 'Chưa gán phòng ban';
-                    $subtitle = 'Nhân sự chưa được phân về bộ phận cụ thể';
-                } else {
-                    $key = 'department-'.md5($normalized);
-                    $name = $departmentName;
-                    $subtitle = 'Nhân sự thuộc '.$departmentName;
-                }
-
-                if (! isset($grouped[$key])) {
-                    $grouped[$key] = [
-                        'key' => $key,
-                        'name' => $name,
-                        'subtitle' => $subtitle,
-                        'members' => collect(),
-                        'leader' => null,
-                    ];
-                }
-
-                if (! $grouped[$key]['members']->contains(fn ($member) => $member->id === $employee->id)) {
-                    $grouped[$key]['members']->push($employee);
-                }
-            }
-        }
-
-        $collection = collect($grouped)
-            ->map(function ($group) use ($boardUserIds) {
-                $members = $group['members']
-                    ->sortBy(fn ($user) => [
-                        in_array($user->id, $boardUserIds, true) ? 0 : 1,
-                        ! $this->isLikelyLeader($user),
-                        strtolower($user->name ?? ''),
-                    ])
-                    ->values();
-
-                $leader = $members->first(fn ($user) => $this->isLikelyLeader($user))
-                    ?? $members->first();
-
-                return [
-                    'key' => $group['key'],
-                    'name' => $group['name'],
-                    'subtitle' => $group['subtitle'],
-                    'leader' => $leader,
-                    'members' => $members,
-                ];
-            })
-            ->sortBy(function ($group) {
-                $priority = [
-                    'marketing-sales' => 1,
-                    'accounting-warehouse' => 2,
-                    'unassigned' => 99,
-                ];
-
-                return [
-                    $priority[$group['key']] ?? 10,
-                    strtolower($group['name']),
-                ];
-            })
-            ->values();
-
-        return $collection;
-    }
-
-    /**
-     * Suy ra danh sách tên phòng ban của user từ department, position và role.
-     */
-    private function extractDepartmentNames(User $user): array
-    {
-        $names = [];
-
-        if (! empty(optional($user->department)->name)) {
-            $names[] = trim($user->department->name);
-        }
-
-        $positionName = trim((string) optional($user->position)->name);
-        $roleName = trim((string) optional($user->roles->first())->name);
-        $departmentName = trim((string) optional($user->department)->name);
-
-        if (
-            $this->isMarketingSales(mb_strtolower($positionName)) ||
-            $this->isMarketingSales(mb_strtolower($roleName)) ||
-            $this->isMarketingSales(mb_strtolower($departmentName))
-        ) {
-            $names[] = 'Marketing & Sales';
-        }
-
-        if (
-            $this->isAccountingWarehouse(mb_strtolower($positionName)) ||
-            $this->isAccountingWarehouse(mb_strtolower($roleName)) ||
-            $this->isAccountingWarehouse(mb_strtolower($departmentName))
-        ) {
-            $names[] = 'Kế toán & Kho';
-        }
-
-        return array_values(array_unique(array_filter($names)));
-    }
-
-    /**
-     * Kiểm tra user có thuộc ban giám đốc (theo role, chức vụ hoặc phòng ban).
-     */
-    private function isBoardMember(User $user): bool
-    {
-        $role = mb_strtolower((string) optional($user->roles->first())->name);
-        $position = mb_strtolower((string) optional($user->position)->name);
-        $department = mb_strtolower((string) optional($user->department)->name);
-
-        return in_array($role, ['admin', 'management', 'super-admin', 'director'], true)
-            || str_contains($position, 'giám đốc')
-            || str_contains($position, 'director')
-            || str_contains($position, 'ceo')
-            || str_contains($position, 'founder')
-            || str_contains($department, 'ban giám đốc');
-    }
-
-    /**
-     * Kiểm tra user có khả năng là trưởng nhóm / quản lý (theo role hoặc tên chức vụ).
-     */
-    private function isLikelyLeader(User $user): bool
-    {
-        $role = mb_strtolower((string) optional($user->roles->first())->name);
-        $position = mb_strtolower((string) optional($user->position)->name);
-
-        return in_array($role, ['admin', 'management', 'sales_manager', 'manager', 'leader', 'lead'], true)
-            || str_contains($position, 'trưởng')
-            || str_contains($position, 'phó')
-            || str_contains($position, 'manager')
-            || str_contains($position, 'lead')
-            || str_contains($position, 'head')
-            || str_contains($position, 'giám đốc');
-    }
-
-    /**
-     * Kiểm tra chuỗi có thuộc nhóm Marketing / Sales / kinh doanh.
-     */
-    private function isMarketingSales(string $text): bool
-    {
-        return str_contains($text, 'marketing')
-            || str_contains($text, 'sale')
-            || str_contains($text, 'sales')
-            || str_contains($text, 'kinh doanh');
-    }
-
-    /**
-     * Kiểm tra chuỗi có thuộc nhóm Kế toán / Kho.
-     */
-    private function isAccountingWarehouse(string $text): bool
-    {
-        return str_contains($text, 'kế toán')
-            || str_contains($text, 'ke toan')
-            || str_contains($text, 'accounting')
-            || str_contains($text, 'kho')
-            || str_contains($text, 'warehouse');
     }
 }

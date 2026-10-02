@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Hr\Gifts;
 use App\Http\Controllers\Controller;
 use App\Models\Hr\Gift;
 use App\Models\Hr\GiftReceipt;
-use App\Support\EgoCompanyLock;
+use App\Support\EgoCompanyScope;
 use App\Support\GiftAccess;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -18,7 +18,7 @@ final class GiftStockController extends Controller
     {
         abort_unless(GiftAccess::canHandleStock($request->user()), 403);
 
-        $companyId = EgoCompanyLock::id();
+        $companyId = EgoCompanyScope::currentId();
         $search = trim((string) $request->query('q'));
 
         $giftBaseQuery = Gift::query()

@@ -1,4 +1,3 @@
-@php($ewdSettings = collect($workflow['document_settings'] ?? []))
 <dialog class="pword-assign-dialog ewd-settings-dialog" id="{{ $wfSettingsDialogId }}">
     <div class="ewd-settings-card">
         <header class="ewd-settings-header"><div><small>CHỈ QUẢN TRỊ VIÊN</small><h3>Cài đặt hồ sơ · {{ $wfDefinition['label'] ?? $wfStepCode }}</h3><p>Thêm, đổi tên, sắp xếp và quy định số lượng hồ sơ theo từng giai đoạn.</p></div><button type="button" data-pword-close-dialog aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>

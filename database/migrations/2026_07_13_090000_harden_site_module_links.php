@@ -13,7 +13,7 @@ return new class extends Migration
                 'sites',
                 function (Blueprint $table) {
                     if (
-                        !Schema::hasColumn(
+                        ! Schema::hasColumn(
                             'sites',
                             'created_by'
                         )
@@ -25,7 +25,7 @@ return new class extends Migration
                     }
 
                     if (
-                        !Schema::hasColumn(
+                        ! Schema::hasColumn(
                             'sites',
                             'company_id'
                         )
@@ -44,7 +44,7 @@ return new class extends Migration
                 'receipts',
                 function (Blueprint $table) {
                     if (
-                        !Schema::hasColumn(
+                        ! Schema::hasColumn(
                             'receipts',
                             'site_id'
                         )
@@ -56,7 +56,7 @@ return new class extends Migration
                     }
 
                     if (
-                        !Schema::hasColumn(
+                        ! Schema::hasColumn(
                             'receipts',
                             'site_payment_term_id'
                         )

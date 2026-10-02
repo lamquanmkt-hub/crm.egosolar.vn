@@ -327,12 +327,15 @@
   }
 @endphp
 
-<div class="container-fluid k-shell">
+{{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+     thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+     quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+<div class="container-fluid k-shell tw:py-4">
 
   <div class="k-hero">
     <div class="k-hero-top">
       <div>
-        <div class="d-flex flex-wrap gap-2 mb-2">
+        <div class="tw:flex flex-wrap tw:gap-2 tw:mb-2">
           <span class="pill">KPI & Lương</span>
           <span class="pill">Thiết lập</span>
           <span class="pill">Kỳ: {{ $period }}</span>
@@ -345,28 +348,28 @@
       </div>
 
       <form method="GET" action="{{ route('marketing.kpi-payroll.settings') }}" class="k-controls">
-        <label class="ghost mb-0">Kỳ</label>
-        <input type="month" name="period" value="{{ $period }}" class="form-control form-42" style="width: 190px;">
-        <button class="btn btn-primary btn-round" type="submit">👀 Xem</button>
-        <a class="btn btn-outline-secondary btn-round" href="{{ route('marketing.kpi-payroll.index', ['period' => $period]) }}">↩️ Quay lại</a>
+        <label class="ghost tw:mb-0">Kỳ</label>
+        <x-ui.input class="form-42" type="month" name="period" value="{{ $period }}" style="width: 190px;" />
+        <x-ui.button variant="primary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-round" type="submit">👀 Xem</x-ui.button>
+        <x-ui.button variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-round" :href="route('marketing.kpi-payroll.index', ['period' => $period])">↩️ Quay lại</x-ui.button>
       </form>
     </div>
 
     <div class="k-body">
 
       @if(session('success'))
-        <div class="alert alert-success alertx mb-3">{{ session('success') }}</div>
+        <x-ui.alert variant="success" class="alertx tw:mb-4">{{ session('success') }}</x-ui.alert>
       @endif
 
       @if($errors->any())
-        <div class="alert alert-danger alertx mb-3">
+        <x-ui.alert variant="danger" class="alertx tw:mb-4">
           <div style="font-weight:900;">Có lỗi:</div>
-          <ul class="mb-0">
+          <ul class="tw:mb-0">
             @foreach($errors->all() as $e)
               <li>{{ $e }}</li>
             @endforeach
           </ul>
-        </div>
+        </x-ui.alert>
       @endif
 
       {{-- STATS --}}
@@ -396,55 +399,49 @@
         {{-- ===========================
             IV. THƯỞNG NÓNG VIDEO XU HƯỚNG (DYNAMIC TIERS)
             =========================== --}}
-        <div class="cardx mb-3" id="trendCard">
+        <div class="cardx tw:mb-4" id="trendCard">
           <div class="cardx-hd">
             <div>
               <div class="cardx-tt">IV. Thưởng nóng video lên xu hướng (TikTok / Facebook Reel)</div>
               <div class="cardx-sub">Đạt <b>đủ cả View</b> và <b>Tương tác</b> (like + comment + share). Có thể tạo nhiều mốc (1,2,3,4...).</div>
             </div>
-            <div class="d-flex gap-2 align-items-center">
+            <div class="tw:flex tw:gap-2 tw:items-center">
               <span class="badge-soft">/ video</span>
-              <button type="button" class="btn btn-outline-primary btn-round" id="addTrendTier">➕ Thêm mốc</button>
+              <x-ui.button variant="outline-primary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-round" type="button" id="addTrendTier">➕ Thêm mốc</x-ui.button>
             </div>
           </div>
 
           <div class="cardx-bd">
-            <div class="mini-help mb-3">
+            <div class="mini-help tw:mb-4">
               Quy tắc: nếu video đạt nhiều mốc thì hệ thống xét <b>mốc cao nhất</b> đạt được trong tháng (theo từng video).
             </div>
 
             <div class="table-responsive">
-              <table class="table table-sm rule-table mb-0" id="trendTierTable">
+              <table class="table table-sm rule-table tw:mb-0" id="trendTierTable">
                 <thead>
                   <tr>
                     <th style="width:110px;">Mốc</th>
                     <th style="min-width:180px;">Min view</th>
                     <th style="min-width:200px;">Min tương tác</th>
                     <th style="min-width:220px;">Thưởng (VND) / video</th>
-                    <th style="width:80px;" class="text-end">Xoá</th>
+                    <th style="width:80px;" class="tw:text-right">Xoá</th>
                   </tr>
                 </thead>
                 <tbody id="trendTierTbody">
                   @foreach($trendTiers as $i => $t)
                     <tr class="trend-tier-row" data-idx="{{ $i }}">
-                      <td class="fw-bold">Mốc <span class="trend-tier-no">{{ $i+1 }}</span></td>
+                      <td class="tw:font-bold">Mốc <span class="trend-tier-no">{{ $i+1 }}</span></td>
                       <td>
-                        <input type="number" min="0" class="form-control inp"
-                          name="bonus_config[trend_video][tiers][{{ $i }}][min_view]"
-                          value="{{ data_get($t,'min_view',0) }}">
+                        <x-ui.input class="inp" type="number" min="0" name="bonus_config[trend_video][tiers][{{ $i }}][min_view]" value="{{ data_get($t,'min_view',0) }}" />
                       </td>
                       <td>
-                        <input type="number" min="0" class="form-control inp"
-                          name="bonus_config[trend_video][tiers][{{ $i }}][min_engagement]"
-                          value="{{ data_get($t,'min_engagement',0) }}">
+                        <x-ui.input class="inp" type="number" min="0" name="bonus_config[trend_video][tiers][{{ $i }}][min_engagement]" value="{{ data_get($t,'min_engagement',0) }}" />
                       </td>
                       <td>
-                        <input inputmode="numeric" class="form-control inp money"
-                          name="bonus_config[trend_video][tiers][{{ $i }}][reward]"
-                          value="{{ data_get($t,'reward',0) }}">
+                        <x-ui.input class="inp money" inputmode="numeric" name="bonus_config[trend_video][tiers][{{ $i }}][reward]" value="{{ data_get($t,'reward',0) }}" />
                       </td>
-                      <td class="text-end">
-                        <button type="button" class="btn btn-outline-danger btn-icon removeTrendTier" title="Xoá mốc">✕</button>
+                      <td class="tw:text-right">
+                        <x-ui.button variant="outline-danger" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-icon removeTrendTier" type="button" title="Xoá mốc">✕</x-ui.button>
                       </td>
                     </tr>
                   @endforeach
@@ -454,24 +451,18 @@
 
             <template id="trendTierTpl">
               <tr class="trend-tier-row" data-idx="__IDX__">
-                <td class="fw-bold">Mốc <span class="trend-tier-no">__NO__</span></td>
+                <td class="tw:font-bold">Mốc <span class="trend-tier-no">__NO__</span></td>
                 <td>
-                  <input type="number" min="0" class="form-control inp"
-                    name="bonus_config[trend_video][tiers][__IDX__][min_view]"
-                    value="0">
+                  <x-ui.input class="inp" type="number" min="0" name="bonus_config[trend_video][tiers][__IDX__][min_view]" value="0" />
                 </td>
                 <td>
-                  <input type="number" min="0" class="form-control inp"
-                    name="bonus_config[trend_video][tiers][__IDX__][min_engagement]"
-                    value="0">
+                  <x-ui.input class="inp" type="number" min="0" name="bonus_config[trend_video][tiers][__IDX__][min_engagement]" value="0" />
                 </td>
                 <td>
-                  <input inputmode="numeric" class="form-control inp money"
-                    name="bonus_config[trend_video][tiers][__IDX__][reward]"
-                    value="0">
+                  <x-ui.input class="inp money" inputmode="numeric" name="bonus_config[trend_video][tiers][__IDX__][reward]" value="0" />
                 </td>
-                <td class="text-end">
-                  <button type="button" class="btn btn-outline-danger btn-icon removeTrendTier" title="Xoá mốc">✕</button>
+                <td class="tw:text-right">
+                  <x-ui.button variant="outline-danger" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-icon removeTrendTier" type="button" title="Xoá mốc">✕</x-ui.button>
                 </td>
               </tr>
             </template>
@@ -496,45 +487,41 @@
   }
 @endphp
 
-<div class="card border-0 shadow-sm mb-3" style="border-radius:16px; overflow:hidden;">
-  <div class="card-body">
-    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+<x-ui.card class="border-0 shadow-sm tw:mb-4" style="border-radius:16px; overflow:hidden;">
+  <x-ui.card-body>
+    <div class="tw:flex tw:items-start tw:justify-between flex-wrap tw:gap-2">
       <div>
-        <div class="fw-bold" style="font-size:18px;">VII. Thưởng theo Livestream (Facebook / TikTok)</div>
-        <div class="text-muted">
+        <div class="tw:font-bold" style="font-size:18px;">VII. Thưởng theo Livestream (Facebook / TikTok)</div>
+        <div class="tw:text-[rgba(33,37,41,0.75)]">
           Chỉ tính <b>1 mốc cao nhất</b> mỗi buổi live + thưởng lead (nếu áp dụng). Có thể thêm nhiều mốc.
         </div>
       </div>
 
-      <div class="d-flex align-items-center gap-2">
-        <span class="badge bg-light text-dark" style="font-size:13px;">/ buổi</span>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="lsAddTier">
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <span class="badge bg-light tw:text-[#212529]" style="font-size:13px;">/ buổi</span>
+        <x-ui.button variant="outline-primary" size="sm" type="button" id="lsAddTier">
           + Thêm mốc
-        </button>
+        </x-ui.button>
       </div>
     </div>
 
-    <div class="row g-3 mt-2">
-      <div class="col-12 col-lg-6">
-        <label class="form-label small text-muted mb-1">Thời lượng tối thiểu (phút)</label>
-        <input type="number" min="0" class="form-control"
-               name="bonus_config[livestream][min_duration_min]"
-               value="{{ old('bonus_config.livestream.min_duration_min', $lsMin) }}">
+    <div class="tw:row tw:g-3 tw:mt-2">
+      <div class="tw:col12-12 tw:min-[62rem]:col12-6">
+        <x-ui.label class="small tw:text-[rgba(33,37,41,0.75)] tw:mb-1">Thời lượng tối thiểu (phút)</x-ui.label>
+        <x-ui.input type="number" min="0" name="bonus_config[livestream][min_duration_min]" value="{{ old('bonus_config.livestream.min_duration_min', $lsMin) }}" />
       </div>
 
-      <div class="col-12 col-lg-6">
-        <label class="form-label small text-muted mb-1">Thưởng / lead hợp lệ (VND)</label>
-        <input type="number" min="0" class="form-control moneyish"
-               name="bonus_config[livestream][lead_reward]"
-               value="{{ old('bonus_config.livestream.lead_reward', $lsLead) }}">
+      <div class="tw:col12-12 tw:min-[62rem]:col12-6">
+        <x-ui.label class="small tw:text-[rgba(33,37,41,0.75)] tw:mb-1">Thưởng / lead hợp lệ (VND)</x-ui.label>
+        <x-ui.input class="moneyish" type="number" min="0" name="bonus_config[livestream][lead_reward]" value="{{ old('bonus_config.livestream.lead_reward', $lsLead) }}" />
       </div>
     </div>
 
-    <div class="mt-3 p-2 border rounded-4">
+    <div class="tw:mt-4 tw:p-2 border rounded-4">
       <div class="table-responsive">
-        <table class="table align-middle mb-0">
+        <table class="table align-middle tw:mb-0">
           <thead>
-            <tr class="text-muted small">
+            <tr class="tw:text-[rgba(33,37,41,0.75)] small">
               <th style="width:110px;">Mốc</th>
               <th>Min view</th>
               <th>Min tương tác</th>
@@ -545,24 +532,18 @@
           <tbody id="lsTierBody">
             @foreach($lsTiers as $i => $t)
               <tr data-ls-tier-row>
-                <td class="fw-semibold text-muted">Mốc <span class="ls-idx">{{ $i+1 }}</span></td>
+                <td class="tw:font-semibold tw:text-[rgba(33,37,41,0.75)]!">Mốc <span class="ls-idx">{{ $i+1 }}</span></td>
                 <td>
-                  <input type="number" min="0" class="form-control"
-                         name="bonus_config[livestream][tiers][{{ $i }}][min_view]"
-                         value="{{ (int)($t['min_view'] ?? 0) }}">
+                  <x-ui.input type="number" min="0" name="bonus_config[livestream][tiers][{{ $i }}][min_view]" value="{{ (int)($t['min_view'] ?? 0) }}" />
                 </td>
                 <td>
-                  <input type="number" min="0" class="form-control"
-                         name="bonus_config[livestream][tiers][{{ $i }}][min_engagement]"
-                         value="{{ (int)($t['min_engagement'] ?? 0) }}">
+                  <x-ui.input type="number" min="0" name="bonus_config[livestream][tiers][{{ $i }}][min_engagement]" value="{{ (int)($t['min_engagement'] ?? 0) }}" />
                 </td>
                 <td>
-                  <input type="number" min="0" class="form-control moneyish"
-                         name="bonus_config[livestream][tiers][{{ $i }}][reward]"
-                         value="{{ (int)($t['reward'] ?? 0) }}">
+                  <x-ui.input class="moneyish" type="number" min="0" name="bonus_config[livestream][tiers][{{ $i }}][reward]" value="{{ (int)($t['reward'] ?? 0) }}" />
                 </td>
-                <td class="text-end">
-                  <button type="button" class="btn btn-outline-danger btn-sm" data-ls-remove>✕</button>
+                <td class="tw:text-right">
+                  <x-ui.button variant="outline-danger" size="sm" type="button" data-ls-remove>✕</x-ui.button>
                 </td>
               </tr>
             @endforeach
@@ -570,32 +551,32 @@
         </table>
       </div>
 
-      <div class="small text-muted mt-2" id="lsPreview"></div>
+      <div class="small tw:text-[rgba(33,37,41,0.75)] tw:mt-2" id="lsPreview"></div>
     </div>
 
-    <div class="alert alert-light mt-3 mb-0" style="border-radius:14px;">
+    <x-ui.alert variant="light" class="tw:mt-4 tw:mb-0" style="border-radius:14px;">
       <div class="small">
         Điều kiện hợp lệ: ≥ <b>{{ $lsMin }}</b> phút + đúng định hướng + CTA + có link + nhập số liệu trong 24h.
         Tương tác = like + comment + share.
       </div>
-    </div>
-  </div>
-</div>
+    </x-ui.alert>
+  </x-ui.card-body>
+</x-ui.card>
 
 <template id="lsTierTpl">
   <tr data-ls-tier-row>
-    <td class="fw-semibold text-muted">Mốc <span class="ls-idx">X</span></td>
-    <td><input type="number" min="0" class="form-control" name="__NAME__[min_view]" value="0"></td>
-    <td><input type="number" min="0" class="form-control" name="__NAME__[min_engagement]" value="0"></td>
-    <td><input type="number" min="0" class="form-control moneyish" name="__NAME__[reward]" value="0"></td>
-    <td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-ls-remove>✕</button></td>
+    <td class="tw:font-semibold tw:text-[rgba(33,37,41,0.75)]!">Mốc <span class="ls-idx">X</span></td>
+    <td><x-ui.input type="number" min="0" name="__NAME__[min_view]" value="0" /></td>
+    <td><x-ui.input type="number" min="0" name="__NAME__[min_engagement]" value="0" /></td>
+    <td><x-ui.input class="moneyish" type="number" min="0" name="__NAME__[reward]" value="0" /></td>
+    <td class="tw:text-right"><x-ui.button variant="outline-danger" size="sm" type="button" data-ls-remove>✕</x-ui.button></td>
   </tr>
 </template>
 
         {{-- ===========================
             VI. ANTI FRAUD
             =========================== --}}
-        <div class="cardx mb-3">
+        <div class="cardx tw:mb-4">
           <div class="cardx-hd">
             <div>
               <div class="cardx-tt">VI. Quy định chống gian lận (bắt buộc)</div>
@@ -604,25 +585,21 @@
             <span class="badge-soft">Penalty</span>
           </div>
           <div class="cardx-bd">
-            <div class="row g-3">
-              <div class="col-12 col-lg-6">
-                <label class="ghost mb-1">Mức trừ (%)</label>
-                <input type="number" min="0" max="100" class="form-control inp" id="penaltyPct"
-                  name="bonus_config[anti_fraud][penalty_percent]"
-                  value="{{ old('bonus_config.anti_fraud.penalty_percent', data_get($bonusConfig,'anti_fraud.penalty_percent',70)) }}">
+            <div class="tw:row tw:g-3">
+              <div class="tw:col12-12 tw:min-[62rem]:col12-6">
+                <label class="ghost tw:mb-1">Mức trừ (%)</label>
+                <x-ui.input class="inp" type="number" min="0" max="100" id="penaltyPct" name="bonus_config[anti_fraud][penalty_percent]" value="{{ old('bonus_config.anti_fraud.penalty_percent', data_get($bonusConfig,'anti_fraud.penalty_percent',70)) }}" />
               </div>
-              <div class="col-12 col-lg-6">
-                <label class="ghost mb-1">Giữ lại (%)</label>
-                <input type="number" min="0" max="100" class="form-control inp" id="keepPct"
-                  name="bonus_config[anti_fraud][keep_percent]"
-                  value="{{ old('bonus_config.anti_fraud.keep_percent', data_get($bonusConfig,'anti_fraud.keep_percent',30)) }}">
+              <div class="tw:col12-12 tw:min-[62rem]:col12-6">
+                <label class="ghost tw:mb-1">Giữ lại (%)</label>
+                <x-ui.input class="inp" type="number" min="0" max="100" id="keepPct" name="bonus_config[anti_fraud][keep_percent]" value="{{ old('bonus_config.anti_fraud.keep_percent', data_get($bonusConfig,'anti_fraud.keep_percent',30)) }}" />
               </div>
-              <div class="col-12">
+              <div class="tw:col12-12">
                 <div class="mini-help" id="fraudPreview">
                   Lương thực nhận sau phạt = (Lương KPI + Thưởng nóng + Thưởng TikTok) × 30%
                 </div>
               </div>
-              <div class="col-12">
+              <div class="tw:col12-12">
                 <div class="mini-help">
                   Nghiêm cấm buff tương tác ảo (mua view/like/comment/share, tool/traffic không hợp lệ...). Nếu vi phạm, áp dụng penalty theo % ở trên.
                 </div>
@@ -634,7 +611,7 @@
         {{-- ===========================
             KPI FORMULA
             =========================== --}}
-        <div class="cardx mb-3">
+        <div class="cardx tw:mb-4">
           <div class="cardx-hd">
             <div>
               <div class="cardx-tt">Công thức KPI% (theo kỳ)</div>
@@ -650,16 +627,14 @@
                   <span class="badge-soft">KPI</span>
                 </div>
                 <div class="cardx-bd">
-                  <div class="row g-2">
-                    <div class="col-6">
-                      <label class="ghost mb-1">Tỷ trọng (%)</label>
-                      <input type="number" step="0.01" class="form-control inp kpi-weight"
-                        name="rule[weight_review]" value="{{ $wReview }}">
+                  <div class="tw:row tw:g-2">
+                    <div class="tw:col12-6">
+                      <label class="ghost tw:mb-1">Tỷ trọng (%)</label>
+                      <x-ui.input class="inp kpi-weight" type="number" step="0.01" name="rule[weight_review]" value="{{ $wReview }}" />
                     </div>
-                    <div class="col-6">
-                      <label class="ghost mb-1">Vượt target (+%/video)</label>
-                      <input type="number" step="0.01" class="form-control inp"
-                        name="rule[bonus_over_review]" value="{{ $bReview }}">
+                    <div class="tw:col12-6">
+                      <label class="ghost tw:mb-1">Vượt target (+%/video)</label>
+                      <x-ui.input class="inp" type="number" step="0.01" name="rule[bonus_over_review]" value="{{ $bReview }}" />
                     </div>
                   </div>
                 </div>
@@ -671,16 +646,14 @@
                   <span class="badge-soft">KPI</span>
                 </div>
                 <div class="cardx-bd">
-                  <div class="row g-2">
-                    <div class="col-6">
-                      <label class="ghost mb-1">Tỷ trọng (%)</label>
-                      <input type="number" step="0.01" class="form-control inp kpi-weight"
-                        name="rule[weight_ai]" value="{{ $wAi }}">
+                  <div class="tw:row tw:g-2">
+                    <div class="tw:col12-6">
+                      <label class="ghost tw:mb-1">Tỷ trọng (%)</label>
+                      <x-ui.input class="inp kpi-weight" type="number" step="0.01" name="rule[weight_ai]" value="{{ $wAi }}" />
                     </div>
-                    <div class="col-6">
-                      <label class="ghost mb-1">Vượt target (+%/video)</label>
-                      <input type="number" step="0.01" class="form-control inp"
-                        name="rule[bonus_over_ai]" value="{{ $bAi }}">
+                    <div class="tw:col12-6">
+                      <label class="ghost tw:mb-1">Vượt target (+%/video)</label>
+                      <x-ui.input class="inp" type="number" step="0.01" name="rule[bonus_over_ai]" value="{{ $bAi }}" />
                     </div>
                   </div>
                 </div>
@@ -692,28 +665,26 @@
                   <span class="badge-soft">KPI</span>
                 </div>
                 <div class="cardx-bd">
-                  <div class="row g-2">
-                    <div class="col-6">
-                      <label class="ghost mb-1">Tỷ trọng (%)</label>
-                      <input type="number" step="0.01" class="form-control inp kpi-weight"
-                        name="rule[weight_post]" value="{{ $wPost }}">
+                  <div class="tw:row tw:g-2">
+                    <div class="tw:col12-6">
+                      <label class="ghost tw:mb-1">Tỷ trọng (%)</label>
+                      <x-ui.input class="inp kpi-weight" type="number" step="0.01" name="rule[weight_post]" value="{{ $wPost }}" />
                     </div>
-                    <div class="col-6">
-                      <label class="ghost mb-1">Vượt target (+%/bài)</label>
-                      <input type="number" step="0.01" class="form-control inp"
-                        name="rule[bonus_over_post]" value="{{ $bPost }}">
+                    <div class="tw:col12-6">
+                      <label class="ghost tw:mb-1">Vượt target (+%/bài)</label>
+                      <x-ui.input class="inp" type="number" step="0.01" name="rule[bonus_over_post]" value="{{ $bPost }}" />
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="alert alert-info mt-3 mb-0" style="border-radius:14px;">
-              <div class="fw-bold">Gợi ý theo quy định hiện tại</div>
+            <x-ui.alert variant="info" class="tw:mt-4 tw:mb-0" style="border-radius:14px;">
+              <div class="tw:font-bold">Gợi ý theo quy định hiện tại</div>
               <div class="small">
                 Review 40% (+3%/video vượt), AI 30% (+1%/video vượt), Bài viết 30% (+0.5%/bài vượt).
               </div>
-            </div>
+            </x-ui.alert>
           </div>
         </div>
 
@@ -723,7 +694,7 @@
         <div class="toolrow">
           <div class="toolbox">
             <div class="ghost">Tìm</div>
-            <input id="rowSearch" class="form-control form-42" style="width: 260px;" placeholder="Tìm nhân viên / ID...">
+            <x-ui.input class="form-42" id="rowSearch" style="width: 260px;" placeholder="Tìm nhân viên / ID..." />
 
             <div class="divider"></div>
 
@@ -735,20 +706,20 @@
             <div class="divider"></div>
 
             <div class="ghost">Bulk</div>
-            <select id="bulkField" class="form-control form-42" style="width: 170px;">
+            <x-ui.input as="select" class="form-42" id="bulkField" style="width: 170px;">
               <option value="base_salary">Lương cơ bản</option>
               <option value="kpi_salary_pool">Quỹ KPI</option>
               <option value="target_post">Target bài</option>
               <option value="target_video_ai">Target AI</option>
               <option value="target_video_review">Target Review</option>
-            </select>
-            <input id="bulkValue" class="form-control form-42" style="width: 160px;" placeholder="Giá trị">
-            <button type="button" id="applyBulk" class="btn btn-outline-primary btn-round" style="height:42px;">⚡ Áp dụng</button>
+            </x-ui.input>
+            <x-ui.input class="form-42" id="bulkValue" style="width: 160px;" placeholder="Giá trị" />
+            <x-ui.button variant="outline-primary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-round" type="button" id="applyBulk" style="height:42px;">⚡ Áp dụng</x-ui.button>
 
             <div class="divider"></div>
 
-            <button type="button" id="restoreDraft" class="btn btn-outline-success btn-round" style="height:42px;">🧠 Khôi phục nháp</button>
-            <button type="button" id="clearDraft" class="btn btn-outline-danger btn-round" style="height:42px;">🗑️ Xoá nháp</button>
+            <x-ui.button variant="outline-success" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-round" type="button" id="restoreDraft" style="height:42px;">🧠 Khôi phục nháp</x-ui.button>
+            <x-ui.button variant="outline-danger" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-round" type="button" id="clearDraft" style="height:42px;">🗑️ Xoá nháp</x-ui.button>
           </div>
 
           <div class="mini-help" style="max-width:520px;">
@@ -784,28 +755,23 @@
                   </td>
 
                   <td>
-                    <input class="form-control inp money" inputmode="numeric" data-field="base_salary"
-                      name="rows[{{ $u->id }}][base_salary]" value="{{ $s->base_salary ?? 0 }}">
+                    <x-ui.input class="inp money" inputmode="numeric" data-field="base_salary" name="rows[{{ $u->id }}][base_salary]" value="{{ $s->base_salary ?? 0 }}" />
                   </td>
 
                   <td>
-                    <input class="form-control inp money" inputmode="numeric" data-field="kpi_salary_pool"
-                      name="rows[{{ $u->id }}][kpi_salary_pool]" value="{{ $s->kpi_salary_pool ?? 0 }}">
+                    <x-ui.input class="inp money" inputmode="numeric" data-field="kpi_salary_pool" name="rows[{{ $u->id }}][kpi_salary_pool]" value="{{ $s->kpi_salary_pool ?? 0 }}" />
                   </td>
 
                   <td>
-                    <input class="form-control inp num" type="number" min="0" data-field="target_post"
-                      name="rows[{{ $u->id }}][target_post]" value="{{ $s->target_post ?? 0 }}">
+                    <x-ui.input class="inp num" type="number" min="0" data-field="target_post" name="rows[{{ $u->id }}][target_post]" value="{{ $s->target_post ?? 0 }}" />
                   </td>
 
                   <td>
-                    <input class="form-control inp num" type="number" min="0" data-field="target_video_ai"
-                      name="rows[{{ $u->id }}][target_video_ai]" value="{{ $s->target_video_ai ?? 0 }}">
+                    <x-ui.input class="inp num" type="number" min="0" data-field="target_video_ai" name="rows[{{ $u->id }}][target_video_ai]" value="{{ $s->target_video_ai ?? 0 }}" />
                   </td>
 
                   <td>
-                    <input class="form-control inp num" type="number" min="0" data-field="target_video_review"
-                      name="rows[{{ $u->id }}][target_video_review]" value="{{ $s->target_video_review ?? 0 }}">
+                    <x-ui.input class="inp num" type="number" min="0" data-field="target_video_review" name="rows[{{ $u->id }}][target_video_review]" value="{{ $s->target_video_review ?? 0 }}" />
                   </td>
                 </tr>
               @endforeach
@@ -829,13 +795,13 @@
         </div>
       </div>
 
-      <div class="d-flex flex-wrap gap-2">
-        <button type="button" id="saveBtn" class="btn btn-success btn-round" style="min-width: 170px;">
+      <div class="tw:flex flex-wrap tw:gap-2">
+        <x-ui.button variant="success" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-round" type="button" id="saveBtn" style="min-width: 170px;">
           💾 Lưu thiết lập
-        </button>
-        <a class="btn btn-outline-secondary btn-round" href="{{ route('marketing.kpi-payroll.index', ['period' => $period]) }}">
+        </x-ui.button>
+        <x-ui.button variant="outline-secondary" size="none" class="tw:px-3 tw:py-[6px] tw:text-[16px]/[24px] btn-round" :href="route('marketing.kpi-payroll.index', ['period' => $period])">
           ↩️ Quay lại
-        </a>
+        </x-ui.button>
       </div>
     </div>
   </div>

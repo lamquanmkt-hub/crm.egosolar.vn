@@ -8,13 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('conversations', function (Blueprint $table) {
-            $table->id();
-            $table->string('type')->default('direct'); // direct | group
-            $table->foreignId('created_by')->constrained('users');
-            $table->timestamp('last_message_at')->nullable()->index();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('conversations')) {
+            Schema::create('conversations', function (Blueprint $table) {
+                $table->id();
+                $table->string('type')->default('direct'); // direct | group
+                $table->foreignId('created_by')->constrained('users');
+                $table->timestamp('last_message_at')->nullable()->index();
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void

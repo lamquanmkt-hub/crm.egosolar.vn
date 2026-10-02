@@ -18,9 +18,36 @@ class SolarMaintenanceApprovalService
      */
     public function submit(SolarMaintenanceSchedule $schedule, User $actor, ?string $comment = null): void
     {
-        // V3: giữ endpoint cũ để các tab/cache cũ không lỗi, nhưng không tạo hàng đợi duyệt nữa.
-        // Checklist + minh chứng đủ sẽ hoàn tất thẳng đợt bảo trì.
-        app(SolarMaintenanceWorkflowService::class)->finishExecution($schedule, $actor);
+        DB::transaction(function () use ($schedule, $actor, $comment) {
+            if (! in_array($schedule->status, ['in_progress', 'waiting_material', 'waiting_submission', 'revision_requested'], true)) {
+                throw ValidationException::withMessages([
+                    'approval' => 'Chỉ gửi duyệt khi công việc đang thực hiện, chờ gửi duyệt hoặc đang được yêu cầu chỉnh sửa.',
+                ]);
+            }
+
+            if (! trim((string) $schedule->result_note)) {
+                throw ValidationException::withMessages([
+                    'result_note' => 'Phải nhập kết quả xử lý trước khi gửi duyệt.',
+                ]);
+            }
+
+            $oldStatus = $schedule->status;
+            $schedule->forceFill([
+                'status' => 'pending_approval',
+                'approval_status' => 'pending',
+                'submitted_at' => now(),
+                'submitted_by' => $actor->id,
+                'approved_at' => null,
+                'approved_by' => null,
+                'revision_requested_at' => null,
+                'revision_requested_by' => null,
+                'approval_note' => $comment,
+            ])->save();
+
+            $this->approval($schedule, $actor, 'submit', 'pending', $comment, null);
+            $this->history($schedule, $actor, $oldStatus, 'pending_approval', $comment ?: 'Gửi Trưởng phòng kỹ thuật phê duyệt');
+            $this->audit($schedule, $actor, 'approval_submitted');
+        });
     }
 
     /**
@@ -31,31 +58,45 @@ class SolarMaintenanceApprovalService
         DB::transaction(function () use ($schedule, $actor, $comment) {
             $this->assertPending($schedule);
             $this->assertNotExecutor($schedule, $actor);
-            app(SolarMaintenanceWorkflowService::class)->assertReadyForApproval($schedule);
 
             $oldStatus = $schedule->status;
             $schedule->forceFill([
-                'status' => 'completed',
+                'status' => 'approved',
                 'approval_status' => 'approved',
                 'approved_at' => now(),
                 'approved_by' => $actor->id,
                 'approval_note' => $comment,
-                'completed_at' => now(),
-                'completed_date' => today(),
             ])->save();
 
-            $schedule->assignees()->whereNull('completed_at')->update([
-                'completed_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $this->approval($schedule, $actor, 'approve', 'approved', $comment, $actor->id);
+            $this->history($schedule, $actor, $oldStatus, 'approved', $comment ?: 'Trưởng phòng kỹ thuật đã phê duyệt');
+            $this->audit($schedule, $actor, 'approval_approved');
+        });
+    }
 
-            if ($schedule->maintenance_profile_id && $schedule->maintenanceProfile) {
-                $schedule->maintenanceProfile->forceFill(['status' => 'active'])->save();
+    /**
+     * Hoàn thành công việc sau khi đã được Trưởng phòng phê duyệt.
+     */
+    public function complete(SolarMaintenanceSchedule $schedule, User $actor, ?string $comment = null): void
+    {
+        DB::transaction(function () use ($schedule, $actor, $comment) {
+            if ($schedule->status !== 'approved' || $schedule->approval_status !== 'approved') {
+                throw ValidationException::withMessages([
+                    'approval' => 'Chỉ được hoàn thành sau khi kết quả kỹ thuật đã được phê duyệt.',
+                ]);
             }
 
-            $this->approval($schedule, $actor, 'approve', 'approved', $comment, $actor->id);
-            $this->history($schedule, $actor, $oldStatus, 'completed', $comment ?: 'Đã duyệt checklist, minh chứng và hoàn thành đợt bảo trì.');
-            $this->audit($schedule, $actor, 'approval_approved_completed');
+            $oldStatus = $schedule->status;
+            $schedule->forceFill([
+                'status' => 'completed',
+                'completed_date' => now()->toDateString(),
+                'completed_at' => now(),
+                'approval_note' => $comment ?: $schedule->approval_note,
+            ])->save();
+
+            $this->approval($schedule, $actor, 'complete', 'approved', $comment, $actor->id);
+            $this->history($schedule, $actor, $oldStatus, 'completed', $comment ?: 'Đóng hồ sơ sau phê duyệt');
+            $this->audit($schedule, $actor, 'approval_completed');
         });
     }
 
@@ -142,7 +183,6 @@ class SolarMaintenanceApprovalService
                 'approval_note' => $comment,
                 'completed_at' => null,
                 'completed_date' => null,
-                'execution_finished_at' => null,
                 'reopened_at' => now(),
                 'reopened_by' => $actor->id,
             ])->save();
@@ -197,15 +237,10 @@ class SolarMaintenanceApprovalService
             'comment' => $comment,
             'submitted_at' => $schedule->submitted_at ?: now(),
             'reviewed_at' => $action === 'submit' ? null : now(),
-                'metadata' => [
-                    'schedule_code' => $schedule->schedule_code,
-                    'company_id' => $schedule->company_id,
-                    'site_id' => $schedule->site_id,
-                    'project_id' => $schedule->project_id,
-                    'round_no' => $schedule->round_no,
-                    'total_rounds' => $schedule->total_rounds,
-                    'round_group' => $schedule->round_group,
-                ],
+            'metadata' => [
+                'schedule_code' => $schedule->schedule_code,
+                'company_id' => $schedule->company_id,
+            ],
         ]);
     }
 

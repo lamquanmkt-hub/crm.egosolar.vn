@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('hr_vpp_requests')) {
+        if (! Schema::hasTable('hr_vpp_requests')) {
             Schema::create('hr_vpp_requests', function (Blueprint $table) {
                 $table->id();
                 $table->string('code')->unique();
@@ -45,7 +45,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_vpp_items')) {
+        if (! Schema::hasTable('hr_vpp_items')) {
             Schema::create('hr_vpp_items', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('request_id')->index();
@@ -58,7 +58,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('hr_vpp_logs')) {
+        if (! Schema::hasTable('hr_vpp_logs')) {
             Schema::create('hr_vpp_logs', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('request_id')->index();

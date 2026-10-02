@@ -3,15 +3,14 @@
 namespace App\Support;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class EgoSupplierDebtSync
 {
     public static function syncAll(): array
     {
         if (
-            ! Schema::hasTable('finance_supplier_debts') ||
-            ! Schema::hasTable('finance_supplier_debt_payments')
+            ! SchemaCache::hasTable('finance_supplier_debts') ||
+            ! SchemaCache::hasTable('finance_supplier_debt_payments')
         ) {
             return [
                 'ok' => false,
@@ -61,7 +60,7 @@ class EgoSupplierDebtSync
             $isPaid = self::isPaidRoundStatus($roundStatus);
             $isWaiting = self::isWaitingRoundStatus($roundStatus);
 
-            if (! empty($round->payment_request_id) && Schema::hasTable('payment_requests')) {
+            if (! empty($round->payment_request_id) && SchemaCache::hasTable('payment_requests')) {
                 $paymentRequest = DB::table('payment_requests')
                     ->where('id', (int) $round->payment_request_id)
                     ->first();

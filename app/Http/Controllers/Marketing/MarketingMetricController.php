@@ -5,24 +5,45 @@ namespace App\Http\Controllers\Marketing;
 use App\Http\Controllers\Controller;
 use App\Models\Marketing\MarketingCampaign;
 use App\Models\Marketing\MarketingMetric;
+use App\View\Presenters\Marketing\MarketingMetricEditPresenter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Controller CRUD chỉ số marketing (reach/leads/spend) kèm bộ lọc.
+ */
+/**
+ * Chỉ số marketing (metrics) — KHÔI PHỤC 2026-09-02.
+ *
+ * File này bị xoá ngày 2026-07-20 (commit f416ab8) với lý do "cụm marketing metrics
+ * chết". Lý do đó SAI: cụm này chỉ trông như chết vì trang duy nhất trỏ tới nó —
+ * /marketing/budget — đã mất route từ ngày 2026-05-06. Model MarketingMetric, ba bảng
+ * marketing_metrics/budgets/campaigns và cả `metricRows` mà MarketingBudgetController
+ * truyền sang view đều còn nguyên suốt thời gian đó.
+ *
+ * ⚠️ `index()` và `create()` CỐ Ý KHÔNG được khai route: view chúng trả về
+ * (marketing.metrics, marketing.metrics_create) đã bị xoá và không khôi phục ở đợt này
+ * vì không trang nào liên kết tới. Khai route cho chúng sẽ ra 500. Muốn dùng thì khôi
+ * phục view trước — `git show f416ab8^:resources/views/marketing/metrics.blade.php`.
+ */
 class MarketingMetricController extends Controller
 {
+    /**
+     * Danh sách chỉ số marketing có lọc theo ngày/kênh/chiến dịch và tính tổng CPL/CPO/ROAS.
+     */
     public function index(Request $request)
     {
-        $month       = $request->get('month');        // YYYY-MM
-        $platform    = $request->get('platform');     // Facebook/Google/...
+        $month = $request->get('month');        // YYYY-MM
+        $platform = $request->get('platform');     // Facebook/Google/...
         $campaign_id = $request->get('campaign_id');  // id
-        $campaign    = $request->get('campaign');     // search by name
-        $dateFrom    = $request->get('date_from');    // YYYY-MM-DD
-        $dateTo      = $request->get('date_to');      // YYYY-MM-DD
+        $campaign = $request->get('campaign');     // search by name
+        $dateFrom = $request->get('date_from');    // YYYY-MM-DD
+        $dateTo = $request->get('date_to');      // YYYY-MM-DD
 
-        $gender   = $request->get('gender');
+        $gender = $request->get('gender');
         $ageRange = $request->get('age_range');
-        $region   = $request->get('region');
+        $region = $request->get('region');
 
         $query = MarketingMetric::with('campaign')
             ->orderByDesc('date_to')
@@ -31,11 +52,11 @@ class MarketingMetricController extends Controller
         // Date filter: overlap
         if ($dateFrom || $dateTo) {
             $start = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
-            $end   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()     : null;
+            $end = $dateTo ? Carbon::parse($dateTo)->endOfDay() : null;
 
             if ($start && $end) {
                 $query->whereDate('date_from', '<=', $end)
-                      ->whereDate('date_to', '>=', $start);
+                    ->whereDate('date_to', '>=', $start);
             } elseif ($start) {
                 $query->whereDate('date_to', '>=', $start);
             } elseif ($end) {
@@ -43,10 +64,10 @@ class MarketingMetricController extends Controller
             }
         } elseif ($month) {
             $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-            $end   = (clone $start)->endOfMonth();
+            $end = (clone $start)->endOfMonth();
 
             $query->whereDate('date_from', '<=', $end)
-                  ->whereDate('date_to', '>=', $start);
+                ->whereDate('date_to', '>=', $start);
         }
 
         if ($platform) {
@@ -54,12 +75,12 @@ class MarketingMetricController extends Controller
         }
 
         if ($campaign_id) {
-            $query->where('campaign_id', (int)$campaign_id);
+            $query->where('campaign_id', (int) $campaign_id);
         }
 
         if ($campaign) {
             $query->whereHas('campaign', function ($q) use ($campaign) {
-                $q->where('name', 'like', '%' . $campaign . '%');
+                $q->where('name', 'like', '%'.$campaign.'%');
             });
         }
 
@@ -70,7 +91,7 @@ class MarketingMetricController extends Controller
             $query->where('age_range', $ageRange);
         }
         if ($region && Schema::hasColumn('marketing_metrics', 'region')) {
-            $query->where('region', 'like', '%' . $region . '%');
+            $query->where('region', 'like', '%'.$region.'%');
         }
 
         $rows = (clone $query)->paginate(20)->withQueryString();
@@ -79,11 +100,11 @@ class MarketingMetricController extends Controller
         $sumLeads = (clone $query)->sum('leads');
         $sumReach = (clone $query)->sum('reach');
 
-        $sumOrders  = Schema::hasColumn('marketing_metrics', 'orders')  ? (clone $query)->sum('orders')  : 0;
+        $sumOrders = Schema::hasColumn('marketing_metrics', 'orders') ? (clone $query)->sum('orders') : 0;
         $sumRevenue = Schema::hasColumn('marketing_metrics', 'revenue') ? (clone $query)->sum('revenue') : 0;
 
-        $cpl  = $sumLeads > 0 ? round($sumSpend / $sumLeads) : 0;
-        $cpo  = $sumOrders > 0 ? round($sumSpend / $sumOrders) : 0;
+        $cpl = $sumLeads > 0 ? round($sumSpend / $sumLeads) : 0;
+        $cpo = $sumOrders > 0 ? round($sumSpend / $sumOrders) : 0;
         $roas = $sumSpend > 0 ? round($sumRevenue / $sumSpend, 2) : 0;
 
         return view('marketing.metrics', compact(
@@ -96,94 +117,112 @@ class MarketingMetricController extends Controller
         ));
     }
 
+    /**
+     * Hiển thị form thêm chỉ số marketing.
+     */
     public function create()
     {
         return view('marketing.metrics_create');
     }
 
+    /**
+     * Lưu chỉ số marketing mới kèm breakdown giới tính/tuổi/khu vực.
+     */
     public function store(Request $request)
     {
         $data = $request->validate([
             'campaign_id' => 'required|integer|exists:marketing_campaigns,id',
-            'platform'    => 'required|string|max:50',
-            'date_from'   => 'required|date',
-            'date_to'     => 'required|date|after_or_equal:date_from',
-            'reach'       => 'required|integer|min:0',
-            'leads'       => 'required|integer|min:0',
-            'spend'       => 'nullable|integer|min:0',
-            'gender'      => 'nullable|array',
-            'gender.*'    => 'integer|min:0',
-            'age'         => 'nullable|array',
-            'age.*'       => 'integer|min:0',
-            'region'      => 'nullable|array',
-            'region.*'    => 'integer|min:0',
-            'note'        => 'nullable|string',
+            'platform' => 'required|string|max:50',
+            'date_from' => 'required|date',
+            'date_to' => 'required|date|after_or_equal:date_from',
+            'reach' => 'required|integer|min:0',
+            'leads' => 'required|integer|min:0',
+            'spend' => 'nullable|integer|min:0',
+            'gender' => 'nullable|array',
+            'gender.*' => 'integer|min:0',
+            'age' => 'nullable|array',
+            'age.*' => 'integer|min:0',
+            'region' => 'nullable|array',
+            'region.*' => 'integer|min:0',
+            'note' => 'nullable|string',
         ]);
 
         MarketingMetric::create([
-            'campaign_id'       => $data['campaign_id'],
-            'platform'          => $data['platform'],
-            'date_from'         => $data['date_from'],
-            'date_to'           => $data['date_to'],
-            'reach'             => $data['reach'],
-            'leads'             => $data['leads'],
-            'spend'             => $data['spend'] ?? 0,
-            'gender_breakdown'  => $data['gender'] ?? [],
-            'age_breakdown'     => $data['age'] ?? [],
-            'region_breakdown'  => $data['region'] ?? [],
-            'note'              => $data['note'] ?? null,
-            'created_by'        => auth()->id(),
+            'campaign_id' => $data['campaign_id'],
+            'platform' => $data['platform'],
+            'date_from' => $data['date_from'],
+            'date_to' => $data['date_to'],
+            'reach' => $data['reach'],
+            'leads' => $data['leads'],
+            'spend' => $data['spend'] ?? 0,
+            'gender_breakdown' => $data['gender'] ?? [],
+            'age_breakdown' => $data['age'] ?? [],
+            'region_breakdown' => $data['region'] ?? [],
+            'note' => $data['note'] ?? null,
+            'created_by' => auth()->id(),
         ]);
 
         return back()->with('success', 'Đã lưu chỉ số marketing');
     }
 
+    /**
+     * Hiển thị form sửa chỉ số marketing.
+     */
     public function edit($id)
     {
         $metric = MarketingMetric::with('campaign')->findOrFail($id);
         $campaigns = MarketingCampaign::orderBy('name')->get();
 
-        return view('marketing.metrics_edit', compact('metric', 'campaigns'));
+        return view('marketing.metrics_edit', array_merge(
+            compact('metric', 'campaigns'),
+            app(MarketingMetricEditPresenter::class)->viewData($metric, (array) request()->old())
+        ));
     }
 
+    /**
+     * Cập nhật chỉ số marketing.
+     */
     public function update(Request $request, $id)
     {
         $metric = MarketingMetric::findOrFail($id);
 
         $data = $request->validate([
             'campaign_id' => 'required|integer|exists:marketing_campaigns,id',
-            'platform'    => 'required|string|max:50',
-            'date_from'   => 'required|date',
-            'date_to'     => 'required|date|after_or_equal:date_from',
-            'reach'       => 'required|integer|min:0',
-            'leads'       => 'required|integer|min:0',
-            'spend'       => 'nullable|integer|min:0',
-            'gender'      => 'nullable|array',
-            'gender.*'    => 'integer|min:0',
-            'age'         => 'nullable|array',
-            'age.*'       => 'integer|min:0',
-            'region'      => 'nullable|array',
-            'region.*'    => 'integer|min:0',
-            'note'        => 'nullable|string',
+            'platform' => 'required|string|max:50',
+            'date_from' => 'required|date',
+            'date_to' => 'required|date|after_or_equal:date_from',
+            'reach' => 'required|integer|min:0',
+            'leads' => 'required|integer|min:0',
+            'spend' => 'nullable|integer|min:0',
+            'gender' => 'nullable|array',
+            'gender.*' => 'integer|min:0',
+            'age' => 'nullable|array',
+            'age.*' => 'integer|min:0',
+            'region' => 'nullable|array',
+            'region.*' => 'integer|min:0',
+            'note' => 'nullable|string',
         ]);
 
         $metric->update([
-            'campaign_id'       => $data['campaign_id'],
-            'platform'          => $data['platform'],
-            'date_from'         => $data['date_from'],
-            'date_to'           => $data['date_to'],
-            'reach'             => $data['reach'],
-            'leads'             => $data['leads'],
-            'spend'             => $data['spend'] ?? 0,
-            'gender_breakdown'  => $data['gender'] ?? [],
-            'age_breakdown'     => $data['age'] ?? [],
-            'region_breakdown'  => $data['region'] ?? [],
-            'note'              => $data['note'] ?? null,
+            'campaign_id' => $data['campaign_id'],
+            'platform' => $data['platform'],
+            'date_from' => $data['date_from'],
+            'date_to' => $data['date_to'],
+            'reach' => $data['reach'],
+            'leads' => $data['leads'],
+            'spend' => $data['spend'] ?? 0,
+            'gender_breakdown' => $data['gender'] ?? [],
+            'age_breakdown' => $data['age'] ?? [],
+            'region_breakdown' => $data['region'] ?? [],
+            'note' => $data['note'] ?? null,
         ]);
 
         return redirect()->back()->with('success', 'Đã cập nhật chỉ số marketing');
     }
 
+    /**
+     * Xóa chỉ số marketing.
+     */
     public function destroy($id)
     {
         $metric = MarketingMetric::findOrFail($id);

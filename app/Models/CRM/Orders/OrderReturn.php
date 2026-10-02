@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models\CRM\Orders;
 
-use App\Models\Concerns\LockedToEgoInternational;
 use App\Models\Core\Warehouse;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +13,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class OrderReturn extends Model
 {
-    use LockedToEgoInternational;
     use SoftDeletes;
 
     protected $table = 'order_returns';

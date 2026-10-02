@@ -102,14 +102,13 @@
 
             <div class="oc-field">
                 <label for="orderDate">Ngày đặt hàng <span>*</span></label>
-                <input
+                <x-ui.input
                     id="orderDate"
                     type="date"
                     name="order_date"
-                    class="form-control @error('order_date') is-invalid @enderror"
+                    class="ego-input @error('order_date') is-invalid @enderror"
                     value="{{ $orderDateValue }}"
-                    required
-                >
+                    required />
                 @error('order_date')
                     <div class="oc-invalid-feedback">{{ $message }}</div>
                 @enderror
@@ -117,14 +116,13 @@
 
             <div class="oc-field">
                 <label for="orderNote">Ghi chú</label>
-                <input
+                <x-ui.input
                     id="orderNote"
                     type="text"
                     name="note"
-                    class="form-control @error('note') is-invalid @enderror"
+                    class="ego-input @error('note') is-invalid @enderror"
                     value="{{ old('note', $isEdit ? ($order->note ?? '') : '') }}"
-                    placeholder="Giao gấp, yêu cầu đặc biệt..."
-                >
+                    placeholder="Giao gấp, yêu cầu đặc biệt..." />
                 @error('note')
                     <div class="oc-invalid-feedback">{{ $message }}</div>
                 @enderror
@@ -154,14 +152,13 @@
                 <div class="oc-invoice-grid">
                     <div class="oc-field">
                         <label for="invoice_company_name">Tên công ty / cá nhân</label>
-                        <input
+                        <x-ui.input
                             type="text"
                             id="invoice_company_name"
                             name="invoice_company_name"
-                            class="form-control @error('invoice_company_name') is-invalid @enderror"
+                            class="ego-input @error('invoice_company_name') is-invalid @enderror"
                             value="{{ $invoiceCompanyNameValue }}"
-                            placeholder="CÔNG TY ABC"
-                        >
+                            placeholder="CÔNG TY ABC" />
                         @error('invoice_company_name')
                             <div class="oc-invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -169,14 +166,13 @@
 
                     <div class="oc-field">
                         <label for="invoice_tax_code">Mã số thuế</label>
-                        <input
+                        <x-ui.input
                             type="text"
                             id="invoice_tax_code"
                             name="invoice_tax_code"
-                            class="form-control @error('invoice_tax_code') is-invalid @enderror"
+                            class="ego-input @error('invoice_tax_code') is-invalid @enderror"
                             value="{{ $invoiceTaxCodeValue }}"
-                            placeholder="Nhập mã số thuế"
-                        >
+                            placeholder="Nhập mã số thuế" />
                         @error('invoice_tax_code')
                             <div class="oc-invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -184,14 +180,13 @@
 
                     <div class="oc-field">
                         <label for="invoice_email">Email nhận hóa đơn</label>
-                        <input
+                        <x-ui.input
                             type="email"
                             id="invoice_email"
                             name="invoice_email"
-                            class="form-control @error('invoice_email') is-invalid @enderror"
+                            class="ego-input @error('invoice_email') is-invalid @enderror"
                             value="{{ $invoiceEmailValue }}"
-                            placeholder="example@email.com"
-                        >
+                            placeholder="example@email.com" />
                         @error('invoice_email')
                             <div class="oc-invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -199,14 +194,13 @@
 
                     <div class="oc-field oc-field-full">
                         <label for="invoice_address">Địa chỉ xuất hóa đơn</label>
-                        <input
+                        <x-ui.input
                             type="text"
                             id="invoice_address"
                             name="invoice_address"
-                            class="form-control @error('invoice_address') is-invalid @enderror"
+                            class="ego-input @error('invoice_address') is-invalid @enderror"
                             value="{{ $invoiceAddressValue }}"
-                            placeholder="Nhập địa chỉ xuất hóa đơn"
-                        >
+                            placeholder="Nhập địa chỉ xuất hóa đơn" />
                         @error('invoice_address')
                             <div class="oc-invalid-feedback">{{ $message }}</div>
                         @enderror

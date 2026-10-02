@@ -11,18 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('media_metadata', function (Blueprint $table) {
-	        $table->id();
-	        $table->foreignId('media_id')->constrained('media_files')->cascadeOnDelete();
-	        // normalized metadata
-	        $table->integer('width')->nullable();
-	        $table->integer('height')->nullable();
-	        $table->integer('duration')->nullable(); // seconds, for audio/video
-	        $table->integer('bitrate')->nullable();
-	        $table->json('metadata')->nullable(); // additional exif/json
-	        $table->timestamps();
-	        $table->index('media_id');
-        });
+        if (! Schema::hasTable('media_metadata')) {
+            Schema::create('media_metadata', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('media_id')->constrained('media_files')->cascadeOnDelete();
+                // normalized metadata
+                $table->integer('width')->nullable();
+                $table->integer('height')->nullable();
+                $table->integer('duration')->nullable(); // seconds, for audio/video
+                $table->integer('bitrate')->nullable();
+                $table->json('metadata')->nullable(); // additional exif/json
+                $table->timestamps();
+                $table->index('media_id');
+            });
+        }
     }
 
     /**

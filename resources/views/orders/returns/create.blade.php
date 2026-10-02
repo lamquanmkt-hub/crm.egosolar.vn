@@ -1,45 +1,48 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container">
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <h4 class="mb-0">Tạo yêu cầu Đổi/Trả - Đơn #{{ $order->code ?? $order->id }}</h4>
-        <a href="{{ route('orders.show', $order->id) }}" class="btn btn-light">Quay lại</a>
+{{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
+     thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
+     quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
+<div class="container tw:py-4">
+    <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
+        <h4 class="tw:mb-0">Tạo yêu cầu Đổi/Trả - Đơn #{{ $order->code ?? $order->id }}</h4>
+        <x-ui.button href="{{ route('orders.show', $order->id) }}" variant="light">Quay lại</x-ui.button>
     </div>
 
     @if ($errors->any())
-        <div class="alert alert-danger">
+        <x-ui.alert variant="danger">
             <div><b>Có lỗi:</b></div>
-            <ul class="mb-0">
+            <ul class="tw:mb-0">
                 @foreach ($errors->all() as $e) <li>{{ $e }}</li> @endforeach
             </ul>
-        </div>
+        </x-ui.alert>
     @endif
 
-    <div class="card">
-        <div class="card-body">
+    <x-ui.card>
+        <x-ui.card-body>
             <form method="POST" action="{{ route('orders.returns.store', $order->id) }}">
                 @csrf
 
-                <div class="mb-3">
-                    <label class="form-label">Loại yêu cầu</label>
-                    <select name="type" class="form-select" required>
+                <div class="tw:mb-4">
+                    <x-ui.label>Loại yêu cầu</x-ui.label>
+                    <x-ui.select name="type" required>
                         <option value="exchange" @selected(old('type')=='exchange')>Đổi hàng</option>
                         <option value="return" @selected(old('type')=='return')>Trả hàng</option>
-                    </select>
+                    </x-ui.select>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Lý do</label>
-                    <textarea name="reason" class="form-control" rows="5" required>{{ old('reason') }}</textarea>
+                <div class="tw:mb-4">
+                    <x-ui.label>Lý do</x-ui.label>
+                    <x-ui.input as="textarea" name="reason" rows="5" required>{{ old('reason') }}</x-ui.input>
                     <div class="form-text">Mô tả tình trạng hàng, lỗi, thiếu phụ kiện, v.v...</div>
                 </div>
 
-                <button class="btn btn-warning w-100" type="submit">
+                <x-ui.button variant="warning" type="submit" class="tw:w-full">
                     Gửi yêu cầu Đổi/Trả
-                </button>
+                </x-ui.button>
             </form>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 </div>
 @endsection

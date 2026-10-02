@@ -9,23 +9,6 @@
     >
 @endpush
 
-@php
-    $hasCreateErrors = session('open_booking_modal') === 'create'
-        || ($errors->any() && ! session('editing_booking_id'));
-
-    $queryForMonth = static function (string $monthValue) use ($room, $usageStatus): array {
-        return array_filter([
-            'month' => $monthValue,
-            'room_name' => $room,
-            'usage_status' => $usageStatus,
-        ], static fn ($value) => $value !== '');
-    };
-
-    $dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-    $mobileBookingGroups = $monthBookings->groupBy(
-        static fn ($booking) => \Carbon\Carbon::parse($booking->start_at)->toDateString()
-    );
-@endphp
 
 @section('content')
 <div
@@ -93,7 +76,7 @@
                 <div class="mrb3-month-nav">
                     <a
                         class="mrb3-icon-btn"
-                        href="{{ route('meeting-room-bookings.index', $queryForMonth($previousMonth)) }}"
+                        href="{{ route('meeting-room-bookings.index', $previousMonthQuery) }}"
                         aria-label="Tháng trước"
                     >
                         <i class="bi bi-chevron-left"></i>
@@ -106,7 +89,7 @@
 
                     <a
                         class="mrb3-icon-btn"
-                        href="{{ route('meeting-room-bookings.index', $queryForMonth($nextMonth)) }}"
+                        href="{{ route('meeting-room-bookings.index', $nextMonthQuery) }}"
                         aria-label="Tháng sau"
                     >
                         <i class="bi bi-chevron-right"></i>
@@ -115,7 +98,7 @@
                     @if($monthStart->format('Y-m') !== $currentMonth)
                         <a
                             class="mrb3-today-link"
-                            href="{{ route('meeting-room-bookings.index', $queryForMonth($currentMonth)) }}"
+                            href="{{ route('meeting-room-bookings.index', $currentMonthQuery) }}"
                         >
                             Hôm nay
                         </a>
@@ -173,59 +156,46 @@
                 </div>
 
                 <div class="mrb3-month-grid">
-                    @foreach($calendarDays as $calendarDay)
-                        @php
-                            $dateKey = $calendarDay->toDateString();
-                            $dayBookings = $bookingsByDate->get($dateKey, collect());
-                            $isCurrentMonth = $calendarDay->month === $monthStart->month;
-                            $isToday = $calendarDay->isToday();
-                            $visibleBookings = $dayBookings->take(3);
-                            $remainingCount = max(0, $dayBookings->count() - $visibleBookings->count());
-                        @endphp
+                    @foreach($calendarCells as $cell)
 
                         <article
-                            class="mrb3-day {{ $isCurrentMonth ? '' : 'is-outside' }} {{ $isToday ? 'is-today' : '' }}"
-                            data-create-date="{{ $dateKey }}"
+                            class="mrb3-day {{ $cell['isCurrentMonth'] ? '' : 'is-outside' }} {{ $cell['isToday'] ? 'is-today' : '' }}"
+                            data-create-date="{{ $cell['dateKey'] }}"
                         >
                             <div class="mrb3-day__head">
-                                <span class="mrb3-day__number">{{ $calendarDay->day }}</span>
-                                @if($dayBookings->isNotEmpty())
-                                    <span class="mrb3-day__count">{{ $dayBookings->count() }}</span>
+                                <span class="mrb3-day__number">{{ $cell['day']->day }}</span>
+                                @if($cell['count'] > 0)
+                                    <span class="mrb3-day__count">{{ $cell['count'] }}</span>
                                 @endif
                             </div>
 
                             <div class="mrb3-day__events">
-                                @foreach($visibleBookings as $booking)
-                                    @php
-                                        $bookingStart = \Carbon\Carbon::parse($booking->start_at);
-                                        $bookingEnd = \Carbon\Carbon::parse($booking->end_at);
-                                        $isUsed = (string) $booking->usage_status === 'used';
-                                    @endphp
+                                @foreach($cell['bookings'] as $entry)
 
                                     <button
                                         type="button"
-                                        class="mrb3-event {{ $isUsed ? 'is-used' : 'is-unused' }}"
+                                        class="mrb3-event {{ $entry['used'] ? 'is-used' : 'is-unused' }}"
                                         data-edit-booking
-                                        data-id="{{ $booking->id }}"
-                                        data-room="{{ $booking->room_name }}"
-                                        data-title="{{ $booking->title }}"
-                                        data-organizer="{{ (string) $booking->organizer_name }}"
-                                        data-department="{{ (string) $booking->department }}"
-                                        data-attendees="{{ (int) $booking->attendees }}"
-                                        data-start="{{ $bookingStart->format('Y-m-d\TH:i') }}"
-                                        data-end="{{ $bookingEnd->format('Y-m-d\TH:i') }}"
-                                        data-usage="{{ (string) $booking->usage_status }}"
-                                        data-note="{{ (string) $booking->note }}"
-                                        title="{{ $bookingStart->format('H:i') }}–{{ $bookingEnd->format('H:i') }} · {{ $booking->title }}"
+                                        data-id="{{ $entry['booking']->id }}"
+                                        data-room="{{ $entry['booking']->room_name }}"
+                                        data-title="{{ $entry['booking']->title }}"
+                                        data-organizer="{{ (string) $entry['booking']->organizer_name }}"
+                                        data-department="{{ (string) $entry['booking']->department }}"
+                                        data-attendees="{{ (int) $entry['booking']->attendees }}"
+                                        data-start="{{ $entry['start']->format('Y-m-d\TH:i') }}"
+                                        data-end="{{ $entry['end']->format('Y-m-d\TH:i') }}"
+                                        data-usage="{{ (string) $entry['booking']->usage_status }}"
+                                        data-note="{{ (string) $entry['booking']->note }}"
+                                        title="{{ $entry['start']->format('H:i') }}–{{ $entry['end']->format('H:i') }} · {{ $entry['booking']->title }}"
                                     >
-                                        <span class="mrb3-event__time">{{ $bookingStart->format('H:i') }}</span>
-                                        <span class="mrb3-event__title">{{ $booking->title }}</span>
-                                        <span class="mrb3-event__room">{{ $booking->room_name }}</span>
+                                        <span class="mrb3-event__time">{{ $entry['start']->format('H:i') }}</span>
+                                        <span class="mrb3-event__title">{{ $entry['booking']->title }}</span>
+                                        <span class="mrb3-event__room">{{ $entry['booking']->room_name }}</span>
                                     </button>
                                 @endforeach
 
-                                @if($remainingCount > 0)
-                                    <span class="mrb3-more-events">+{{ $remainingCount }} lịch khác</span>
+                                @if($cell['remaining'] > 0)
+                                    <span class="mrb3-more-events">+{{ $cell['remaining'] }} lịch khác</span>
                                 @endif
                             </div>
 
@@ -233,8 +203,8 @@
                                 type="button"
                                 class="mrb3-day__add"
                                 data-create-booking
-                                data-date="{{ $dateKey }}"
-                                aria-label="Tạo booking ngày {{ $calendarDay->format('d/m/Y') }}"
+                                data-date="{{ $cell['dateKey'] }}"
+                                aria-label="Tạo booking ngày {{ $cell['day']->format('d/m/Y') }}"
                             >
                                 <i class="bi bi-plus"></i>
                             </button>
@@ -244,43 +214,35 @@
             </div>
 
             <div class="mrb3-mobile-agenda">
-                @forelse($mobileBookingGroups as $dateKey => $dateBookings)
-                    @php
-                        $agendaDate = \Carbon\Carbon::parse($dateKey);
-                    @endphp
+                @forelse($agendaGroups as $group)
                     <section class="mrb3-agenda-day">
                         <div class="mrb3-agenda-day__date">
-                            <strong>{{ $agendaDate->format('d') }}</strong>
-                            <span>Tháng {{ $agendaDate->format('m') }}</span>
+                            <strong>{{ $group['date']->format('d') }}</strong>
+                            <span>Tháng {{ $group['date']->format('m') }}</span>
                         </div>
 
                         <div class="mrb3-agenda-day__items">
-                            @foreach($dateBookings as $booking)
-                                @php
-                                    $bookingStart = \Carbon\Carbon::parse($booking->start_at);
-                                    $bookingEnd = \Carbon\Carbon::parse($booking->end_at);
-                                    $isUsed = (string) $booking->usage_status === 'used';
-                                @endphp
+                            @foreach($group['bookings'] as $entry)
                                 <button
                                     type="button"
-                                    class="mrb3-agenda-item {{ $isUsed ? 'is-used' : 'is-unused' }}"
+                                    class="mrb3-agenda-item {{ $entry['used'] ? 'is-used' : 'is-unused' }}"
                                     data-edit-booking
-                                    data-id="{{ $booking->id }}"
-                                    data-room="{{ $booking->room_name }}"
-                                    data-title="{{ $booking->title }}"
-                                    data-organizer="{{ (string) $booking->organizer_name }}"
-                                    data-department="{{ (string) $booking->department }}"
-                                    data-attendees="{{ (int) $booking->attendees }}"
-                                    data-start="{{ $bookingStart->format('Y-m-d\TH:i') }}"
-                                    data-end="{{ $bookingEnd->format('Y-m-d\TH:i') }}"
-                                    data-usage="{{ (string) $booking->usage_status }}"
-                                    data-note="{{ (string) $booking->note }}"
+                                    data-id="{{ $entry['booking']->id }}"
+                                    data-room="{{ $entry['booking']->room_name }}"
+                                    data-title="{{ $entry['booking']->title }}"
+                                    data-organizer="{{ (string) $entry['booking']->organizer_name }}"
+                                    data-department="{{ (string) $entry['booking']->department }}"
+                                    data-attendees="{{ (int) $entry['booking']->attendees }}"
+                                    data-start="{{ $entry['start']->format('Y-m-d\TH:i') }}"
+                                    data-end="{{ $entry['end']->format('Y-m-d\TH:i') }}"
+                                    data-usage="{{ (string) $entry['booking']->usage_status }}"
+                                    data-note="{{ (string) $entry['booking']->note }}"
                                 >
                                     <span class="mrb3-agenda-item__time">
-                                        {{ $bookingStart->format('H:i') }}–{{ $bookingEnd->format('H:i') }}
+                                        {{ $entry['start']->format('H:i') }}–{{ $entry['end']->format('H:i') }}
                                     </span>
-                                    <strong>{{ $booking->title }}</strong>
-                                    <small>{{ $booking->room_name }}</small>
+                                    <strong>{{ $entry['booking']->title }}</strong>
+                                    <small>{{ $entry['booking']->room_name }}</small>
                                 </button>
                             @endforeach
                         </div>
@@ -324,7 +286,7 @@
         'isEdit' => true,
     ])
 
-    <form method="POST" id="deleteBookingForm" class="d-none">
+    <form method="POST" id="deleteBookingForm" class="tw:hidden">
         @csrf
         @method('DELETE')
     </form>

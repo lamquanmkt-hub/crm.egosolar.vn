@@ -1,98 +1,8 @@
 @extends('layouts.app')
 @section('title', 'Đơn hàng '.$order->order_code)
 @section('content')
-
-    @include('orders.partials.stock-shortage-warning')
 <link rel="stylesheet" href="{{ asset('css/orders-one-page-v3.css') }}?v={{ @filemtime(public_path('css/orders-one-page-v3.css')) ?: time() }}">
 <script defer src="{{ asset('js/orders-one-page-v3.js') }}?v={{ @filemtime(public_path('js/orders-one-page-v3.js')) ?: time() }}"></script>
-@php
-    use Illuminate\Support\Facades\Route;
-    $customer = $order->lead?->customer ?? $order->customer ?? null;
-    $paid = (float) collect($order->payments ?? [])->sum('amount');
-    $total = (float) ($order->total_amount ?? 0);
-    $remaining = max(0, $total - $paid);
-    $paymentPercent = $total > 0 ? min(100, round(($paid / $total) * 100)) : 0;
-    $returns = collect($order->returns ?? []);
-    $activeReturns = $returns->whereNotIn('status', ['completed', 'rejected', 'cancelled']);
-    $refunds = $returns->flatMap(fn ($return) => $return->refunds ?? []);
-    $refundPaid = (float) $refunds->where('status', 'paid')->sum('amount');
-    $department = strtolower((string) ($order->current_department ?? 'sales'));
-    $departmentMap = [
-        'sales' => 'Sales', 'sales_manager' => 'Sales Manager', 'duyet1' => 'Sales Manager',
-        'accounting' => 'Kế toán', 'ketoan' => 'Kế toán', 'management' => 'Ban Giám đốc',
-        'duyet2' => 'Ban Giám đốc', 'warehouse' => 'Kho', 'kho' => 'Kho',
-        'shipping' => 'Vận chuyển', 'completed' => 'Hoàn tất', 'cancelled' => 'Đã hủy',
-    ];
-    $flowKeys = ['sales', 'sales_manager', 'accounting', 'management', 'warehouse', 'shipping', 'completed'];
-    $flowLabel = ['sales' => 'Sales', 'sales_manager' => 'Sales Manager', 'accounting' => 'Kế toán', 'management' => 'Ban Giám đốc', 'warehouse' => 'Kho', 'shipping' => 'Vận chuyển', 'completed' => 'Hoàn tất'];
-    $flowAlias = ['duyet1' => 'sales_manager', 'ketoan' => 'accounting', 'duyet2' => 'management', 'kho' => 'warehouse'];
-    $currentFlow = $flowAlias[$department] ?? $department;
-    $currentIndex = array_search($currentFlow, $flowKeys, true);
-    if ($currentIndex === false) $currentIndex = 0;
-    $isCancelled = in_array($department, ['cancelled', 'canceled', 'huy', 'da_huy'], true);
-    $statusName = $isCancelled
-        ? 'Đã hủy'
-        : ($order->inventory_issued
-            ? ($remaining > 0 ? 'Hoàn tất · còn công nợ' : 'Hoàn tất')
-            : ($order->currentStatusType->name ?? ($departmentMap[$department] ?? ucfirst($department))));
-    $dateFmt = fn ($value, $format = 'd/m/Y') => $value ? \Carbon\Carbon::parse($value)->format($format) : '—';
-    $invoiceStatus = (string) ($order->invoice_status ?? 'none');
-    $user = auth()->user();
-    $canByRole = function (array $roles) use ($user): bool {
-        return $user && method_exists($user, 'hasAnyRole') && $user->hasAnyRole($roles);
-    };
-    $canReturnView = ($user?->can('orders.return.view') ?? false) || $canByRole(['admin','management','accounting','warehouse','kho','sales_manager','sales']);
-    $canReturnCreate = ($user?->can('orders.return.create') ?? false) || $canByRole(['admin','management','sales_manager','sales']);
-
-    // EGO_COMPLETED_RETURN_VIEW_RULE_V1
-    $canCreateCompletedReturn =
-        $canReturnCreate
-        && (bool) ($order->inventory_issued ?? false)
-        && (string) ($department ?? '') === 'completed'
-        && (int) collect(
-            $returnAvailable ?? []
-        )->sum() > 0;
-
-    $canReturnApprove = ($user?->can('orders.return.approve') ?? false) || $canByRole(['admin','management','accounting','sales_manager']);
-    $canReturnReceive = ($user?->can('orders.return.receive') ?? false) || $canByRole(['admin','warehouse','kho']);
-    $canReturnInspect = ($user?->can('orders.return.inspect') ?? false) || $canByRole(['admin','warehouse','kho']);
-    $canReturnStockIn = ($user?->can('orders.return.stock_in') ?? false) || $canByRole(['admin','warehouse','kho']);
-    $canRefundCreate = ($user?->can('orders.refund.create') ?? false) || $canByRole(['admin','accounting','sales_manager']);
-    $canRefundApprove = ($user?->can('orders.refund.approve') ?? false) || $canByRole(['admin','management','accounting']);
-    $customerRegion = $customer->region ?? $customer->area ?? null;
-    if (is_string($customerRegion)) {
-        $regionDecoded = json_decode($customerRegion, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($regionDecoded)) {
-            $customerRegion = $regionDecoded['name'] ?? $regionDecoded['label'] ?? $regionDecoded['title'] ?? $customerRegion;
-        }
-    } elseif (is_object($customerRegion)) {
-        $customerRegion = $customerRegion->name ?? $customerRegion->label ?? $customerRegion->title ?? '—';
-    }
-    $customerRegion = $customerRegion ?: '—';
-    $lastPayment = collect($order->payments ?? [])->sortByDesc(function ($payment) {
-        return (string) ($payment->payment_date ?? $payment->created_at ?? '');
-    })->first();
-    $nextActionMap = [
-        'sales' => 'Hoàn thiện và gửi đơn đi duyệt',
-        'sales_manager' => 'Sales Manager kiểm tra và phê duyệt',
-        'accounting' => 'Kế toán kiểm tra thanh toán và công nợ',
-        'management' => 'Ban Giám đốc phê duyệt đơn hàng',
-        'warehouse' => $order->inventory_issued ? 'Bàn giao đơn cho vận chuyển' : 'Kho kiểm tra tồn, serial và xuất hàng',
-        'shipping' => 'Cập nhật giao hàng và xác nhận hoàn tất',
-        'completed' => $activeReturns->count() ? 'Theo dõi hồ sơ hậu mãi đang xử lý' : 'Đơn đã hoàn tất, sẵn sàng xử lý hậu mãi khi cần',
-    ];
-    $nextActionText = $isCancelled ? 'Đơn hàng đã hủy' : ($nextActionMap[$currentFlow] ?? 'Kiểm tra trạng thái đơn hàng');
-    $hasWarnings = $remaining > 0
-        || (!$order->inventory_issued && $currentFlow === 'warehouse')
-        || ($order->inventory_issued && !$order->is_shipped)
-        || $activeReturns->count() > 0
-        || ($returns->count() > 0 && !in_array($invoiceStatus, ['none', 'not_issued', ''], true));
-    $activeTab = request('tab', 'approval');
-    $validTabs = ['approval','payments','inventory','shipping','returns','invoice','documents','history'];
-    if (!in_array($activeTab, $validTabs, true)) $activeTab = 'approval';
-    $currentApprovalLevel = strtolower((string) ($currentApprovalLevel ?? $department));
-    $isAccountingApproval = in_array($currentApprovalLevel, ['accounting','ketoan'], true);
-@endphp
 
 <div class="op-page" data-order-page data-active-tab="{{ $activeTab }}">
     <div class="op-container">
@@ -108,7 +18,7 @@
                     </div>
                     <div class="op-meta">
                         <span><i class="bi bi-person"></i>{{ $customer->name ?? 'Chưa có khách hàng' }}</span>
-                        <span><i class="bi bi-calendar3"></i>{{ $dateFmt($order->order_date) }}</span>
+                        <span><i class="bi bi-calendar3"></i>{{ \App\Support\DisplayFormat::date($order->order_date) }}</span>
                         <span><i class="bi bi-person-circle"></i>{{ $order->creator->name ?? '—' }}</span>
                         <span><i class="bi bi-building"></i>{{ $order->company->name ?? '—' }}</span>
                     </div>
@@ -197,7 +107,7 @@
                         {{ $order->warehouse->name ?? 'Chưa chọn kho' }}
 
                         @if($order->inventory_issued_at)
-                            · {{ $dateFmt($order->inventory_issued_at, 'd/m H:i') }}
+                            · {{ \App\Support\DisplayFormat::date($order->inventory_issued_at, 'd/m H:i') }}
                         @endif
                     </small>
                 </div>
@@ -240,10 +150,7 @@
                     <p>
                         Đang ở
                         <strong>
-                            {{
-                                $departmentMap[$department]
-                                ?? ucfirst($department)
-                            }}
+                            {{ $departmentLabel }}
                         </strong>
                         · Bấm vào bước để xem lịch sử và thao tác duyệt.
                     </p>
@@ -260,56 +167,30 @@
             </header>
 
             <div class="op-approval-track">
-                @foreach($flowKeys as $stepIndex => $flowKey)
-                    @php
-                        $flowCompleted =
-                            $currentFlow === 'completed';
-
-                        $stepDone =
-                            !$isCancelled
-                            && (
-                                $flowCompleted
-                                    ? $stepIndex <= $currentIndex
-                                    : $stepIndex < $currentIndex
-                            );
-
-                        $stepActive =
-                            !$isCancelled
-                            && !$flowCompleted
-                            && $stepIndex === $currentIndex;
-
-                        $stepClass =
-                            $stepDone
-                                ? 'done'
-                                : (
-                                    $stepActive
-                                        ? 'active'
-                                        : 'pending'
-                                );
-                    @endphp
+                @foreach($flowSteps as $step)
 
                     <button
                         type="button"
-                        class="op-approval-step {{ $stepClass }}"
+                        class="op-approval-step {{ $step->class }}"
                         data-op-tab-target="approval"
                     >
                         <span class="op-approval-node">
-                            @if($stepDone)
+                            @if($step->done)
                                 <i class="bi bi-check-lg"></i>
                             @else
-                                {{ $stepIndex + 1 }}
+                                {{ $step->number }}
                             @endif
                         </span>
 
                         <span class="op-approval-copy">
                             <strong>
-                                {{ $flowLabel[$flowKey] }}
+                                {{ $step->label }}
                             </strong>
 
                             <small>
-                                @if($stepDone)
+                                @if($step->done)
                                     Đã xử lý
-                                @elseif($stepActive)
+                                @elseif($step->active)
                                     Đang xử lý
                                 @else
                                     Chờ xử lý
@@ -376,21 +257,9 @@
                         </span>
                     </header>
 
-                    @php
-                        $displayBeforeVat = 0;
-                        $displayVatAmount = 0;
-                        $displayAfterVat = 0;
-                        $displayVatGroups = [];
-                    @endphp
 
                     <div class="op-card-body op-table-wrap op-main-products-wrap">
                         {{-- SIMPLIFIED PRODUCT TABLE V3.4 --}}
-                        @php
-                            $displayBeforeVat = 0;
-                            $displayVatAmount = 0;
-                            $displayAfterVat = 0;
-                            $displayVatGroups = [];
-                        @endphp
 
                         <table class="op-table op-main-products-table op-product-vat-table op-product-table-v34">
                             <thead>
@@ -403,7 +272,7 @@
                                         Giá trước VAT
                                     </th>
 
-                                    <th class="text-center">
+                                    <th class="tw:text-center">
                                         SL
                                     </th>
 
@@ -414,107 +283,7 @@
                             </thead>
 
                             <tbody>
-                                @foreach($order->items as $index => $item)
-                                    @php
-                                        $mainQuantity = max(
-                                            1,
-                                            (int) ($item->quantity ?? 1)
-                                        );
-
-                                        $mainVat = max(
-                                            0,
-                                            (float) (
-                                                $item->vat_percent
-                                                ?? $item->product?->vat_percent
-                                                ?? 0
-                                            )
-                                        );
-
-                                        $mainUnitAfter = max(
-                                            0,
-                                            (float) ($item->unit_price ?? 0)
-                                        );
-
-                                        $mainUnitBefore = $mainVat > 0
-                                            ? $mainUnitAfter / (1 + $mainVat / 100)
-                                            : $mainUnitAfter;
-
-                                        $mainSubAfter =
-                                            $mainUnitAfter * $mainQuantity;
-
-                                        $mainDiscountPercent = max(
-                                            0,
-                                            min(
-                                                100,
-                                                (float) (
-                                                    $item->discount_percent
-                                                    ?? 0
-                                                )
-                                            )
-                                        );
-
-                                        $mainDiscountPerUnit = max(
-                                            0,
-                                            (float) (
-                                                $item->discount_amount
-                                                ?? 0
-                                            )
-                                        );
-
-                                        $mainDiscount = $mainDiscountPerUnit > 0
-                                            ? $mainDiscountPerUnit * $mainQuantity
-                                            : (
-                                                $mainSubAfter
-                                                * $mainDiscountPercent
-                                                / 100
-                                            );
-
-                                        $mainDiscount = min(
-                                            $mainDiscount,
-                                            $mainSubAfter
-                                        );
-
-                                        $mainLineAfter = max(
-                                            0,
-                                            $mainSubAfter - $mainDiscount
-                                        );
-
-                                        $mainLineBefore = $mainVat > 0
-                                            ? $mainLineAfter
-                                                / (1 + $mainVat / 100)
-                                            : $mainLineAfter;
-
-                                        $mainVatAmount = max(
-                                            0,
-                                            $mainLineAfter - $mainLineBefore
-                                        );
-
-                                        $mainVatLabel = rtrim(
-                                            rtrim(
-                                                number_format(
-                                                    $mainVat,
-                                                    2,
-                                                    '.',
-                                                    ''
-                                                ),
-                                                '0'
-                                            ),
-                                            '.'
-                                        );
-
-                                        $displayBeforeVat += $mainLineBefore;
-                                        $displayVatAmount += $mainVatAmount;
-                                        $displayAfterVat += $mainLineAfter;
-
-                                        $displayVatGroups[$mainVatLabel] =
-                                            (
-                                                $displayVatGroups[
-                                                    $mainVatLabel
-                                                ]
-                                                ?? 0
-                                            )
-                                            + $mainVatAmount;
-                                    @endphp
+                                @foreach($productLines as $index => $line)
 
                                     <tr
                                         @if($index >= 5)
@@ -525,12 +294,12 @@
                                         <td>
                                             <strong>
                                                 {{
-                                                    $item->product_name
+                                                    $line->item->product_name
                                                     ?: (
-                                                        $item->product->name
+                                                        $line->item->product->name
                                                         ?? (
                                                             'Sản phẩm #'
-                                                            .$item->product_id
+                                                            .$line->item->product_id
                                                         )
                                                     )
                                                 }}
@@ -539,7 +308,7 @@
                                             <small>
                                                 SKU:
                                                 {{
-                                                    $item->product->sku
+                                                    $line->item->product->sku
                                                     ?? '—'
                                                 }}
                                             </small>
@@ -547,7 +316,7 @@
 
                                         <td>
                                             {{
-                                                $item->warehouse->name
+                                                $line->item->warehouse->name
                                                 ?? $order->warehouse->name
                                                 ?? '—'
                                             }}
@@ -556,7 +325,7 @@
                                         <td class="text-end">
                                             {{
                                                 number_format(
-                                                    $mainUnitBefore,
+                                                    $line->unitBefore,
                                                     0,
                                                     ',',
                                                     '.'
@@ -565,9 +334,9 @@
                                             đ
                                         </td>
 
-                                        <td class="text-center">
+                                        <td class="tw:text-center">
                                             <strong>
-                                                {{ $mainQuantity }}
+                                                {{ $line->quantity }}
                                             </strong>
                                         </td>
 
@@ -575,7 +344,7 @@
                                             <strong>
                                                 {{
                                                     number_format(
-                                                        $mainLineAfter,
+                                                        $line->lineAfter,
                                                         0,
                                                         ',',
                                                         '.'
@@ -597,7 +366,7 @@
                                     <td class="text-end">
                                         {{
                                             number_format(
-                                                $displayBeforeVat,
+                                                $vatSummary->beforeVat,
                                                 0,
                                                 ',',
                                                 '.'
@@ -608,7 +377,7 @@
                                 </tr>
 
                                 @foreach(
-                                    $displayVatGroups
+                                    $vatSummary->groups
                                     as $displayVatRate => $displayVatValue
                                 )
                                     @if((float) $displayVatValue > 0)
@@ -641,7 +410,7 @@
                                     <td class="text-end">
                                         {{
                                             number_format(
-                                                $displayAfterVat,
+                                                $vatSummary->afterVat,
                                                 0,
                                                 ',',
                                                 '.'
@@ -694,7 +463,7 @@
                                 Gần nhất:
                                 <strong>{{ $lastPayment ? number_format((float) $lastPayment->amount, 0, ',', '.').' đ' : 'Chưa có thanh toán' }}</strong>
                                 @if($lastPayment)
-                                    · {{ $dateFmt($lastPayment->payment_date ?? $lastPayment->created_at) }}
+                                    · {{ \App\Support\DisplayFormat::date($lastPayment->payment_date ?? $lastPayment->created_at) }}
                                 @endif
                             </p>
                         </div>
@@ -709,7 +478,7 @@
                             <div><span>Kho xuất</span><strong>{{ $order->warehouse->name ?? 'Chưa chọn kho' }}</strong></div>
                             <div><span>Tồn kho</span><strong>{{ $order->inventory_issued ? 'Đã trừ tồn' : 'Chưa trừ tồn' }}</strong></div>
                             <div><span>Vận chuyển</span><strong>{{ $order->shipping_carrier ?: 'Chưa cập nhật' }}</strong></div>
-                            <div><span>Ngày giao</span><strong>{{ $dateFmt($order->estimated_delivery) }}</strong></div>
+                            <div><span>Ngày giao</span><strong>{{ \App\Support\DisplayFormat::date($order->estimated_delivery) }}</strong></div>
                             <div><span>Mã vận đơn</span><strong>{{ $order->tracking_number ?: '—' }}</strong></div>
                             <div><span>Hậu mãi</span><strong>{{ $activeReturns->count() ? $activeReturns->count().' hồ sơ đang xử lý' : 'Không có yêu cầu mở' }}</strong></div>
                         </div>
@@ -726,7 +495,7 @@
                         </span>
                         <div>
                             <strong>{{ $statusName }}</strong>
-                            <small>Đang ở: {{ $departmentMap[$department] ?? ucfirst($department) }}</small>
+                            <small>Đang ở: {{ $departmentLabel }}</small>
                         </div>
                     </div>
                 </section>
@@ -796,7 +565,7 @@
                         <div><span>Công ty</span><strong>{{ $order->company->name ?? '—' }}</strong></div>
                         <div><span>Người tạo</span><strong>{{ $order->creator->name ?? '—' }}</strong></div>
                         <div><span>Duyệt cuối</span><strong>{{ $order->approver->name ?? '—' }}</strong></div>
-                        <div><span>Ngày giao dự kiến</span><strong>{{ $dateFmt($order->estimated_delivery) }}</strong></div>
+                        <div><span>Ngày giao dự kiến</span><strong>{{ \App\Support\DisplayFormat::date($order->estimated_delivery) }}</strong></div>
                         <div><span>Ghi chú</span><strong>{{ $order->note ?: 'Không có ghi chú' }}</strong></div>
                     </div>
                 </section>
@@ -826,7 +595,7 @@
                             <div class="op-card-body">
                                 <div class="op-approval-list">
                                     @forelse($order->approvals ?? [] as $approval)
-                                        <div class="op-approval-row"><span class="op-state-dot {{ $approval->status === 'approved' ? 'success' : ($approval->status === 'rejected' ? 'danger' : 'warning') }}"></span><div><strong>{{ ucfirst(str_replace('_',' ', (string) $approval->level)) }}</strong><small>{{ $approval->approver->name ?? 'Chưa có người xử lý' }} · {{ $dateFmt($approval->approved_at ?: $approval->created_at, 'd/m/Y H:i') }}</small></div><span class="op-badge {{ $approval->status === 'approved' ? 'success' : ($approval->status === 'rejected' ? 'danger' : 'warning') }}">{{ $approval->status }}</span></div>
+                                        <div class="op-approval-row"><span class="op-state-dot {{ $approval->status === 'approved' ? 'success' : ($approval->status === 'rejected' ? 'danger' : 'warning') }}"></span><div><strong>{{ ucfirst(str_replace('_',' ', (string) $approval->level)) }}</strong><small>{{ $approval->approver->name ?? 'Chưa có người xử lý' }} · {{ \App\Support\DisplayFormat::date($approval->approved_at ?: $approval->created_at, 'd/m/Y H:i') }}</small></div><span class="op-badge {{ $approval->status === 'approved' ? 'success' : ($approval->status === 'rejected' ? 'danger' : 'warning') }}">{{ $approval->status }}</span></div>
                                     @empty
                                         <div class="op-empty">Chưa có lịch sử phê duyệt.</div>
                                     @endforelse
@@ -868,7 +637,7 @@
                             <div class="op-card-body op-table-wrap">
                                 <table class="op-table"><thead><tr><th>Ngày</th><th>Số tiền</th><th>Phương thức</th><th>Người ghi nhận</th><th>Ghi chú</th><th>Thao tác</th></tr></thead><tbody>
                                 @forelse($order->payments ?? [] as $payment)
-                                    <tr><td>{{ $dateFmt($payment->payment_date) }}</td><td class="text-success"><strong>+{{ number_format((float) $payment->amount, 0, ',', '.') }} đ</strong></td><td>{{ $payment->method->method_name ?? '—' }}</td><td>{{ $payment->recordedBy->name ?? '—' }}</td><td>{{ $payment->note ?: '—' }}</td><td><details class="op-inline-details"><summary>Sửa</summary><form method="POST" action="{{ route('orders.payments.update', $payment->id) }}" class="op-inline-form">@csrf @method('PUT')<input type="hidden" name="return_tab" value="payments"><input class="op-input" type="date" name="payment_date" value="{{ $payment->payment_date ? \Carbon\Carbon::parse($payment->payment_date)->format('Y-m-d') : '' }}" required><input class="op-input" type="number" name="amount" value="{{ $payment->amount }}" min="0.01" step="any" required><select class="op-select" name="method_id" required>@foreach($paymentMethods ?? [] as $method)<option value="{{ $method->id }}" @selected((int)$payment->method_id === (int)$method->id)>{{ $method->method_name }}</option>@endforeach</select><input class="op-input" name="note" value="{{ $payment->note }}"><button class="op-btn op-btn-primary op-btn-sm">Lưu</button></form>@can('recordPayment', $order)<form method="POST" action="{{ route('orders.payments.destroy', $payment->id) }}" data-op-confirm="Xóa giao dịch thanh toán này?">@csrf @method('DELETE')<button class="op-link-danger">Xóa giao dịch</button></form>@endcan</details></td></tr>
+                                    <tr><td>{{ \App\Support\DisplayFormat::date($payment->payment_date) }}</td><td class="text-success"><strong>+{{ number_format((float) $payment->amount, 0, ',', '.') }} đ</strong></td><td>{{ $payment->method->method_name ?? '—' }}</td><td>{{ $payment->recordedBy->name ?? '—' }}</td><td>{{ $payment->note ?: '—' }}</td><td><details class="op-inline-details"><summary>Sửa</summary><form method="POST" action="{{ route('orders.payments.update', $payment->id) }}" class="op-inline-form">@csrf @method('PUT')<input type="hidden" name="return_tab" value="payments"><input class="op-input" type="date" name="payment_date" value="{{ $payment->payment_date ? \Carbon\Carbon::parse($payment->payment_date)->format('Y-m-d') : '' }}" required><input class="op-input" type="number" name="amount" value="{{ $payment->amount }}" min="0.01" step="any" required><select class="op-select" name="method_id" required>@foreach($paymentMethods ?? [] as $method)<option value="{{ $method->id }}" @selected((int)$payment->method_id === (int)$method->id)>{{ $method->method_name }}</option>@endforeach</select><input class="op-input" name="note" value="{{ $payment->note }}"><button class="op-btn op-btn-primary op-btn-sm">Lưu</button></form>@can('recordPayment', $order)<form method="POST" action="{{ route('orders.payments.destroy', $payment->id) }}" data-op-confirm="Xóa giao dịch thanh toán này?">@csrf @method('DELETE')<button class="op-link-danger">Xóa giao dịch</button></form>@endcan</details></td></tr>
                                 @empty<tr><td colspan="6"><div class="op-empty">Chưa có thanh toán.</div></td></tr>@endforelse
                                 </tbody></table>
                             </div>
@@ -891,20 +660,20 @@
                                 @endcan
                             </header>
                             <div class="op-card-body">
-                                @if($order->inventory_issued)<div class="op-alert success"><i class="bi bi-check-circle"></i><div><strong>Đã xuất kho và trừ tồn.</strong><br>{{ $dateFmt($order->inventory_issued_at, 'd/m/Y H:i') }} · {{ $order->warehouse->name ?? 'Kho chưa xác định' }}</div></div>@else<div class="op-alert warning"><i class="bi bi-exclamation-triangle"></i><div>Đơn chưa xuất kho. Chỉ bộ phận Kho hoặc người có quyền mới được xác nhận xuất.</div></div>@endif
+                                @if($order->inventory_issued)<div class="op-alert success"><i class="bi bi-check-circle"></i><div><strong>Đã xuất kho và trừ tồn.</strong><br>{{ \App\Support\DisplayFormat::date($order->inventory_issued_at, 'd/m/Y H:i') }} · {{ $order->warehouse->name ?? 'Kho chưa xác định' }}</div></div>@else<div class="op-alert warning"><i class="bi bi-exclamation-triangle"></i><div>Đơn chưa xuất kho. Chỉ bộ phận Kho hoặc người có quyền mới được xác nhận xuất.</div></div>@endif
                                 <h3 class="op-subtitle">Phân bổ lot FIFO</h3>
                                 <div class="op-table-wrap"><table class="op-table"><thead><tr><th>Sản phẩm</th><th>Kho</th><th>Lot</th><th>SL xuất</th><th>Giá vốn</th><th>Tham chiếu</th></tr></thead><tbody>@forelse($stockAllocations ?? [] as $allocation)<tr><td>{{ $allocation->product_name ?? ('SP #'.$allocation->product_id) }}</td><td>{{ $allocation->warehouse_name ?? '—' }}</td><td>{{ $allocation->lot_code ?? ('#'.$allocation->stock_lot_id) }}</td><td>{{ $allocation->qty }}</td><td>{{ number_format((float)($allocation->unit_cost_after_vat ?? 0),0,',','.') }} đ</td><td>#{{ $allocation->id }}</td></tr>@empty<tr><td colspan="6"><div class="op-empty">Chưa có allocation kho.</div></td></tr>@endforelse</tbody></table></div>
                                 <h3 class="op-subtitle">Serial đã gắn với đơn</h3>
                                 <div class="op-table-wrap"><table class="op-table"><thead><tr><th>Sản phẩm</th><th>Serial</th><th>Trạng thái</th><th>Kho</th></tr></thead><tbody>@forelse($orderSerials ?? [] as $serial)<tr><td>{{ $serial->product_name ?? ('SP #'.$serial->product_id) }}</td><td><strong>{{ $serial->serial_code ?? ('#'.$serial->serial_unit_id) }}</strong></td><td><span class="op-badge info">{{ $serial->state ?? '—' }}</span></td><td>{{ $serial->warehouse_name ?? '—' }}</td></tr>@empty<tr><td colspan="4"><div class="op-empty">Chưa có serial gắn với đơn.</div></td></tr>@endforelse</tbody></table></div>
                             </div>
                         </article>
-                        <article class="op-card op-col-4"><header class="op-card-head"><h2>Giao dịch kho</h2></header><div class="op-card-body op-activity-list">@forelse($stockMovements ?? [] as $movement)<div class="op-activity"><span class="op-state-dot {{ ($movement->change_qty ?? 0) < 0 ? 'danger' : 'success' }}"></span><div><strong>{{ $movement->reason ?? 'Biến động tồn kho' }}</strong><small>{{ $movement->product_name ?? ('SP #'.$movement->product_id) }} · {{ $movement->change_qty > 0 ? '+' : '' }}{{ $movement->change_qty }} · {{ $dateFmt($movement->created_at,'d/m H:i') }}</small></div></div>@empty<div class="op-empty">Chưa có giao dịch kho.</div>@endforelse</div></article>
+                        <article class="op-card op-col-4"><header class="op-card-head"><h2>Giao dịch kho</h2></header><div class="op-card-body op-activity-list">@forelse($stockMovements ?? [] as $movement)<div class="op-activity"><span class="op-state-dot {{ ($movement->change_qty ?? 0) < 0 ? 'danger' : 'success' }}"></span><div><strong>{{ $movement->reason ?? 'Biến động tồn kho' }}</strong><small>{{ $movement->product_name ?? ('SP #'.$movement->product_id) }} · {{ $movement->change_qty > 0 ? '+' : '' }}{{ $movement->change_qty }} · {{ \App\Support\DisplayFormat::date($movement->created_at,'d/m H:i') }}</small></div></div>@empty<div class="op-empty">Chưa có giao dịch kho.</div>@endforelse</div></article>
                     </div>
                 </section>
 
                 <section class="op-panel {{ $activeTab === 'shipping' ? 'active' : '' }}" data-op-panel="shipping">
                     <div class="op-grid">
-                        <article class="op-card op-col-8"><header class="op-card-head"><h2><i class="bi bi-truck"></i> Vận chuyển</h2>@can('updateShippingInfo', $order)<button type="button" class="op-btn op-btn-primary op-btn-sm" data-op-open="shippingModal">Cập nhật</button>@endcan</header><div class="op-card-body"><dl class="op-info-grid"><dt>Đơn vị vận chuyển</dt><dd>{{ $order->shipping_carrier ?: '—' }}</dd><dt>Mã vận đơn</dt><dd>{{ $order->tracking_number ?: '—' }}</dd><dt>Người nhận</dt><dd>{{ $order->receiver_name ?: '—' }}</dd><dt>Số điện thoại</dt><dd>{{ $order->receiver_phone ?: '—' }}</dd><dt>Địa chỉ</dt><dd>{{ $order->shipping_address ?: '—' }}</dd><dt>Ngày dự kiến</dt><dd>{{ $dateFmt($order->estimated_delivery) }}</dd><dt>Trạng thái</dt><dd>{{ $order->shipping_status ?: '—' }}</dd><dt>Ghi chú</dt><dd>{{ $order->shipping_note ?: '—' }}</dd></dl></div></article>
+                        <article class="op-card op-col-8"><header class="op-card-head"><h2><i class="bi bi-truck"></i> Vận chuyển</h2>@can('updateShippingInfo', $order)<button type="button" class="op-btn op-btn-primary op-btn-sm" data-op-open="shippingModal">Cập nhật</button>@endcan</header><div class="op-card-body"><dl class="op-info-grid"><dt>Đơn vị vận chuyển</dt><dd>{{ $order->shipping_carrier ?: '—' }}</dd><dt>Mã vận đơn</dt><dd>{{ $order->tracking_number ?: '—' }}</dd><dt>Người nhận</dt><dd>{{ $order->receiver_name ?: '—' }}</dd><dt>Số điện thoại</dt><dd>{{ $order->receiver_phone ?: '—' }}</dd><dt>Địa chỉ</dt><dd>{{ $order->shipping_address ?: '—' }}</dd><dt>Ngày dự kiến</dt><dd>{{ \App\Support\DisplayFormat::date($order->estimated_delivery) }}</dd><dt>Trạng thái</dt><dd>{{ $order->shipping_status ?: '—' }}</dd><dt>Ghi chú</dt><dd>{{ $order->shipping_note ?: '—' }}</dd></dl></div></article>
                         <article class="op-card op-col-4"><header class="op-card-head"><h2>Phí vận chuyển</h2></header><div class="op-card-body op-kv-list"><div><span>Kho → chành</span><strong>{{ number_format((float)($order->shipping_fee_warehouse_to_station ?? 0),0,',','.') }} đ</strong></div><div><span>Chành → khách</span><strong>{{ number_format((float)($order->shipping_fee_station_to_customer ?? 0),0,',','.') }} đ</strong></div><div><span>Người chịu phí</span><strong>{{ ($order->shipping_fee_payer ?? 'company') === 'customer' ? 'Khách chịu' : 'Công ty chịu' }}</strong></div>@can('markShipped', $order)
                                 @if(!$order->is_shipped)<form method="POST" action="{{ route('orders.markShipped',$order->id) }}?tab=shipping" data-op-confirm="Xác nhận đơn đã được vận chuyển?">@csrf<button class="op-btn op-btn-primary op-btn-block">Đánh dấu đã vận chuyển</button></form>@endif
                                 @endcan
@@ -919,7 +688,7 @@
                             @if($order->inventory_issued)<div class="op-alert warning"><i class="bi bi-exclamation-triangle"></i><div><strong>Đơn đã xuất kho và trừ tồn.</strong> Hàng chỉ được cộng lại sau khi kho xác nhận nhận hàng, kiểm tra và nhập hoàn.</div></div>@endif
                             @forelse($returns as $return)
                                 <article class="op-return-card">
-                                    <div class="op-return-head"><div><strong>{{ $return->return_code }}</strong><small>{{ ucfirst($return->type) }} · {{ $dateFmt($return->created_at,'d/m/Y H:i') }}</small></div><span class="op-badge {{ in_array($return->status,['completed','stocked_in']) ? 'success' : (str_contains((string)$return->status,'pending') ? 'warning' : 'info') }}">{{ $return->status_label ?? $return->status }}</span></div>
+                                    <div class="op-return-head"><div><strong>{{ $return->return_code }}</strong><small>{{ ucfirst($return->type) }} · {{ \App\Support\DisplayFormat::date($return->created_at,'d/m/Y H:i') }}</small></div><span class="op-badge {{ in_array($return->status,['completed','stocked_in']) ? 'success' : (str_contains((string)$return->status,'pending') ? 'warning' : 'info') }}">{{ $return->status_label ?? $return->status }}</span></div>
                                     <div class="op-return-grid"><div><span>Giá trị dự kiến</span><strong>{{ number_format((float)($return->total_return_amount ?? 0),0,',','.') }} đ</strong></div><div><span>Kho nhận</span><strong>{{ $return->receivingWarehouse->name ?? 'Chưa chọn' }}</strong></div><div><span>Sản phẩm</span><strong>{{ collect($return->items ?? [])->sum('requested_quantity') }} sản phẩm</strong></div><div><span>Hoàn tiền</span><strong>{{ number_format((float)collect($return->refunds ?? [])->sum('amount'),0,',','.') }} đ</strong></div></div>
                                     <details class="op-return-details"><summary>Xử lý hồ sơ</summary><div class="op-return-actions">
                                         @if($return->status === 'draft' || $return->status === 'revision_requested')<form method="POST" action="{{ route('order-returns.submit',$return) }}">@csrf<button class="op-btn op-btn-primary op-btn-sm">Gửi duyệt</button></form>@endif
@@ -1049,7 +818,7 @@
                                                     <?php endif; ?>
 
                                                     <?php if (
-                                                        $canByRole(['admin', 'accounting'])
+                                                        $canRefundProcess
                                                         && in_array(
                                                             $refund->status,
                                                             ['approved', 'processing'],
@@ -1088,7 +857,7 @@
                 </section>
 
                 <section class="op-panel {{ $activeTab === 'history' ? 'active' : '' }}" data-op-panel="history">
-                    <div class="op-grid"><article class="op-card op-col-8"><header class="op-card-head"><h2><i class="bi bi-clock-history"></i> Nhật ký xử lý</h2></header><div class="op-card-body op-activity-list">@forelse($timeline as $event)<div class="op-activity"><span class="op-state-dot info"></span><div><strong>{{ $event->statusType->name ?? $event->status ?? 'Cập nhật đơn hàng' }}</strong><small>{{ $event->note ?? '' }} · {{ $event->changedBy->name ?? 'Hệ thống' }} · {{ $dateFmt($event->changed_at ?? $event->created_at,'d/m/Y H:i') }}</small></div></div>@empty<div class="op-empty">Chưa có nhật ký.</div>@endforelse</div></article><article class="op-card op-col-4"><header class="op-card-head"><h2>Lịch sử chỉnh sửa</h2><span class="op-badge neutral">{{ collect($editHistories ?? [])->count() }} lần</span></header><div class="op-card-body op-activity-list">@forelse(collect($editHistories ?? [])->take(20) as $history)<div class="op-activity"><span class="op-state-dot warning"></span><div><strong>{{ $history->user_name ?? 'Không rõ' }}</strong><small>{{ $dateFmt($history->created_at,'d/m H:i') }} · Chi tiết đơn hàng đã thay đổi</small></div></div>@empty<div class="op-empty">Chưa có chỉnh sửa.</div>@endforelse</div></article></div>
+                    <div class="op-grid"><article class="op-card op-col-8"><header class="op-card-head"><h2><i class="bi bi-clock-history"></i> Nhật ký xử lý</h2></header><div class="op-card-body op-activity-list">@forelse($timeline as $event)<div class="op-activity"><span class="op-state-dot info"></span><div><strong>{{ $event->statusType->name ?? $event->status ?? 'Cập nhật đơn hàng' }}</strong><small>{{ $event->note ?? '' }} · {{ $event->changedBy->name ?? 'Hệ thống' }} · {{ \App\Support\DisplayFormat::date($event->changed_at ?? $event->created_at,'d/m/Y H:i') }}</small></div></div>@empty<div class="op-empty">Chưa có nhật ký.</div>@endforelse</div></article><article class="op-card op-col-4"><header class="op-card-head"><h2>Lịch sử chỉnh sửa</h2><span class="op-badge neutral">{{ collect($editHistories ?? [])->count() }} lần</span></header><div class="op-card-body op-activity-list">@forelse(collect($editHistories ?? [])->take(20) as $history)<div class="op-activity"><span class="op-state-dot warning"></span><div><strong>{{ $history->user_name ?? 'Không rõ' }}</strong><small>{{ \App\Support\DisplayFormat::date($history->created_at,'d/m H:i') }} · Chi tiết đơn hàng đã thay đổi</small></div></div>@empty<div class="op-empty">Chưa có chỉnh sửa.</div>@endforelse</div></article></div>
                 </section>
             </div>
         </section>

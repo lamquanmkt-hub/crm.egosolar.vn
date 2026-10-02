@@ -1,160 +1,165 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid py-4">
+{{-- `.container-fluid` quy đổi theo GIÁ TRỊ: width 100% + đệm calc(1.5rem*.5)=12px + margin auto. --}}
+<div class="tw:w-full tw:px-3 tw:mx-auto tw:py-6">
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm rounded-pill px-4">
+        <x-ui.alert variant="success" class="tw:[border:0] tw:[box-shadow:0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[50rem] tw:px-6">
             {{ session('success') }}
-        </div>
+        </x-ui.alert>
     @endif
 
     @if(session('error'))
-        <div class="alert alert-danger border-0 shadow-sm rounded-pill px-4">
+        <x-ui.alert variant="danger" class="tw:[border:0] tw:[box-shadow:0_2px_4px_0_rgba(0,0,0,0.075)] tw:rounded-[50rem] tw:px-6">
             {{ session('error') }}
-        </div>
+        </x-ui.alert>
     @endif
 
-    <div class="card border-0 shadow-lg rounded-4 overflow-hidden mb-4">
-        <div class="card-body p-4 text-white" style="background: linear-gradient(135deg, #0ea5e9, #2563eb);">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <x-ui.card class="tw:[border:0] tw:[box-shadow:0_1rem_3rem_rgba(0,0,0,0.175)] tw:rounded-[1rem] tw:overflow-hidden tw:mb-6">
+        <x-ui.card-body class="tw:p-6 tw:text-[#ffffff] tw:[background:linear-gradient(135deg,#0ea5e9,#2563eb)]">
+            <div class="tw:flex tw:flex-wrap tw:justify-between tw:items-center tw:gap-4">
                 <div>
-                    <h3 class="mb-1 fw-bold">Quỹ & Tài Khoản</h3>
-                    <div class="opacity-75">Quản lý tiền mặt, ngân hàng, ví điện tử và số dư thực tế</div>
+                    <h3 class="tw:mb-1 tw:font-bold">Quỹ & Tài Khoản</h3>
+                    <div class="tw:opacity-75">Quản lý tiền mặt, ngân hàng, ví điện tử và số dư thực tế</div>
                 </div>
-                <a href="{{ route('finance.accounts.create') }}" class="btn btn-light rounded-pill px-4 fw-semibold">
+                <x-ui.button href="{{ route('finance.accounts.create') }}" variant="light" class="tw:rounded-[50rem]! tw:px-6 tw:font-semibold">
                     + Tạo tài khoản
-                </a>
+                </x-ui.button>
             </div>
+        </x-ui.card-body>
+    </x-ui.card>
+
+    <div class="tw:row tw:g-3 tw:mb-6">
+        <div class="tw:md:col12-3">
+            <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem] tw:h-full">
+                <x-ui.card-body>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Tổng tài khoản</div>
+                    <div class="tw:text-[calc(1.275rem+0.3vw)] tw:min-[75rem]:text-[1.5rem] tw:font-bold">{{ $statsCards->totalAccountsText }}</div>
+                </x-ui.card-body>
+            </x-ui.card>
+        </div>
+        <div class="tw:md:col12-3">
+            <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem] tw:h-full">
+                <x-ui.card-body>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Đang hoạt động</div>
+                    <div class="tw:text-[calc(1.275rem+0.3vw)] tw:min-[75rem]:text-[1.5rem] tw:font-bold tw:text-[#198754]">{{ $statsCards->activeAccountsText }}</div>
+                </x-ui.card-body>
+            </x-ui.card>
+        </div>
+        <div class="tw:md:col12-3">
+            <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem] tw:h-full">
+                <x-ui.card-body>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Tổng số dư</div>
+                    <div class="tw:text-[calc(1.275rem+0.3vw)] tw:min-[75rem]:text-[1.5rem] tw:font-bold tw:text-[#0d6efd]">{{ $statsCards->totalBalanceText }}</div>
+                </x-ui.card-body>
+            </x-ui.card>
+        </div>
+        <div class="tw:md:col12-3">
+            <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem] tw:h-full">
+                <x-ui.card-body>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">Tiền mặt</div>
+                    <div class="tw:text-[calc(1.275rem+0.3vw)] tw:min-[75rem]:text-[1.5rem] tw:font-bold tw:text-[#0dcaf0]">{{ $statsCards->cashBalanceText }}</div>
+                </x-ui.card-body>
+            </x-ui.card>
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
-                <div class="card-body">
-                    <div class="text-muted small">Tổng tài khoản</div>
-                    <div class="fs-4 fw-bold">{{ number_format($stats['total_accounts']) }}</div>
+    <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem] tw:mb-6">
+        <x-ui.card-body>
+            <form method="GET" class="tw:row tw:g-3">
+                <div class="tw:md:col12-5">
+                    <x-ui.input type="text" name="keyword" value="{{ request('keyword') }}" class="tw:rounded-[50rem]!" placeholder="Tìm theo tên, mã, ghi chú..." />
                 </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
-                <div class="card-body">
-                    <div class="text-muted small">Đang hoạt động</div>
-                    <div class="fs-4 fw-bold text-success">{{ number_format($stats['active_accounts']) }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
-                <div class="card-body">
-                    <div class="text-muted small">Tổng số dư</div>
-                    <div class="fs-4 fw-bold text-primary">{{ number_format($stats['total_balance'], 0, ',', '.') }}đ</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
-                <div class="card-body">
-                    <div class="text-muted small">Tiền mặt</div>
-                    <div class="fs-4 fw-bold text-info">{{ number_format($stats['cash_balance'], 0, ',', '.') }}đ</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card border-0 shadow-sm rounded-4 mb-4">
-        <div class="card-body">
-            <form method="GET" class="row g-3">
-                <div class="col-md-5">
-                    <input type="text" name="keyword" value="{{ request('keyword') }}" class="form-control rounded-pill" placeholder="Tìm theo tên, mã, ghi chú...">
-                </div>
-                <div class="col-md-3">
-                    <select name="type" class="form-select rounded-pill">
+                <div class="tw:md:col12-3">
+                    <x-ui.select name="type" class="tw:rounded-[50rem]!">
                         <option value="">-- Loại tài khoản --</option>
                         <option value="cash" @selected(request('type') == 'cash')>Tiền mặt</option>
                         <option value="bank" @selected(request('type') == 'bank')>Ngân hàng</option>
                         <option value="ewallet" @selected(request('type') == 'ewallet')>Ví điện tử</option>
-                    </select>
+                    </x-ui.select>
                 </div>
-                <div class="col-md-2">
-                    <select name="status" class="form-select rounded-pill">
+                <div class="tw:md:col12-2">
+                    <x-ui.select name="status" class="tw:rounded-[50rem]!">
                         <option value="">-- Trạng thái --</option>
                         <option value="active" @selected(request('status') == 'active')>Hoạt động</option>
                         <option value="inactive" @selected(request('status') == 'inactive')>Ngưng</option>
-                    </select>
+                    </x-ui.select>
                 </div>
-                <div class="col-md-2 d-grid">
-                    <button class="btn btn-primary rounded-pill">Lọc</button>
+                <div class="tw:md:col12-2 tw:grid">
+                    <x-ui.button variant="primary" type="submit" class="tw:rounded-[50rem]!">Lọc</x-ui.button>
                 </div>
             </form>
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 
-    <div class="card border-0 shadow-sm rounded-4">
-        <div class="card-body p-0">
+    <x-ui.card class="tw:[border:0] tw:[box-shadow:0_0.125rem_0.25rem_rgba(0,0,0,0.075)] tw:rounded-[1rem]">
+        <x-ui.card-body class="tw:p-0">
             @if($accounts->count())
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead class="bg-light">
+                <x-ui.table-wrap>
+                    <x-ui.table class="tw:align-middle tw:mb-0">
+                        {{-- Dùng `<thead>` trơn, KHÔNG dùng `<x-ui.table-head>`: component đó tái hiện `.table-light`
+                             (gán lại BIẾN nền/viền/màu chữ của Ô), còn bản cũ chỉ đặt `bg-light` trên chính thẻ
+                             `<thead>` — mà nền ô của `.table` phủ lên nên ô vẫn TRẮNG. Đo được: đổi sang
+                             component làm 228 ô lệch (nền ô, màu viền, màu chữ). Giữ y bản cũ. --}}
+                        <thead class="tw:bg-[rgb(248,249,250)]">
                             <tr>
-                                <th class="px-4 py-3">Tên tài khoản</th>
-                                <th class="py-3">Mã</th>
-                                <th class="py-3">Loại</th>
-                                <th class="py-3">Số dư đầu</th>
-                                <th class="py-3">Số dư hiện tại</th>
-                                <th class="py-3">Trạng thái</th>
-                                <th class="text-end px-4 py-3">Thao tác</th>
+                                <th class="tw:px-6 tw:py-4">Tên tài khoản</th>
+                                <th class="tw:py-4">Mã</th>
+                                <th class="tw:py-4">Loại</th>
+                                <th class="tw:py-4">Số dư đầu</th>
+                                <th class="tw:py-4">Số dư hiện tại</th>
+                                <th class="tw:py-4">Trạng thái</th>
+                                <th class="tw:text-right tw:px-6 tw:py-4">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($accounts as $account)
+                            @foreach($accountRows as $row)
                                 <tr>
-                                    <td class="px-4">
-                                        <div class="fw-semibold">{{ $account->name }}</div>
-                                        @if($account->note)
-                                            <div class="text-muted small">{{ $account->note }}</div>
+                                    <td class="tw:px-6">
+                                        <div class="tw:font-semibold">{{ $row->name }}</div>
+                                        @if($row->note)
+                                            <div class="tw:text-[rgba(33,37,41,0.75)] tw:text-[0.875em]">{{ $row->note }}</div>
                                         @endif
                                     </td>
-                                    <td>{{ $account->code ?: '—' }}</td>
-                                    <td>{{ $account->type_label }}</td>
-                                    <td>{{ number_format($account->opening_balance, 0, ',', '.') }}đ</td>
-                                    <td class="fw-bold text-primary">{{ number_format($account->current_balance, 0, ',', '.') }}đ</td>
+                                    <td>{{ $row->codeText }}</td>
+                                    <td>{{ $row->typeLabel }}</td>
+                                    <td>{{ $row->openingText }}</td>
+                                    <td class="tw:font-bold tw:text-[#0d6efd]">{{ $row->currentText }}</td>
                                     <td>
-                                        @if($account->is_active)
-                                            <span class="badge bg-success-subtle text-success rounded-pill px-3">Hoạt động</span>
+                                        @if($row->isActive)
+                                            <x-finance.pill tone="success" class="tw:text-[#198754] tw:px-4 tw:rounded-[50rem]">Hoạt động</x-finance.pill>
                                         @else
-                                            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3">Ngưng</span>
+                                            <x-finance.pill class="tw:text-[#6c757d] tw:px-4 tw:rounded-[50rem]">Ngưng</x-finance.pill>
                                         @endif
                                     </td>
-                                    <td class="text-end px-4">
+                                    <td class="tw:text-right tw:px-6">
                                         
 
-                                        <form action="{{ route('finance.accounts.destroy', $account) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Xóa tài khoản này?')">
+                                        <form action="{{ route('finance.accounts.destroy', $row->id) }}" method="POST" class="tw:inline-block" onsubmit="return confirm('Xóa tài khoản này?')">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="btn btn-sm btn-danger rounded-pill px-3">Xóa</button>
+                                            <x-ui.button variant="danger" size="sm" type="submit" class="tw:rounded-[50rem]! tw:px-4">Xóa</x-ui.button>
                                         </form>
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
-                    </table>
-                </div>
+                    </x-ui.table>
+                </x-ui.table-wrap>
 
-                <div class="p-3">
+                <div class="tw:p-4">
                     {{ $accounts->links() }}
                 </div>
             @else
-                <div class="text-center py-5">
-                    <div class="mb-2 fw-semibold">Chưa có quỹ / tài khoản nào</div>
-                    <div class="text-muted mb-3">Bắt đầu bằng cách tạo quỹ tiền mặt hoặc tài khoản ngân hàng đầu tiên.</div>
-                    <a href="{{ route('finance.accounts.create') }}" class="btn btn-primary rounded-pill px-4">
+                <div class="tw:text-center tw:py-12">
+                    <div class="tw:mb-2 tw:font-semibold">Chưa có quỹ / tài khoản nào</div>
+                    <div class="tw:text-[rgba(33,37,41,0.75)] tw:mb-4">Bắt đầu bằng cách tạo quỹ tiền mặt hoặc tài khoản ngân hàng đầu tiên.</div>
+                    <x-ui.button href="{{ route('finance.accounts.create') }}" variant="primary" class="tw:rounded-[50rem]! tw:px-6">
                         + Tạo ngay
-                    </a>
+                    </x-ui.button>
                 </div>
             @endif
-        </div>
-    </div>
+        </x-ui.card-body>
+    </x-ui.card>
 </div>
 @endsection

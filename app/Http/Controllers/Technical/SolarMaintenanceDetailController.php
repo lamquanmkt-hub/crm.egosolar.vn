@@ -3,18 +3,22 @@
 namespace App\Http\Controllers\Technical;
 
 use App\Http\Controllers\Controller;
-use App\Models\Site;
+use App\Models\Core\Warehouse;
+use App\Models\Projects\Site;
 use App\Models\SolarMaintenanceSchedule;
+use App\Models\SolarMaintenanceWorkItem;
 use App\Models\SolarSiteDocument;
+use App\Models\SolarWarrantyClaim;
+use App\Models\SolarWarrantyStockMovement;
 use App\Services\Technical\SolarMaintenanceQueryService;
-use App\Services\Technical\SolarMaintenanceWorkflowService;
 use App\Support\EgoCompanyScope;
+use App\Support\SchemaCache;
 use App\Support\SolarMaintenanceAccess;
+use App\View\Presenters\Technical\MaintenanceSitePresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 /**
@@ -25,9 +29,8 @@ class SolarMaintenanceDetailController extends Controller
     /**
      * Khởi tạo controller với service truy vấn bảo trì.
      */
-    public function __construct(
-        private readonly SolarMaintenanceQueryService $queryService,
-        private readonly SolarMaintenanceWorkflowService $workflow,
+    public function __construct(private readonly SolarMaintenanceQueryService $queryService,
+        private readonly MaintenanceSitePresenter $sitePresenter,
     ) {}
 
     /**
@@ -39,10 +42,10 @@ class SolarMaintenanceDetailController extends Controller
             return $this->deny('Bạn chưa có quyền xem hồ sơ công trình bảo trì.');
         }
 
-        $siteModel = Site::withoutGlobalScopes()->find($site);
+        $siteModel = Site::query()->find($site);
         if (! $siteModel) {
             return redirect()
-                ->route('ky-thuat.maintenance.index')
+                ->route('projects-unified.maintenance.index')
                 ->with('error', 'Không tìm thấy công trình. Có thể lịch cũ đang liên kết tới một công trình đã bị xóa.');
         }
 
@@ -76,11 +79,7 @@ class SolarMaintenanceDetailController extends Controller
             ->map(function (Collection $items, string $key) {
                 $first = $items->first();
                 $planned = max(1, (int) ($first?->total_rounds ?? $items->count()));
-                $completed = $items->filter(fn (SolarMaintenanceSchedule $item) =>
-                    $item->status === 'completed'
-                    && $item->approval_status === 'approved'
-                    && $item->approved_at
-                )->count();
+                $completed = $items->where('status', 'completed')->count();
 
                 return [
                     'key' => $key,
@@ -102,7 +101,7 @@ class SolarMaintenanceDetailController extends Controller
             ->latest('id')
             ->get();
 
-        return view('technical.maintenance.site-show', [
+        return view('technical.maintenance.site-show', array_merge([
             'site' => $siteModel,
             'schedules' => $schedules,
             'cycles' => $cycles,
@@ -112,14 +111,13 @@ class SolarMaintenanceDetailController extends Controller
             'statuses' => SolarMaintenanceSchedule::STATUSES,
             'types' => SolarMaintenanceSchedule::TYPES,
             'approvalStatuses' => SolarMaintenanceSchedule::APPROVAL_STATUSES,
-            'assignmentApprovalStatuses' => SolarMaintenanceSchedule::ASSIGNMENT_APPROVAL_STATUSES,
             'permissions' => [
                 'create' => $request->user()->can('create', SolarMaintenanceSchedule::class),
                 'upload' => SolarMaintenanceAccess::isTechnician($request->user())
                     || SolarMaintenanceAccess::isManager($request->user()),
                 'manage' => SolarMaintenanceAccess::isManager($request->user()),
             ],
-        ]);
+        ], $this->sitePresenter->viewData($siteModel, $schedules, $cycles)));
     }
 
     /**
@@ -130,61 +128,155 @@ class SolarMaintenanceDetailController extends Controller
         $schedule->loadMissing([
             'site',
             'assignees.user:id,name,email,phone_number,department_id,position_id',
-            'maintenanceProfile',
         ]);
 
         if (! $request->user()->can('view', $schedule)) {
             return $this->deny('Bạn chưa có quyền xem đợt bảo trì này hoặc đợt không thuộc công ty đang làm việc.');
         }
 
-        $schedule->load([
+        $relations = [
             'site',
             'creator:id,name',
             'submitter:id,name',
             'approver:id,name',
-            'assignmentSubmitter:id,name',
-            'assignmentApprover:id,name',
-            'assignmentRevisionRequester:id,name',
-            'externalLaborPaymentRequest:id,code,status,amount,created_by',
             'assignees.user:id,name,email,phone_number,department_id,position_id',
             'approvals.approver:id,name',
             'approvals.submitter:id,name',
             'attachments.uploader:id,name',
+            'attachments.workItem:id,maintenance_schedule_id,title',
             'statusHistories.user:id,name',
-            'checklistItems.completer:id,name',
-            'checklistItems.attachments.uploader:id,name',
-            'checklistItems.template',
-            'maintenanceProfile',
-        ]);
-
-        $this->workflow->ensureChecklist($schedule);
-        $schedule->load([
-            'checklistItems.completer:id,name',
-            'checklistItems.attachments.uploader:id,name',
-            'checklistItems.template',
-        ]);
+        ];
+        if (SchemaCache::hasTable('solar_maintenance_work_items')) {
+            $relations[] = 'workItems.assignee:id,name,email,phone_number';
+            $relations[] = 'workItems.creator:id,name';
+            $relations[] = 'workItems.attachments';
+        }
+        if (SchemaCache::hasTable('solar_maintenance_comments')) {
+            $relations[] = 'comments.user:id,name';
+        }
+        $schedule->load($relations);
 
         $siblingQuery = SolarMaintenanceSchedule::query()
             ->when($schedule->round_group, fn ($q) => $q->where('round_group', $schedule->round_group))
             ->when(! $schedule->round_group, fn ($q) => $q->whereKey($schedule->id));
-
         $this->queryService->scopeVisibleTo($siblingQuery, $request->user());
-
-        $siblings = $siblingQuery
-            ->orderBy('round_no')
-            ->orderBy('scheduled_date')
-            ->get();
+        $siblings = $siblingQuery->orderBy('round_no')->orderBy('scheduled_date')->get();
 
         $technicalUsers = $this->queryService->technicalUsers();
         $leaderId = optional($schedule->leader)->user_id;
         $memberIds = $schedule->assignees
             ->reject(fn ($item) => (int) $item->user_id === (int) $leaderId)
-            ->pluck('user_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
+            ->pluck('user_id')->map(fn ($id) => (int) $id)->all();
         $previous = $siblings->filter(fn ($item) => (int) $item->round_no < (int) $schedule->round_no)->last();
         $next = $siblings->first(fn ($item) => (int) $item->round_no > (int) $schedule->round_no);
+
+        $workItems = SchemaCache::hasTable('solar_maintenance_work_items')
+            ? $schedule->workItems
+            : collect();
+        $comments = SchemaCache::hasTable('solar_maintenance_comments')
+            ? $schedule->comments
+            : collect();
+        $workProgress = $workItems->isNotEmpty()
+            ? (int) round((float) $workItems->avg('progress_percent'))
+            : 0;
+        $workSummary = [
+            'total' => $workItems->count(),
+            'completed' => $workItems->where('status', 'completed')->count(),
+            'in_progress' => $workItems->where('status', 'in_progress')->count(),
+            'blocked' => $workItems->where('status', 'blocked')->count(),
+            'progress' => $workProgress,
+        ];
+
+        $warrantyClaim = null;
+        if (SchemaCache::hasTable('crm_serial_warranty_claims')) {
+            $warrantyClaim = SolarWarrantyClaim::query()
+                ->where('maintenance_schedule_id', $schedule->id)
+                ->with([
+                    'site', 'assignee:id,name', 'creator:id,name', 'approver:id,name',
+                    'stockMovements.requester:id,name',
+                    'stockMovements.approver:id,name',
+                    'stockMovements.completer:id,name',
+                    'stockMovements.warehouse:id,name',
+                ])
+                ->latest('id')
+                ->first();
+        }
+
+        $isWarrantyFlow = (bool) $warrantyClaim
+            || in_array($schedule->type, ['warranty_inverter', 'incident'], true);
+        [$workflowSteps, $currentWorkflowStep] = $this->workflowFor($schedule, $warrantyClaim, $isWarrantyFlow);
+
+        $canViewCosts = SolarMaintenanceAccess::canViewMaintenanceCosts($request->user());
+        $canManageStock = SolarMaintenanceAccess::canHandleWarrantyStock($request->user());
+        $warehouses = collect();
+        if ($canManageStock && SchemaCache::hasTable('crm_warehouses')) {
+            $warehouses = Warehouse::query()
+                ->when((int) ($schedule->company_id ?: $schedule->site?->company_id) > 0, function ($query) use ($schedule) {
+                    $companyId = (int) ($schedule->company_id ?: $schedule->site?->company_id);
+                    $query->where(function ($q) use ($companyId) {
+                        $q->where('company_id', $companyId)->orWhereNull('company_id');
+                    });
+                })
+                ->orderBy('name')
+                ->get(['id', 'name', 'location']);
+        }
+
+        $canUpdateWarranty = $warrantyClaim && (
+            SolarMaintenanceAccess::isManager($request->user())
+            || (SolarMaintenanceAccess::isTechnician($request->user())
+                && (int) $warrantyClaim->assigned_to === (int) $request->user()->id)
+        );
+
+        $assignmentApproval = $schedule->approvals
+            ->first(fn ($approval) => (string) $approval->approval_level === 'assignment');
+        $currentAssignment = $schedule->assignees
+            ->first(fn ($assignee) => (int) $assignee->user_id === (int) $request->user()->id);
+        $assignmentApprovalStatus = $assignmentApproval?->status
+            ?: ($schedule->assignees->isNotEmpty()
+                && in_array($schedule->status, ['assigned', 'customer_confirmed', 'travelling', 'in_progress', 'waiting_material', 'waiting_submission', 'revision_requested', 'pending_approval', 'approved', 'completed'], true)
+                ? 'approved' : 'pending');
+        $maintenanceProposals = collect();
+        $maintenanceProposalItems = collect();
+        if ($schedule->site_id && SchemaCache::hasTable('project_material_proposals')) {
+            $maintenanceProposals = DB::table('project_material_proposals as proposal')
+                ->leftJoin('users as creator', 'creator.id', '=', 'proposal.created_by')
+                ->where('proposal.site_id', $schedule->site_id)
+                ->where(function ($query) use ($schedule): void {
+                    $query->where('proposal.purpose', 'like', '%'.$schedule->schedule_code.'%')
+                        ->orWhere('proposal.note', 'like', '%'.$schedule->schedule_code.'%');
+                })
+                ->select('proposal.*', 'creator.name as creator_name')
+                ->orderByDesc('proposal.id')
+                ->get();
+
+            $proposalIds = $maintenanceProposals
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if ($proposalIds && SchemaCache::hasTable('project_material_proposal_items')) {
+                $proposalItemQuery = DB::table('project_material_proposal_items as item')
+                    ->whereIn('item.proposal_id', $proposalIds);
+                $proposalItemSelect = ['item.*'];
+
+                if (SchemaCache::hasTable('crm_product_catalog')) {
+                    $proposalItemQuery->leftJoin('crm_product_catalog as product', 'product.id', '=', 'item.selected_product_id');
+                    $proposalItemSelect[] = 'product.name as selected_product_name';
+                    $proposalItemSelect[] = 'product.sku as selected_product_sku';
+                }
+
+                if (SchemaCache::hasTable('crm_warehouses')) {
+                    $proposalItemQuery->leftJoin('crm_warehouses as warehouse', 'warehouse.id', '=', 'item.selected_warehouse_id');
+                    $proposalItemSelect[] = 'warehouse.name as selected_warehouse_name';
+                }
+
+                $maintenanceProposalItems = $proposalItemQuery
+                    ->select($proposalItemSelect)
+                    ->orderBy('item.id')
+                    ->get()
+                    ->groupBy('proposal_id');
+            }
+        }
 
         return view('technical.maintenance.show', [
             'schedule' => $schedule,
@@ -196,35 +288,135 @@ class SolarMaintenanceDetailController extends Controller
             'memberIds' => $memberIds,
             'statuses' => SolarMaintenanceSchedule::STATUSES,
             'approvalStatuses' => SolarMaintenanceSchedule::APPROVAL_STATUSES,
-            'assignmentApprovalStatuses' => SolarMaintenanceSchedule::ASSIGNMENT_APPROVAL_STATUSES,
             'types' => SolarMaintenanceSchedule::TYPES,
             'priorities' => SolarMaintenanceSchedule::PRIORITIES,
-            'reportConclusions' => SolarMaintenanceWorkflowService::CONCLUSIONS,
+            'workItems' => $workItems,
+            'workStatuses' => SolarMaintenanceWorkItem::STATUSES,
+            'workSummary' => $workSummary,
+            'comments' => $comments,
+            'warrantyClaim' => $warrantyClaim,
+            'warrantyStatuses' => SolarWarrantyClaim::STATUSES,
+            'warrantyTransitions' => SolarWarrantyClaim::TRANSITIONS,
+            'stockTypes' => SolarWarrantyStockMovement::TYPES,
+            'stockStatuses' => SolarWarrantyStockMovement::STATUSES,
+            'warehouses' => $warehouses,
+            'isWarrantyFlow' => $isWarrantyFlow,
+            'workflowSteps' => $workflowSteps,
+            'currentWorkflowStep' => $currentWorkflowStep,
+            'canViewCosts' => $canViewCosts,
+            'canUpdateWarranty' => $canUpdateWarranty,
+            'assignmentApproval' => $assignmentApproval,
+            'assignmentApprovalStatus' => $assignmentApprovalStatus,
+            'currentAssignment' => $currentAssignment,
+            'maintenanceProposals' => $maintenanceProposals,
+            'maintenanceProposalItems' => $maintenanceProposalItems,
             'permissions' => [
-                /*
-                 * Mọi nhân sự Kỹ thuật / Tech Manager
-                 * được bắt đầu và thực hiện công việc khi đợt đã phân công.
-                 * Phân công không dùng để ẩn quyền thao tác cơ bản.
-                 */
-                'update' =>
-                    SolarMaintenanceAccess::isTechnician($request->user())
-                    || SolarMaintenanceAccess::isManager($request->user())
-                    || $request->user()->can('update', $schedule),
-                'assign' => SolarMaintenanceAccess::canAssign($request->user()),
-                'assignment_approve' => $request->user()->can('approve', $schedule),
-                // Mọi nhân sự Kỹ thuật / Tech Manager được upload minh chứng.
-                // Trạng thái hồ sơ vẫn được kiểm tra tại AttachmentController.
-                'upload' =>
-                    SolarMaintenanceAccess::isTechnician($request->user())
-                    || SolarMaintenanceAccess::isManager($request->user()),
+                'update' => $request->user()->can('update', $schedule),
+                'upload' => $request->user()->can('uploadAttachment', $schedule),
                 'submit' => $request->user()->can('submitForApproval', $schedule),
                 'approve' => $request->user()->can('approve', $schedule),
                 'revision' => $request->user()->can('requestRevision', $schedule),
                 'reject' => $request->user()->can('reject', $schedule),
                 'reopen' => $request->user()->can('reopen', $schedule),
-                'admin' => SolarMaintenanceAccess::isAdmin($request->user()),
+                'comment' => true,
+                'stock' => $canManageStock,
+                'finance' => $canViewCosts,
+                'manager' => SolarMaintenanceAccess::isManager($request->user()),
+                'assignment_admin' => SolarMaintenanceAccess::isAdmin($request->user()),
+                'assignment_manage' => SolarMaintenanceAccess::isManager($request->user()),
+                'assignment_accept' => (bool) $currentAssignment,
             ],
         ]);
+    }
+
+    private function workflowFor(
+        SolarMaintenanceSchedule $schedule,
+        ?SolarWarrantyClaim $claim,
+        bool $isWarrantyFlow
+    ): array {
+        if ($isWarrantyFlow) {
+            $labels = [
+                'Tiếp nhận', 'Kiểm tra', 'Chẩn đoán', 'Đề xuất', 'Duyệt',
+                'Kho xuất đổi', 'Thay thế', 'Khách xác nhận', 'Đóng phiếu',
+            ];
+            $status = $claim?->status ?: $schedule->status;
+            $map = [
+                'received' => 1, 'draft' => 1, 'scheduled' => 1, 'unassigned' => 1,
+                'eligibility_check' => 2, 'assigned' => 2, 'customer_confirmed' => 2,
+                'diagnosing' => 3, 'travelling' => 3, 'in_progress' => 3,
+                'solution_proposed' => 4, 'waiting_submission' => 4,
+                'pending_approval' => 5, 'approved' => 5,
+                'waiting_stock' => 6, 'waiting_material' => 6,
+                'replacing' => 7,
+                'waiting_customer' => 8,
+                'completed' => 9,
+                'rejected' => 3, 'cancelled' => 1,
+            ];
+            $current = $map[$status] ?? 1;
+            $actors = [
+                $claim?->creator?->name ?: $schedule->creator?->name,
+                $claim?->assignee?->name ?: $schedule->leader?->user?->name,
+                $claim?->assignee?->name ?: $schedule->leader?->user?->name,
+                $claim?->assignee?->name ?: $schedule->leader?->user?->name,
+                $claim?->approver?->name ?: $schedule->approver?->name,
+                'Kho',
+                $claim?->assignee?->name ?: $schedule->leader?->user?->name,
+                'Khách hàng',
+                $claim?->approver?->name ?: $schedule->approver?->name,
+            ];
+            $times = [
+                optional($claim?->received_at ?: $schedule->created_at)->format('d/m/Y H:i'),
+                optional($schedule->assignees->first()?->assigned_at)->format('d/m/Y H:i'),
+                optional($schedule->started_at)->format('d/m/Y H:i'),
+                optional($claim?->submitted_at ?: $schedule->submitted_at)->format('d/m/Y H:i'),
+                optional($claim?->approved_at ?: $schedule->approved_at)->format('d/m/Y H:i'),
+                optional($claim?->stockMovements?->first()?->completed_at)->format('d/m/Y H:i'),
+                optional($claim?->resolved_at)->format('d/m/Y H:i'),
+                optional($claim?->customer_confirmed_at)->format('d/m/Y H:i'),
+                optional($claim?->closed_at ?: $schedule->completed_at)->format('d/m/Y H:i'),
+            ];
+        } else {
+            $labels = ['Lên lịch', 'Phân công', 'Thực hiện', 'Báo cáo', 'Duyệt', 'Hoàn thành'];
+            $map = [
+                'draft' => 1, 'scheduled' => 1, 'unassigned' => 1,
+                'assigned' => 2, 'customer_confirmed' => 2,
+                'travelling' => 3, 'in_progress' => 3, 'waiting_material' => 3,
+                'waiting_submission' => 4, 'revision_requested' => 4,
+                'pending_approval' => 5, 'approved' => 5, 'waiting_customer' => 5,
+                'completed' => 6, 'postponed' => 1, 'cancelled' => 1,
+            ];
+            $current = $map[$schedule->status] ?? 1;
+            $actors = [
+                $schedule->creator?->name,
+                $schedule->leader?->user?->name ?: $schedule->assigned_name,
+                $schedule->leader?->user?->name ?: $schedule->assigned_name,
+                $schedule->submitter?->name ?: $schedule->leader?->user?->name,
+                $schedule->approver?->name ?: $schedule->submitter?->name,
+                $schedule->approver?->name ?: $schedule->leader?->user?->name,
+            ];
+            $times = [
+                optional($schedule->created_at)->format('d/m/Y H:i'),
+                optional($schedule->assignees->first()?->assigned_at)->format('d/m/Y H:i'),
+                optional($schedule->started_at)->format('d/m/Y H:i'),
+                optional($schedule->submitted_at)->format('d/m/Y H:i'),
+                optional($schedule->approved_at ?: $schedule->submitted_at)->format('d/m/Y H:i'),
+                optional($schedule->completed_at)->format('d/m/Y H:i'),
+            ];
+        }
+
+        $steps = collect($labels)->map(function (string $label, int $index) use ($current, $actors, $times) {
+            $number = $index + 1;
+
+            return [
+                'number' => $number,
+                'label' => $label,
+                'state' => $number < $current ? 'done' : ($number === $current ? 'active' : 'todo'),
+                'actor' => $actors[$index] ?: 'Chưa xác định',
+                'time' => $times[$index] ?: 'Chưa cập nhật',
+            ];
+        })->all();
+
+        return [$steps, $current];
     }
 
     /**
@@ -232,13 +424,7 @@ class SolarMaintenanceDetailController extends Controller
      */
     private function canAccessSite(Request $request, Site $site): bool
     {
-        // EGO_TECHNICAL_CROSS_COMPANY_SITE_VIEW_V2
-        // Admin và mọi nhân sự Kỹ thuật được xem hồ sơ công trình
-        // bất kể company đang chọn.
-        if (
-            SolarMaintenanceAccess::isAdmin($request->user())
-            || SolarMaintenanceAccess::isTechnician($request->user())
-        ) {
+        if (SolarMaintenanceAccess::isAdmin($request->user())) {
             return true;
         }
 
@@ -261,7 +447,7 @@ class SolarMaintenanceDetailController extends Controller
     private function deny(string $message): RedirectResponse
     {
         return redirect()
-            ->route('ky-thuat.maintenance.index')
+            ->route('projects-unified.maintenance.index')
             ->with('error', $message);
     }
 
@@ -279,7 +465,7 @@ class SolarMaintenanceDetailController extends Controller
         ];
 
         foreach ($tables as $table) {
-            if (! Schema::hasTable($table)) {
+            if (! SchemaCache::hasTable($table)) {
                 return collect();
             }
         }
@@ -310,7 +496,7 @@ class SolarMaintenanceDetailController extends Controller
         }
 
         $histories = collect();
-        if (Schema::hasTable('solar_maintenance_status_histories')) {
+        if (SchemaCache::hasTable('solar_maintenance_status_histories')) {
             $histories = DB::table('solar_maintenance_status_histories as h')
                 ->leftJoin('users as u', 'u.id', '=', 'h.changed_by')
                 ->whereIn('h.maintenance_schedule_id', $scheduleIds)
@@ -319,7 +505,7 @@ class SolarMaintenanceDetailController extends Controller
         }
 
         $approvals = collect();
-        if (Schema::hasTable('solar_maintenance_approvals')) {
+        if (SchemaCache::hasTable('solar_maintenance_approvals')) {
             $approvals = DB::table('solar_maintenance_approvals as a')
                 ->leftJoin('users as u', 'u.id', '=', 'a.approver_id')
                 ->whereIn('a.maintenance_schedule_id', $scheduleIds)
