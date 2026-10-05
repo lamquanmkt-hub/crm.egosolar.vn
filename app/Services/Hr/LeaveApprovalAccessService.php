@@ -19,6 +19,11 @@ class LeaveApprovalAccessService
         'ke_toan',
     ];
 
+    private const ALWAYS_ELIGIBLE_APPROVER_ROLES = [
+        'technical_manager',
+        'ky_thuat_manager',
+    ];
+
     private const MANAGER_ROLES = [
         'admin',
         'management',
@@ -206,7 +211,7 @@ class LeaveApprovalAccessService
                 return true;
             }
 
-            if ($this->canManageAll($candidate)) {
+            if ($this->canManageAll($candidate) || $this->hasAnyRole($candidate, self::ALWAYS_ELIGIBLE_APPROVER_ROLES)) {
                 return true;
             }
 
@@ -237,7 +242,10 @@ class LeaveApprovalAccessService
                     && $this->isDepartmentManager($candidate)
                 ) {
                     $priority = 1;
-                } elseif ($this->canManageAll($candidate)) {
+                } elseif (
+                    $this->canManageAll($candidate)
+                    || $this->hasAnyRole($candidate, self::ALWAYS_ELIGIBLE_APPROVER_ROLES)
+                ) {
                     $priority = 2;
                 }
 
