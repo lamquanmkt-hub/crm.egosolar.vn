@@ -25,14 +25,14 @@ final class OvertimeListPresenter
      * @param  int  $currentUserId  id người đang đăng nhập (0 nếu không có)
      * @return array{summaryCards: OvertimeSummaryCards, overtimeRows: list<OvertimeRow>}
      */
-    public function viewData(iterable $requests, array $summary, int $currentUserId, bool $canManage): array
+    public function viewData(iterable $requests, array $summary, int $currentUserId, bool $canManage, array $approvableIds = []): array
     {
         $rows = [];
 
         foreach ($requests as $item) {
             // Bản cũ: `$canManage || (int)$item->approver_id === (int)auth()->user()->id`.
             $canApprove = (string) ($item->status ?? '') === 'pending'
-                && ($canManage || (int) ($item->approver_id ?? 0) === $currentUserId);
+                && ($canManage || (int) ($item->approver_id ?? 0) === $currentUserId || in_array((int) ($item->id ?? 0), $approvableIds, true));
 
             $rows[] = new OvertimeRow(
                 id: (int) ($item->id ?? 0),

@@ -55,6 +55,7 @@
                                 <option value="business_trip" @selected(old('request_type', $presetType) === 'business_trip')>Công tác</option>
                                 <option value="late" @selected(old('request_type', $presetType) === 'late')>Xin đi trễ</option>
                                 <option value="early_leave" @selected(old('request_type', $presetType) === 'early_leave')>Xin về sớm</option>
+                                <option value="overtime" data-redirect="{{ route('hr.overtime.create') }}">Tăng ca</option>
                             </select>
                         </div>
 
@@ -156,5 +157,15 @@
 @endsection
 
 @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const typeSelect = document.querySelector('select[name="request_type"]');
+            if (!typeSelect) return;
+            typeSelect.addEventListener('change', function () {
+                const url = typeSelect.selectedOptions[0]?.dataset.redirect;
+                if (url) window.location.href = url;
+            });
+        });
+    </script>
     <script src="{{ asset('js/ego-leave-promax.js') }}?v={{ filemtime(public_path('js/ego-leave-promax.js')) }}" defer></script>
 @endpush

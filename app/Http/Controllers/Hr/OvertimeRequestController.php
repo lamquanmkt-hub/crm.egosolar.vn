@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
 use App\Models\OvertimeRequest;
 use App\Models\User;
+use App\Services\Hr\LeaveApprovalAccessService;
 use App\Support\SchemaCache;
 use App\View\Presenters\Hr\OvertimeListPresenter;
 use Carbon\Carbon;
@@ -42,10 +43,7 @@ class OvertimeRequestController extends Controller
             ->whereBetween('overtime_date', [$start->toDateString(), $end->toDateString()]);
 
         if (! $canManage) {
-            $query->where(function ($q) use ($user) {
-                $q->where('user_id', $user->id)
-                    ->orWhere('approver_id', $user->id);
-            });
+            $query->where(fn ($q) => $this->scopeVisible($q, $user));
         }
 
         if ($status) {
@@ -66,10 +64,7 @@ class OvertimeRequestController extends Controller
             ->whereBetween('overtime_date', [$start->toDateString(), $end->toDateString()]);
 
         if (! $canManage) {
-            $summaryBase->where(function ($q) use ($user) {
-                $q->where('user_id', $user->id)
-                    ->orWhere('approver_id', $user->id);
-            });
+            $summaryBase->where(fn ($q) => $this->scopeVisible($q, $user));
         }
 
         $summary = [
@@ -89,6 +84,11 @@ class OvertimeRequestController extends Controller
                 summary: $summary,
                 currentUserId: (int) ($user->id ?? 0),
                 canManage: $canManage,
+                approvableIds: $canManage ? [] : $requests->getCollection()
+                    ->filter(fn ($item) => $this->canApprove($user, $item))
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all(),
             )
         ));
     }
@@ -242,6 +242,22 @@ class OvertimeRequestController extends Controller
     }
 
     /**
+     * Phạm vi đơn user được xem: của mình, được chọn làm người duyệt, của nhóm mình quản lý.
+     */
+    private function scopeVisible($q, $user): void
+    {
+        $q->where('user_id', $user->id)->orWhere('approver_id', $user->id);
+
+        if (SchemaCache::hasColumn('users', 'manager_id')) {
+            $q->orWhereHas('user', fn ($e) => $e->where('manager_id', $user->id));
+        }
+
+        if ((int) ($user->department_id ?? 0) > 0 && app(LeaveApprovalAccessService::class)->isDepartmentManager($user)) {
+            $q->orWhereHas('user', fn ($e) => $e->where('department_id', $user->department_id));
+        }
+    }
+
+    /**
      * Kiểm tra user có quyền duyệt đơn tăng ca (quản lý HR hoặc đúng người duyệt).
      */
     private function canApprove($user, OvertimeRequest $overtime): bool
@@ -250,7 +266,29 @@ class OvertimeRequestController extends Controller
             return false;
         }
 
-        return $this->canManageHr($user) || (int) $overtime->approver_id === (int) $user->id;
+        if ($this->canManageHr($user) || (int) $overtime->approver_id === (int) $user->id) {
+            return true;
+        }
+
+        $overtime->loadMissing('user');
+        $employee = $overtime->user;
+
+        if (! $employee || (int) $employee->id === (int) $user->id) {
+            return false;
+        }
+
+        $access = app(LeaveApprovalAccessService::class);
+
+        if (
+            SchemaCache::hasColumn('users', 'manager_id')
+            && (int) ($employee->manager_id ?? 0) === (int) $user->id
+        ) {
+            return true;
+        }
+
+        return $access->isDepartmentManager($user)
+            && (int) ($user->department_id ?? 0) > 0
+            && (int) ($employee->department_id ?? 0) === (int) $user->department_id;
     }
 
     /**
@@ -286,13 +324,7 @@ class OvertimeRequestController extends Controller
      */
     private function approverOptions()
     {
-        $query = User::query()->orderBy('name');
-
-        if (SchemaCache::hasColumn('users', 'is_active')) {
-            $query->where('is_active', 1);
-        }
-
-        return $query->limit(100)->get(['id', 'name', 'email']);
+        return app(LeaveApprovalAccessService::class)->eligibleApprovers(auth()->user());
     }
 
     /**
