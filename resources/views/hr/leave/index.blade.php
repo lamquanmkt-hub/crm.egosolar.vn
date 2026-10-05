@@ -25,6 +25,18 @@
         };
     };
 
+    $overtimeStatusLabel = static fn ($status): string => match ((string) $status) {
+        'approved' => 'Đã duyệt',
+        'rejected' => 'Từ chối',
+        default => 'Chờ duyệt',
+    };
+
+    $feed = $leaveRequests->getCollection()
+        ->map(fn ($row) => ['type' => 'leave', 'item' => $row, 'at' => $row->created_at])
+        ->concat(collect($overtimeRequests ?? [])->map(fn ($row) => ['type' => 'overtime', 'item' => $row, 'at' => $row->created_at]))
+        ->sortByDesc('at')
+        ->values();
+
     $timeText = static function ($date, $time): string {
         if (! $date) return '—';
         $value = $date->format('d/m/Y');
@@ -142,6 +154,7 @@
                     <option value="business_trip" @selected($requestType === 'business_trip')>Công tác</option>
                     <option value="late" @selected($requestType === 'late')>Đi trễ</option>
                     <option value="early_leave" @selected($requestType === 'early_leave')>Về sớm</option>
+                    <option value="overtime" @selected($requestType === 'overtime')>Tăng ca</option>
                 </select>
             </div>
 
@@ -161,7 +174,58 @@
         </form>
 
         <section class="lv-list">
-            @forelse($leaveRequests as $item)
+            @forelse($feed as $feedRow)
+                @php($item = $feedRow['item'])
+                @if($feedRow['type'] === 'overtime')
+                <article class="lv-card lv-panel">
+                    <div class="lv-person">
+                        <div class="lv-avatar">{{ $initials($item->user?->name) }}</div>
+                        <div>
+                            <strong>{{ $item->user?->name ?: 'Không xác định' }}</strong>
+                            <small>{{ $item->user?->department?->name ?: 'Chưa có phòng ban' }} · Tăng ca #{{ $item->id }}</small>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="lv-type-row">
+                            <span class="lv-type"><i class="bi bi-clock-history"></i>Tăng ca</span>
+                            <span class="lv-status lv-status--{{ $statusClass($item->status) }}">{{ $overtimeStatusLabel($item->status) }}</span>
+                        </div>
+
+                        <div class="lv-reason">{{ $item->reason ?: 'Không có lý do.' }}</div>
+
+                        <div class="lv-meta-grid">
+                            <div class="lv-meta"><span>Bắt đầu</span><strong>{{ $item->start_at?->format('d/m/Y · H:i') }}</strong></div>
+                            <div class="lv-meta"><span>Kết thúc</span><strong>{{ $item->end_at?->format('d/m/Y · H:i') }}</strong></div>
+                            <div class="lv-meta"><span>Thời lượng</span><strong>{{ rtrim(rtrim(number_format((float) $item->hours, 2, '.', ''), '0'), '.') }} giờ</strong></div>
+                            <div class="lv-meta"><span>Loại chi tiết</span><strong>Đăng ký tăng ca</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="lv-approver">
+                        <small>Người duyệt hiện tại</small>
+                        <strong>{{ $item->approver?->name ?: 'HR / Admin' }}</strong>
+                        <small>Gửi lúc {{ $item->created_at?->format('d/m/Y H:i') }}</small>
+                        @if($item->approval_note)
+                            <small style="color:#9a6100">Ghi chú: {{ $item->approval_note }}</small>
+                        @endif
+                        @if($item->status === 'approved' && (int) $item->user_id === (int) auth()->id())
+                            <small><a href="{{ route('hr.attendance.my') }}">Xem chấm công</a></small>
+                        @endif
+                    </div>
+
+                    <div class="lv-card-actions">
+                        @if($item->_can_approve)
+                            <button type="button" class="lv-btn lv-btn--success" data-leave-approval data-mode="approve" data-employee="{{ $item->user?->name }}" data-approve-url="{{ route('hr.overtime.approve', $item) }}" data-reject-url="{{ route('hr.overtime.reject', $item) }}">
+                                <i class="bi bi-check2-circle"></i>Duyệt
+                            </button>
+                            <button type="button" class="lv-btn lv-btn--danger" data-leave-approval data-mode="reject" data-employee="{{ $item->user?->name }}" data-approve-url="{{ route('hr.overtime.approve', $item) }}" data-reject-url="{{ route('hr.overtime.reject', $item) }}">
+                                <i class="bi bi-x-circle"></i>Từ chối
+                            </button>
+                        @endif
+                    </div>
+                </article>
+                @else
                 <article class="lv-card lv-panel">
                     <div class="lv-person">
                         <div class="lv-avatar">{{ $initials($item->user?->name) }}</div>
@@ -237,6 +301,7 @@
                         @endif
                     </div>
                 </article>
+                @endif
             @empty
                 <div class="lv-panel lv-empty">
                     <i class="bi bi-inbox" style="font-size:28px"></i>

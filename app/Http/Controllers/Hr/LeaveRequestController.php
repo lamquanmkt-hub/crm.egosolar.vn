@@ -8,7 +8,9 @@ use App\Models\LeaveRequestApprovalLog;
 use App\Models\LeaveRequestAttachment;
 use App\Models\User;
 use App\Services\Hr\AttendanceLeaveNoteService;
+use App\Models\OvertimeRequest;
 use App\Services\Hr\LeaveApprovalAccessService;
+use App\Services\Hr\OvertimeAccessService;
 use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,14 +23,17 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class LeaveRequestController extends Controller
 {
     public function __construct(
-        private readonly LeaveApprovalAccessService $approvalAccess
+        private readonly LeaveApprovalAccessService $approvalAccess,
+        private readonly OvertimeAccessService $overtimeAccess
     ) {}
 
     public function index(Request $request)
     {
         $user = $request->user();
         $canManageAll = $this->approvalAccess->canManageAll($user);
-        $canReview = $this->approvalAccess->canReview($user);
+        $overtimeReviewBase = fn () => $this->overtimeAccess->scopeReviewable(OvertimeRequest::query()->where('status', 'pending'), $user);
+        $overtimePendingApproval = $overtimeReviewBase()->count();
+        $canReview = $this->approvalAccess->canReview($user) || $overtimePendingApproval > 0;
 
         $tab = (string) $request->input('tab', 'mine');
 
@@ -71,7 +76,9 @@ class LeaveRequestController extends Controller
             $query->where('status', $status);
         }
 
-        if ($requestType !== '') {
+        if ($requestType === 'overtime') {
+            $query->whereRaw('1 = 0');
+        } elseif ($requestType !== '') {
             $query->where('request_type', $requestType);
         }
 
@@ -88,20 +95,24 @@ class LeaveRequestController extends Controller
             return $leave;
         });
 
+        $overtimeRequests = $this->overtimeRowsFor($user, $tab, $status, $requestType, $userId, $leaveRequests);
+
         $mineCount = LeaveRequest::query()
             ->where('user_id', $user->id)
-            ->count();
+            ->count()
+            + OvertimeRequest::query()->where('user_id', $user->id)->count();
 
         $minePendingCount = LeaveRequest::query()
             ->where('user_id', $user->id)
             ->where('status', 'pending')
-            ->count();
+            ->count()
+            + OvertimeRequest::query()->where('user_id', $user->id)->where('status', 'pending')->count();
 
-        $pendingApprovalCount = 0;
+        $pendingApprovalCount = $overtimePendingApproval;
 
-        if ($canReview) {
+        if ($this->approvalAccess->canReview($user)) {
             $pendingQuery = LeaveRequest::query()->where('status', 'pending');
-            $pendingApprovalCount = $this->approvalAccess
+            $pendingApprovalCount += $this->approvalAccess
                 ->scopeReviewable($pendingQuery, $user)
                 ->count();
         }
@@ -129,6 +140,7 @@ class LeaveRequestController extends Controller
         return view('hr.leave.index', [
             'leaveRequests' => $leaveRequests,
             'requests' => $leaveRequests,
+            'overtimeRequests' => $overtimeRequests,
             'employees' => $employees,
             'approvers' => $approvers,
             'tab' => $tab,
@@ -142,6 +154,50 @@ class LeaveRequestController extends Controller
             'pendingApprovalCount' => $pendingApprovalCount,
             'approvedThisMonth' => (float) $approvedThisMonth,
         ]);
+    }
+
+    /**
+     * Đơn tăng ca hiển thị chung danh sách: chỉ lấy các đơn nằm trong khoảng thời gian của trang hiện tại.
+     */
+    private function overtimeRowsFor(User $user, string $tab, string $status, string $requestType, ?int $userId, $leaveRequests)
+    {
+        if ($requestType !== '' && $requestType !== 'overtime') {
+            return collect();
+        }
+
+        $query = OvertimeRequest::query()
+            ->with(['user.department', 'approver', 'approvedBy'])
+            ->orderByDesc('created_at');
+
+        if ($tab === 'mine') {
+            $query->where('user_id', $user->id);
+        } elseif ($tab === 'approval') {
+            $this->overtimeAccess->scopeReviewable($query, $user);
+        } elseif ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        if ($status !== '') {
+            $query->where('status', $status);
+        }
+
+        $items = $leaveRequests->getCollection();
+
+        if ($items->isNotEmpty()) {
+            if ($leaveRequests->hasMorePages()) {
+                $query->where('created_at', '>', $items->last()->created_at);
+            }
+
+            if ($leaveRequests->currentPage() > 1) {
+                $query->where('created_at', '<=', $items->first()->created_at);
+            }
+        } elseif ($leaveRequests->currentPage() > 1) {
+            return collect();
+        }
+
+        return $query->limit(100)->get()->each(function (OvertimeRequest $overtime) use ($user): void {
+            $overtime->setAttribute('_can_approve', $overtime->status === 'pending' && $this->overtimeAccess->canApprove($user, $overtime));
+        });
     }
 
     public function create(Request $request)
