@@ -251,7 +251,14 @@ final class OrderItemSyncService
         [$unitPrice, $vatPercent] = $this->applyTierPrice($row, $tierPrices, $unitPrice, $vatPercent);
 
         $subtotal = $unitPrice * $quantity;
-        $discount = min($subtotal, ($subtotal * (float) $row['discount_percent'] / 100) + (float) $row['discount_amount']);
+        // discount_amount là "Giảm tiền / SP" (nhân số lượng) và ưu tiên hơn giảm % — khớp form,
+        // OrderItemCalculator::calcLineTotal và phần tách VAT ở trang chi tiết đơn.
+        $discount = min(
+            $subtotal,
+            (float) $row['discount_amount'] > 0
+                ? (float) $row['discount_amount'] * $quantity
+                : $subtotal * (float) $row['discount_percent'] / 100
+        );
         $total = max(0.0, $subtotal - $discount);
 
         $tax = 0.0;
