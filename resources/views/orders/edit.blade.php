@@ -11,11 +11,12 @@
 
 @section('content')
 <link rel="stylesheet" href="{{ asset('css/ego-order.css') }}?v={{ filemtime(public_path('css/ego-order.css')) }}">
+<link rel="stylesheet" href="{{ asset('css/order-create-pro-v4.css') }}?v={{ filemtime(public_path('css/order-create-pro-v4.css')) }}">
 
 {{-- tw:py-4 — khoảng hở dọc chuẩn của trang. Thiếu nó thì nội dung dính sát
      thanh trên cùng, không có chỗ thở. Đo được 32 trang bị vậy; giá trị này là
      quy ước đang dùng nhiều nhất trong repo (29 trang). --}}
-<div class="container-fluid tw:px-6 ego-order tw:py-4">
+<div class="container-fluid tw:px-6 ego-order oc-shell tw:py-4">
   <div class="ego-topbar">
     <div class="ego-topbar__left">
       <div class="ego-topbar__icon"><i class="bi bi-receipt-cutoff"></i></div>
